@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel Uploader - Çıkış Yapılıyor</title>
+    <link rel="stylesheet" href="css/site.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <h1><i class="fas fa-file-excel"></i> Excel Uploader</h1>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <div style="max-width: 500px; margin: 0 auto; text-align: center;">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">
+                            <i class="fas fa-sign-out-alt"></i> Çıkış Yapılıyor
+                        </h2>
+                    </div>
+                    <div class="card-body">
+                        <div style="margin: 2rem 0;">
+                            <div class="spinner"></div>
+                        </div>
+                        <p>Güvenli bir şekilde çıkış yapılıyor...</p>
+                        <p style="color: #666; font-size: 0.9rem;">Birkaç saniye sonra ana sayfaya yönlendirileceksiniz.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer style="background: #333; color: white; text-align: center; padding: 1rem 0; margin-top: 2rem;">
+        <div class="container">
+            <p>&copy; 2024 Excel Uploader. Tüm hakları saklıdır.</p>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="js/site.js"></script>
+    <script>
+        // Auto logout and redirect
+        document.addEventListener('DOMContentLoaded', function() {
+            // Clear authentication data
+            localStorage.removeItem('authToken');
+            
+            // Show logout message
+            setTimeout(function() {
+                // Redirect to home page
+                window.location.href = 'index.html';
+            }, 2000);
+        });
+    </script>
+</body>
+</html>

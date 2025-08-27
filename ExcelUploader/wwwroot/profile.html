@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel Uploader - Profil</title>
+    <link rel="stylesheet" href="css/site.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <h1><i class="fas fa-file-excel"></i> Excel Uploader</h1>
+        </div>
+    </header>
+
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="container">
+            <ul class="nav-list">
+                <li class="nav-item">
+                    <a href="index.html" class="nav-link">
+                        <i class="fas fa-home"></i> Ana Sayfa
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="upload.html" class="nav-link">
+                        <i class="fas fa-upload"></i> Dosya Yükle
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="data.html" class="nav-link">
+                        <i class="fas fa-database"></i> Veri Görüntüle
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="tables.html" class="nav-link">
+                        <i class="fas fa-table"></i> Dinamik Tablolar
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="profile.html" class="nav-link active">
+                        <i class="fas fa-user"></i> <span id="userName">Profil</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="logout.html" class="nav-link">
+                        <i class="fas fa-sign-out-alt"></i> Çıkış Yap
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <div style="max-width: 800px; margin: 0 auto;">
+                <!-- User Profile -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">
+                            <i class="fas fa-user"></i> Kullanıcı Profili
+                        </h2>
+                    </div>
+                    <div class="card-body">
+                        <div id="profileInfo">
+                            <div style="text-align: center; color: #666; padding: 2rem;">
+                                <i class="fas fa-spinner fa-spin" style="font-size: 2rem; margin-bottom: 1rem;"></i>
+                                <p>Profil bilgileri yükleniyor...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Change Password -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            <i class="fas fa-lock"></i> Şifre Değiştir
+                        </h3>
+                    </div>
+                    <div class="card-body">
+                        <form id="changePasswordForm">
+                            <div class="form-group">
+                                <label for="currentPassword" class="form-label">
+                                    <i class="fas fa-key"></i> Mevcut Şifre
+                                </label>
+                                <input type="password" id="currentPassword" name="currentPassword" class="form-control" required>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="newPassword" class="form-label">
+                                    <i class="fas fa-lock"></i> Yeni Şifre
+                                </label>
+                                <input type="password" id="newPassword" name="newPassword" class="form-control" required minlength="6">
+                                <small style="color: #666; font-size: 0.9rem;">
+                                    Şifre en az 6 karakter olmalıdır
+                                </small>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="confirmNewPassword" class="form-label">
+                                    <i class="fas fa-lock"></i> Yeni Şifre Onayı
+                                </label>
+                                <input type="password" id="confirmNewPassword" name="confirmNewPassword" class="form-control" required>
+                            </div>
+
+                            <div class="form-group">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-save"></i> Şifreyi Değiştir
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Account Statistics -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">
+                            <i class="fas fa-chart-bar"></i> Hesap İstatistikleri
+                        </h3>
+                    </div>
+                    <div class="card-body">
+                        <div id="accountStats" class="stats-grid">
+                            <div class="stat-card">
+                                <div class="stat-number" id="totalUploads">0</div>
+                                <div class="stat-label">Toplam Yükleme</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-number" id="totalRecords">0</div>
+                                <div class="stat-label">Toplam Kayıt</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-number" id="totalTables">0</div>
+                                <div class="stat-label">Toplam Tablo</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-number" id="lastLogin">N/A</div>
+                                <div class="stat-label">Son Giriş</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer style="background: #333; color: white; text-align: center; padding: 1rem 0; margin-top: 2rem;">
+        <div class="container">
+            <p>&copy; 2024 Excel Uploader. Tüm hakları saklıdır.</p>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="js/site.js"></script>
+    <script>
+        // Load profile when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            loadProfile();
+            loadAccountStats();
+            setupEventListeners();
+        });
+
+        // Setup event listeners
+        function setupEventListeners() {
+            document.getElementById('changePasswordForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                changePassword();
+            });
+        }
+
+        // Load profile
+        async function loadProfile() {
+            try {
+                const response = await fetch('/api/account/profile', {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                    }
+                });
+
+                if (response.ok) {
+                    const profile = await response.json();
+                    displayProfile(profile);
+                } else {
+                    showMessage('Profil bilgileri yüklenirken hata oluştu', 'error');
+                }
+            } catch (error) {
+                console.error('Profile load error:', error);
+                showMessage('Profil bilgileri yüklenirken hata oluştu', 'error');
+            }
+        }
+
+        // Display profile
+        function displayProfile(profile) {
+            const container = document.getElementById('profileInfo');
+            
+            container.innerHTML = `
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;">
+                    <div>
+                        <div class="form-group">
+                            <label class="form-label">
+                                <i class="fas fa-user"></i> Ad
+                            </label>
+                            <input type="text" value="${profile.firstName || ''}" class="form-control" readonly>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">
+                                <i class="fas fa-user"></i> Soyad
+                            </label>
+                            <input type="text" value="${profile.lastName || ''}" class="form-control" readonly>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">
+                                <i class="fas fa-envelope"></i> E-posta
+                            </label>
+                            <input type="email" value="${profile.email || ''}" class="form-control" readonly>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <div class="form-group">
+                            <label class="form-label">
+                                <i class="fas fa-calendar"></i> Kayıt Tarihi
+                            </label>
+                            <input type="text" value="${profile.createdAt ? formatDate(profile.createdAt) : 'N/A'}" class="form-control" readonly>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">
+                                <i class="fas fa-clock"></i> Son Güncelleme
+                            </label>
+                            <input type="text" value="${profile.updatedAt ? formatDate(profile.updatedAt) : 'N/A'}" class="form-control" readonly>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">
+                                <i class="fas fa-check-circle"></i> E-posta Onayı
+                            </label>
+                            <input type="text" value="${profile.emailConfirmed ? 'Onaylandı' : 'Onaylanmadı'}" class="form-control" readonly>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Load account stats
+        async function loadAccountStats() {
+            try {
+                const response = await fetch('/api/account/stats', {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                    }
+                });
+
+                if (response.ok) {
+                    const stats = await response.json();
+                    displayAccountStats(stats);
+                } else {
+                    showMessage('İstatistikler yüklenirken hata oluştu', 'error');
+                }
+            } catch (error) {
+                console.error('Stats load error:', error);
+                showMessage('İstatistikler yüklenirken hata oluştu', 'error');
+            }
+        }
+
+        // Display account stats
+        function displayAccountStats(stats) {
+            if (stats.totalUploads !== undefined) {
+                document.getElementById('totalUploads').textContent = stats.totalUploads;
+            }
+            if (stats.totalRecords !== undefined) {
+                document.getElementById('totalRecords').textContent = stats.totalRecords;
+            }
+            if (stats.totalTables !== undefined) {
+                document.getElementById('totalTables').textContent = stats.totalTables;
+            }
+            if (stats.lastLogin !== undefined) {
+                document.getElementById('lastLogin').textContent = formatDate(stats.lastLogin);
+            }
+        }
+
+        // Change password
+        async function changePassword() {
+            const currentPassword = document.getElementById('currentPassword').value;
+            const newPassword = document.getElementById('newPassword').value;
+            const confirmNewPassword = document.getElementById('confirmNewPassword').value;
+
+            if (newPassword !== confirmNewPassword) {
+                showMessage('Yeni şifreler eşleşmiyor', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/account/change-password', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                    },
+                    body: JSON.stringify({
+                        currentPassword,
+                        newPassword
+                    })
+                });
+
+                if (response.ok) {
+                    showMessage('Şifre başarıyla değiştirildi', 'success');
+                    document.getElementById('changePasswordForm').reset();
+                } else {
+                    const error = await response.json();
+                    showMessage(error.message || 'Şifre değiştirilirken hata oluştu', 'error');
+                }
+            } catch (error) {
+                console.error('Change password error:', error);
+                showMessage('Şifre değiştirilirken hata oluştu', 'error');
+            }
+        }
+
+        // Show message
+        function showMessage(message, type) {
+            // You can implement a toast or alert system here
+            console.log(`${type}: ${message}`);
+        }
+
+        // Format date
+        function formatDate(dateString) {
+            return new Date(dateString).toLocaleDateString('tr-TR');
+        }
+    </script>
+</body>
+</html>

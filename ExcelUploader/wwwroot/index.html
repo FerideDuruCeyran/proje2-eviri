@@ -4,10 +4,338 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Excel Uploader - Ana Sayfa</title>
-    <link rel="stylesheet" href="/css/site.css">
+    <link rel="stylesheet" href="css/site.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
+<style>
+    /* Reset and base styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    line-height: 1.6;
+    color: #333;
+    background-color: #f8f9fa;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 15px;
+}
+
+/* Header styles */
+.header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 1rem 0;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.header h1 {
+    margin: 0;
+    font-size: 2rem;
+    font-weight: 300;
+}
+
+/* Navigation */
+.nav {
+    background: white;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    padding: 0.5rem 0;
+}
+
+.nav-list {
+    list-style: none;
+    display: flex;
+    gap: 2rem;
+    margin: 0;
+    padding: 0;
+}
+
+.nav-item a {
+    text-decoration: none;
+    color: #333;
+    font-weight: 500;
+    padding: 0.5rem 1rem;
+    border-radius: 5px;
+    transition: all 0.3s ease;
+}
+
+.nav-item a:hover {
+    background-color: #667eea;
+    color: white;
+}
+
+/* Main content */
+.main-content {
+    padding: 2rem 0;
+    min-height: calc(100vh - 200px);
+}
+
+/* Card styles */
+.card {
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    padding: 2rem;
+    margin-bottom: 2rem;
+}
+
+.card-header {
+    border-bottom: 2px solid #f0f0f0;
+    padding-bottom: 1rem;
+    margin-bottom: 1.5rem;
+}
+
+.card-title {
+    font-size: 1.5rem;
+    color: #333;
+    margin: 0;
+}
+
+/* Form styles */
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: #555;
+}
+
+.form-control {
+    width: 100%;
+    padding: 0.75rem;
+    border: 2px solid #e1e5e9;
+    border-radius: 5px;
+    font-size: 1rem;
+    transition: border-color 0.3s ease;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+/* Button styles */
+.btn {
+    display: inline-block;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 5px;
+    font-size: 1rem;
+    font-weight: 500;
+    text-decoration: none;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: center;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-success {
+    background: #28a745;
+    color: white;
+}
+
+.btn-danger {
+    background: #dc3545;
+    color: white;
+}
+
+/* Table styles */
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1rem;
+}
+
+.table th,
+.table td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid #e1e5e9;
+}
+
+.table th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+    color: #555;
+}
+
+.table tbody tr:hover {
+    background-color: #f8f9fa;
+}
+
+/* Alert styles */
+.alert {
+    padding: 1rem;
+    border-radius: 5px;
+    margin-bottom: 1rem;
+}
+
+.alert-success {
+    background-color: #d4edda;
+    border: 1px solid #c3e6cb;
+    color: #155724;
+}
+
+.alert-danger {
+    background-color: #f8d7da;
+    border: 1px solid #f5c6cb;
+    color: #721c24;
+}
+
+.alert-warning {
+    background-color: #fff3cd;
+    border: 1px solid #ffeaa7;
+    color: #856404;
+}
+
+/* Dashboard stats */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    text-align: center;
+}
+
+.stat-number {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #667eea;
+    margin-bottom: 0.5rem;
+}
+
+.stat-label {
+    color: #666;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* File upload area */
+.upload-area {
+    border: 2px dashed #667eea;
+    border-radius: 10px;
+    padding: 3rem;
+    text-align: center;
+    background-color: #f8f9ff;
+    transition: all 0.3s ease;
+}
+
+.upload-area:hover {
+    border-color: #764ba2;
+    background-color: #f0f2ff;
+}
+
+.upload-icon {
+    font-size: 3rem;
+    color: #667eea;
+    margin-bottom: 1rem;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .nav-list {
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+    
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .card {
+        padding: 1rem;
+    }
+}
+
+/* Loading spinner */
+.spinner {
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #667eea;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+    margin: 0 auto;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Modal styles */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.5);
+}
+
+.modal-content {
+    background-color: white;
+    margin: 5% auto;
+    padding: 2rem;
+    border-radius: 10px;
+    width: 90%;
+    max-width: 600px;
+    position: relative;
+}
+
+.modal-close {
+    position: absolute;
+    right: 1rem;
+    top: 1rem;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #666;
+}
+
+.modal-close:hover {
+    color: #333;
+}
+
+</style>
 <body>
+
+
+
     <!-- Header -->
     <header class="header">
         <div class="container">
@@ -20,42 +348,42 @@
         <div class="container">
             <ul class="nav-list">
                 <li class="nav-item">
-                    <a href="/" class="nav-link active">
+                    <a href="index.html" class="nav-link active">
                         <i class="fas fa-home"></i> Ana Sayfa
                     </a>
                 </li>
                 <li class="nav-item auth-only" style="display: none;">
-                    <a href="/upload" class="nav-link">
+                    <a href="upload.html" class="nav-link">
                         <i class="fas fa-upload"></i> Dosya Yükle
                     </a>
                 </li>
                 <li class="nav-item auth-only" style="display: none;">
-                    <a href="/data" class="nav-link">
+                    <a href="data.html" class="nav-link">
                         <i class="fas fa-database"></i> Veri Görüntüle
                     </a>
                 </li>
                 <li class="nav-item auth-only" style="display: none;">
-                    <a href="/tables" class="nav-link">
+                    <a href="tables.html" class="nav-link">
                         <i class="fas fa-table"></i> Dinamik Tablolar
                     </a>
                 </li>
                 <li class="nav-item unauth-only">
-                    <a href="/login" class="nav-link">
+                    <a href="login.html" class="nav-link">
                         <i class="fas fa-sign-in-alt"></i> Giriş Yap
                     </a>
                 </li>
                 <li class="nav-item unauth-only">
-                    <a href="/register" class="nav-link">
+                    <a href="register.html" class="nav-link">
                         <i class="fas fa-user-plus"></i> Kayıt Ol
                     </a>
                 </li>
                 <li class="nav-item auth-only" style="display: none;">
-                    <a href="/profile" class="nav-link">
+                    <a href="profile.html" class="nav-link">
                         <i class="fas fa-user"></i> <span id="userName">Profil</span>
                     </a>
                 </li>
                 <li class="nav-item auth-only" style="display: none;">
-                    <a href="/logout" class="nav-link">
+                    <a href="logout.html" class="nav-link">
                         <i class="fas fa-sign-out-alt"></i> Çıkış Yap
                     </a>
                 </li>
@@ -74,10 +402,10 @@
                 <div class="card-body">
                     <p>Excel dosyalarınızı yüklemek ve verilerinizi yönetmek için lütfen giriş yapın veya kayıt olun.</p>
                     <div style="text-align: center; margin-top: 2rem;">
-                        <a href="/login" class="btn btn-primary" style="margin-right: 1rem;">
+                        <a href="login.html" class="btn btn-primary" style="margin-right: 1rem;">
                             <i class="fas fa-sign-in-alt"></i> Giriş Yap
                         </a>
-                        <a href="/register" class="btn btn-secondary">
+                        <a href="register.html" class="btn btn-secondary">
                             <i class="fas fa-user-plus"></i> Kayıt Ol
                         </a>
                     </div>
@@ -117,13 +445,13 @@
                     </div>
                     <div class="card-body">
                         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
-                            <a href="/upload" class="btn btn-primary" style="display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                            <a href="upload.html" class="btn btn-primary" style="display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
                                 <i class="fas fa-upload"></i> Excel Dosyası Yükle
                             </a>
-                            <a href="/data" class="btn btn-secondary" style="display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                            <a href="data.html" class="btn btn-secondary" style="display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
                                 <i class="fas fa-database"></i> Veri Görüntüle
                             </a>
-                            <a href="/tables" class="btn btn-success" style="display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                            <a href="tables.html" class="btn btn-success" style="display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
                                 <i class="fas fa-table"></i> Dinamik Tablolar
                             </a>
                         </div>
@@ -182,7 +510,7 @@
     </footer>
 
     <!-- Scripts -->
-    <script src="/js/site.js"></script>
+    <script src="js/site.js"></script>
     <script>
         // Load dashboard data when page loads
         document.addEventListener('DOMContentLoaded', function() {
