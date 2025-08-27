@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel Uploader - Dosya Yükle</title>
+    <link rel="stylesheet" href="/css/site.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <h1><i class="fas fa-file-excel"></i> Excel Uploader</h1>
+        </div>
+    </header>
+
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="container">
+            <ul class="nav-list">
+                <li class="nav-item">
+                    <a href="/" class="nav-link">
+                        <i class="fas fa-home"></i> Ana Sayfa
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="/upload" class="nav-link active">
+                        <i class="fas fa-upload"></i> Dosya Yükle
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="/data" class="nav-link">
+                        <i class="fas fa-database"></i> Veri Görüntüle
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="/tables" class="nav-link">
+                        <i class="fas fa-table"></i> Dinamik Tablolar
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="/profile" class="nav-link">
+                        <i class="fas fa-user"></i> <span id="userName">Profil</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="/logout" class="nav-link">
+                        <i class="fas fa-sign-out-alt"></i> Çıkış Yap
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <i class="fas fa-upload"></i> Excel Dosyası Yükle
+                    </h2>
+                </div>
+                <div class="card-body">
+                    <!-- Upload Instructions -->
+                    <div style="background: #f8f9ff; border: 1px solid #e1e5e9; border-radius: 8px; padding: 1.5rem; margin-bottom: 2rem;">
+                        <h4 style="color: #667eea; margin-bottom: 1rem;">
+                            <i class="fas fa-info-circle"></i> Yükleme Kuralları
+                        </h4>
+                        <ul style="margin: 0; padding-left: 1.5rem; color: #555;">
+                            <li>Sadece Excel dosyaları (.xlsx, .xls) yüklenebilir</li>
+                            <li>Maksimum dosya boyutu: 50MB</li>
+                            <li>Dosya ilk satırında sütun başlıkları bulunmalıdır</li>
+                            <li>Desteklenen veri tipleri: Metin, Sayı, Tarih</li>
+                        </ul>
+                    </div>
+
+                    <!-- Upload Form -->
+                    <form id="uploadForm">
+                        <div class="form-group">
+                            <label for="description" class="form-label">
+                                <i class="fas fa-comment"></i> Açıklama (Opsiyonel)
+                            </label>
+                            <textarea id="description" name="description" class="form-control" rows="3" 
+                                      placeholder="Dosya hakkında açıklama ekleyin..."></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="file" class="form-label">
+                                <i class="fas fa-file"></i> Excel Dosyası Seçin
+                            </label>
+                            <input type="file" id="file" name="file" class="form-control" 
+                                   accept=".xlsx,.xls" required>
+                        </div>
+
+                        <div class="form-group">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-upload"></i> Dosyayı Yükle
+                            </button>
+                        </div>
+                    </form>
+
+                    <!-- Drag & Drop Area -->
+                    <div class="upload-area" id="uploadArea">
+                        <div class="upload-icon">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                        </div>
+                        <h3>Dosyayı buraya sürükleyin</h3>
+                        <p>veya yukarıdaki formu kullanın</p>
+                        <p style="font-size: 0.9rem; color: #666; margin-top: 1rem;">
+                            Desteklenen formatlar: .xlsx, .xls
+                        </p>
+                    </div>
+
+                    <!-- Upload Progress -->
+                    <div id="uploadProgress" style="display: none; margin-top: 2rem;">
+                        <div class="card">
+                            <div class="card-header">
+                                <h4 class="card-title">
+                                    <i class="fas fa-spinner fa-spin"></i> Yükleme İşlemi
+                                </h4>
+                            </div>
+                            <div class="card-body">
+                                <div id="progressMessage">Dosya yükleniyor...</div>
+                                <div style="margin-top: 1rem;">
+                                    <div class="spinner"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recent Uploads -->
+                    <div class="card" style="margin-top: 2rem;">
+                        <div class="card-header">
+                            <h3 class="card-title">
+                                <i class="fas fa-history"></i> Son Yüklenen Dosyalar
+                            </h3>
+                        </div>
+                        <div class="card-body">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Dosya Adı</th>
+                                        <th>Yükleme Tarihi</th>
+                                        <th>Kayıt Sayısı</th>
+                                        <th>Durum</th>
+                                        <th>İşlemler</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="recentUploads">
+                                    <tr>
+                                        <td colspan="5" style="text-align: center; color: #666;">
+                                            Henüz dosya yüklenmemiş
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer style="background: #333; color: white; text-align: center; padding: 1rem 0; margin-top: 2rem;">
+        <div class="container">
+            <p>&copy; 2024 Excel Uploader. Tüm hakları saklıdır.</p>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="/js/site.js"></script>
+    <script>
+        // Load recent uploads when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            loadRecentUploads();
+        });
+
+        // Load recent uploads
+        async function loadRecentUploads() {
+            try {
+                const response = await fetch('/api/excel/recent-uploads', {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                    }
+                });
+
+                if (response.ok) {
+                    const uploads = await response.json();
+                    updateRecentUploadsTable(uploads);
+                }
+            } catch (error) {
+                console.error('Recent uploads load error:', error);
+            }
+        }
+
+        // Update recent uploads table
+        function updateRecentUploadsTable(uploads) {
+            const container = document.getElementById('recentUploads');
+            if (!container) return;
+
+            if (uploads.length === 0) {
+                container.innerHTML = `
+                    <tr>
+                        <td colspan="5" style="text-align: center; color: #666;">
+                            Henüz dosya yüklenmemiş
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            container.innerHTML = uploads.map(upload => `
+                <tr>
+                    <td>${upload.fileName}</td>
+                    <td>${formatDate(upload.uploadDate)}</td>
+                    <td>${upload.recordCount}</td>
+                    <td>
+                        <span class="badge badge-${getStatusBadgeClass(upload.status)}">
+                            ${upload.status}
+                        </span>
+                    </td>
+                    <td>
+                        <button class="btn btn-sm btn-secondary" onclick="viewUploadDetails(${upload.id})">
+                            <i class="fas fa-eye"></i> Görüntüle
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // Get status badge class
+        function getStatusBadgeClass(status) {
+            switch (status.toLowerCase()) {
+                case 'completed': return 'success';
+                case 'processing': return 'warning';
+                case 'failed': return 'danger';
+                default: return 'secondary';
+            }
+        }
+
+        // View upload details
+        function viewUploadDetails(uploadId) {
+            // Navigate to data view page with upload filter
+            window.location.href = `/data?uploadId=${uploadId}`;
+        }
+
+        // Show upload progress
+        function showUploadProgress() {
+            document.getElementById('uploadProgress').style.display = 'block';
+            document.getElementById('uploadForm').style.display = 'none';
+        }
+
+        // Hide upload progress
+        function hideUploadProgress() {
+            document.getElementById('uploadProgress').style.display = 'none';
+            document.getElementById('uploadForm').style.display = 'block';
+        }
+
+        // Override handleFileUpload to show progress
+        const originalHandleFileUpload = window.handleFileUpload;
+        window.handleFileUpload = function(file) {
+            showUploadProgress();
+            return originalHandleFileUpload.call(this, file).finally(() => {
+                hideUploadProgress();
+                loadRecentUploads(); // Refresh the table
+            });
+        };
+    </script>
+</body>
+</html>

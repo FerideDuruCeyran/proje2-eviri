@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel Uploader - Ana Sayfa</title>
+    <link rel="stylesheet" href="/css/site.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <h1><i class="fas fa-file-excel"></i> Excel Uploader</h1>
+        </div>
+    </header>
+
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="container">
+            <ul class="nav-list">
+                <li class="nav-item">
+                    <a href="/" class="nav-link active">
+                        <i class="fas fa-home"></i> Ana Sayfa
+                    </a>
+                </li>
+                <li class="nav-item auth-only" style="display: none;">
+                    <a href="/upload" class="nav-link">
+                        <i class="fas fa-upload"></i> Dosya Yükle
+                    </a>
+                </li>
+                <li class="nav-item auth-only" style="display: none;">
+                    <a href="/data" class="nav-link">
+                        <i class="fas fa-database"></i> Veri Görüntüle
+                    </a>
+                </li>
+                <li class="nav-item auth-only" style="display: none;">
+                    <a href="/tables" class="nav-link">
+                        <i class="fas fa-table"></i> Dinamik Tablolar
+                    </a>
+                </li>
+                <li class="nav-item unauth-only">
+                    <a href="/login" class="nav-link">
+                        <i class="fas fa-sign-in-alt"></i> Giriş Yap
+                    </a>
+                </li>
+                <li class="nav-item unauth-only">
+                    <a href="/register" class="nav-link">
+                        <i class="fas fa-user-plus"></i> Kayıt Ol
+                    </a>
+                </li>
+                <li class="nav-item auth-only" style="display: none;">
+                    <a href="/profile" class="nav-link">
+                        <i class="fas fa-user"></i> <span id="userName">Profil</span>
+                    </a>
+                </li>
+                <li class="nav-item auth-only" style="display: none;">
+                    <a href="/logout" class="nav-link">
+                        <i class="fas fa-sign-out-alt"></i> Çıkış Yap
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <!-- Welcome Section for Unauthenticated Users -->
+            <div class="card unauth-only">
+                <div class="card-header">
+                    <h2 class="card-title">Excel Uploader'a Hoş Geldiniz</h2>
+                </div>
+                <div class="card-body">
+                    <p>Excel dosyalarınızı yüklemek ve verilerinizi yönetmek için lütfen giriş yapın veya kayıt olun.</p>
+                    <div style="text-align: center; margin-top: 2rem;">
+                        <a href="/login" class="btn btn-primary" style="margin-right: 1rem;">
+                            <i class="fas fa-sign-in-alt"></i> Giriş Yap
+                        </a>
+                        <a href="/register" class="btn btn-secondary">
+                            <i class="fas fa-user-plus"></i> Kayıt Ol
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dashboard for Authenticated Users -->
+            <div class="auth-only" style="display: none;">
+                <!-- Stats Grid -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-number" id="totalRecords">0</div>
+                        <div class="stat-label">Toplam Kayıt</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="processedRecords">0</div>
+                        <div class="stat-label">İşlenen Kayıt</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="pendingRecords">0</div>
+                        <div class="stat-label">Bekleyen Kayıt</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="totalGrantAmount">₺0</div>
+                        <div class="stat-label">Toplam Burs Miktarı</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number" id="totalPaidAmount">₺0</div>
+                        <div class="stat-label">Toplam Ödenen Miktar</div>
+                    </div>
+                </div>
+
+                <!-- Quick Actions -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Hızlı İşlemler</h3>
+                    </div>
+                    <div class="card-body">
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                            <a href="/upload" class="btn btn-primary" style="display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                                <i class="fas fa-upload"></i> Excel Dosyası Yükle
+                            </a>
+                            <a href="/data" class="btn btn-secondary" style="display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                                <i class="fas fa-database"></i> Veri Görüntüle
+                            </a>
+                            <a href="/tables" class="btn btn-success" style="display: flex; align-items: center; justify-content: center; gap: 0.5rem;">
+                                <i class="fas fa-table"></i> Dinamik Tablolar
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Uploads -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Son Yüklenen Dosyalar</h3>
+                    </div>
+                    <div class="card-body">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Dosya Adı</th>
+                                    <th>Yükleme Tarihi</th>
+                                    <th>Kayıt Sayısı</th>
+                                    <th>Durum</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recentUploads">
+                                <tr>
+                                    <td colspan="4" style="text-align: center; color: #666;">
+                                        Henüz dosya yüklenmemiş
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Dynamic Tables Overview -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">Dinamik Tablolar</h3>
+                    </div>
+                    <div class="card-body">
+                        <div id="dynamicTables" class="stats-grid">
+                            <div class="stat-card">
+                                <div class="stat-number">0</div>
+                                <div class="stat-label">Henüz tablo oluşturulmamış</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer style="background: #333; color: white; text-align: center; padding: 1rem 0; margin-top: 2rem;">
+        <div class="container">
+            <p>&copy; 2024 Excel Uploader. Tüm hakları saklıdır.</p>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="/js/site.js"></script>
+    <script>
+        // Load dashboard data when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            if (isAuthenticated) {
+                loadDashboardData();
+            }
+        });
+    </script>
+</body>
+</html>

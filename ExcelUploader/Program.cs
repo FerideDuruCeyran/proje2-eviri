@@ -81,6 +81,9 @@ if (!app.Environment.IsDevelopment())
 
 app.UseRouting();
 
+// Serve static files
+app.UseStaticFiles();
+
 app.UseAuthentication();
 app.UseAuthorization();
 
