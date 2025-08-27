@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Server.IIS;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -39,12 +40,16 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
     });
 
-// Add Authorization - Require authentication for all pages
+// Add Authorization - Allow anonymous access to login and register
 builder.Services.AddAuthorization(options =>
 {
     options.FallbackPolicy = new AuthorizationPolicyBuilder()
         .RequireAuthenticatedUser()
         .Build();
+    
+    // Allow anonymous access to specific endpoints
+    options.AddPolicy("AllowAnonymous", policy =>
+        policy.RequireAssertion(_ => true));
 });
 
 // Add Services
@@ -54,7 +59,7 @@ builder.Services.AddScoped<IPortService, PortService>();
 builder.Services.AddScoped<IDynamicTableService, DynamicTableService>();
 
 // Add AutoMapper
-builder.Services.AddAutoMapper(typeof(Program));
+builder.Services.AddAutoMapper(typeof(Program).Assembly);
 
 // Add File Upload Configuration
 builder.Services.Configure<IISServerOptions>(options =>
@@ -83,7 +88,12 @@ app.UseAuthorization();
 app.MapControllers();
 
 // Map minimal API endpoints
-app.MapGet("/", () => Results.Redirect("/api/home"));
+app.MapGet("/", () => Results.Ok(new { 
+    message = "Excel Uploader API is running",
+    version = "9.0",
+    timestamp = DateTime.UtcNow,
+    status = "Healthy"
+}));
 app.MapGet("/health", () => Results.Ok(new { 
     message = "Excel Uploader API is running",
     version = "9.0",

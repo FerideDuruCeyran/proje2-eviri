@@ -129,9 +129,9 @@ namespace ExcelUploader.Controllers
 
             var profileModel = new ProfileViewModel
             {
-                FirstName = user.FirstName,
-                LastName = user.LastName,
-                Email = user.Email,
+                FirstName = user.FirstName ?? string.Empty,
+                LastName = user.LastName ?? string.Empty,
+                Email = user.Email ?? string.Empty,
                 CreatedAt = user.CreatedAt,
                 IsActive = user.IsActive
             };

@@ -202,8 +202,33 @@ namespace ExcelUploader.Controllers
             return RedirectToAction(nameof(Index));
         }
 
+        [HttpPost]
+        public async Task<IActionResult> GetTableData([FromBody] GetTableDataRequest request)
+        {
+            try
+            {
+                var data = await _dynamicTableService.GetTableDataAsync(request.TableName, request.Page, request.PageSize);
+                var totalCount = await _dynamicTableService.GetTableDataCountAsync(request.TableName);
+
+                return Json(new
+                {
+                    success = true,
+                    data = data,
+                    totalCount = totalCount,
+                    currentPage = request.Page,
+                    pageSize = request.PageSize,
+                    totalPages = (int)Math.Ceiling((double)totalCount / request.PageSize)
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting table data for AJAX: {TableName}", request.TableName);
+                return Json(new { success = false, message = "Veri yüklenirken hata oluştu." });
+            }
+        }
+
         [HttpGet]
-        public async Task<IActionResult> GetTableData(string tableName, int page = 1, int pageSize = 50)
+        public async Task<IActionResult> GetTableDataGet(string tableName, int page = 1, int pageSize = 50)
         {
             try
             {

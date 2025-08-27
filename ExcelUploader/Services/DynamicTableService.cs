@@ -229,7 +229,12 @@ namespace ExcelUploader.Services
                     var row = new Dictionary<string, object>();
                     for (int i = 0; i < reader.FieldCount; i++)
                     {
-                        row[reader.GetName(i)] = reader.IsDBNull(i) ? null : reader.GetValue(i);
+                        var columnName = reader.GetName(i);
+                        if (columnName != null)
+                        {
+                            var value = reader.IsDBNull(i) ? null : reader.GetValue(i);
+                            row[columnName] = value ?? DBNull.Value;
+                        }
                     }
                     data.Add(row);
                 }
@@ -523,7 +528,7 @@ namespace ExcelUploader.Services
             return insertSql;
         }
 
-        private string GetCellValue(ExcelWorksheet worksheet, int row, int col)
+        private string? GetCellValue(ExcelWorksheet worksheet, int row, int col)
         {
             var cell = worksheet.Cells[row, col];
             return cell.Value?.ToString();

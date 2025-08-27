@@ -115,10 +115,37 @@ namespace ExcelUploader.Controllers
             }
         }
 
+        [HttpPost]
+        [Route("data")]
+        [Authorize]
+        public async Task<IActionResult> Data([FromBody] DataRequest request)
+        {
+            try
+            {
+                if (request.TableId.HasValue)
+                {
+                    var table = await _dynamicTableService.GetTableByIdAsync(request.TableId.Value);
+                    if (table == null)
+                    {
+                        return NotFound(new { error = "Tablo bulunamadı" });
+                    }
+                    return Ok(table);
+                }
+
+                var tables = await _dynamicTableService.GetAllTablesAsync();
+                return Ok(tables);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error loading data");
+                return StatusCode(500, new { error = "Veri yüklenirken hata oluştu" });
+            }
+        }
+
         [HttpGet]
         [Route("data")]
         [Authorize]
-        public async Task<IActionResult> Data(int? tableId = null)
+        public async Task<IActionResult> DataGet(int? tableId = null)
         {
             try
             {

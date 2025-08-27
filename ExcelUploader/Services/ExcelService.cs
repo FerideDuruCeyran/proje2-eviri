@@ -328,21 +328,21 @@ namespace ExcelUploader.Services
             return await Task.FromResult(new List<ExcelData>());
         }
 
-        public async Task<bool> ValidateExcelFileAsync(IFormFile file)
+        public Task<bool> ValidateExcelFileAsync(IFormFile file)
         {
             if (file == null || file.Length == 0)
-                return false;
+                return Task.FromResult(false);
 
             var allowedExtensions = new[] { ".xlsx", ".xls" };
             var fileExtension = Path.GetExtension(file.FileName).ToLowerInvariant();
             
             if (!allowedExtensions.Contains(fileExtension))
-                return false;
+                return Task.FromResult(false);
 
             if (file.Length > 50 * 1024 * 1024) // 50MB limit
-                return false;
+                return Task.FromResult(false);
 
-            return true;
+            return Task.FromResult(true);
         }
 
         public async Task<string> GetFileSummaryAsync(IFormFile file)

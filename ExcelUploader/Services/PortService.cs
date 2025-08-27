@@ -107,17 +107,8 @@ namespace ExcelUploader.Services
             try
             {
                 using var client = new TcpClient();
-                var result = client.BeginConnect(IPAddress.Loopback, port, null, null);
-                var success = result.AsyncWaitHandle.WaitOne(TimeSpan.FromMilliseconds(1000));
-                
-                if (success)
-                {
-                    client.EndConnect(result);
-                    client.Close();
-                    return true;
-                }
-                
-                return false;
+                await client.ConnectAsync(IPAddress.Loopback, port);
+                return true;
             }
             catch
             {

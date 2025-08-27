@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Http;
 
 namespace ExcelUploader.Models
 {
@@ -50,47 +51,55 @@ namespace ExcelUploader.Models
     public class EditDataViewModel
     {
         public int Id { get; set; }
-        
-        [Display(Name = "Başvuru Yılı")]
-        public string? BasvuruYili { get; set; }
-        
-        [Display(Name = "Hareketlilik Tipi")]
-        public string? HareketlilikTipi { get; set; }
-        
-        [Display(Name = "Başvuru Tipi")]
-        public string? BasvuruTipi { get; set; }
-        
-        [Display(Name = "Ad")]
         public string? Ad { get; set; }
-        
-        [Display(Name = "Soyad")]
         public string? Soyad { get; set; }
-        
-        [Display(Name = "Ödeme Tipi")]
+        public string? TCKimlikNo { get; set; }
+        public string? OgrenciNo { get; set; }
+        public string? BasvuruYili { get; set; }
+        public string? HareketlilikTipi { get; set; }
+        public string? BasvuruTipi { get; set; }
         public string? OdemeTipi { get; set; }
-        
-        [Display(Name = "Taksit")]
         public string? Taksit { get; set; }
-        
-        [Display(Name = "Ödenecek")]
         public decimal? Odenecek { get; set; }
-        
-        [Display(Name = "Ödenen")]
         public decimal? Odendiginde { get; set; }
-        
-        [Display(Name = "Ödeme Tarihi")]
         public DateTime? OdemeTarihi { get; set; }
-        
-        [Display(Name = "Açıklama")]
         public string? Aciklama { get; set; }
-        
-        [Display(Name = "Ödeme Oranı")]
         public decimal? OdemeOrani { get; set; }
-        
-        public string FileName { get; set; } = string.Empty;
-        public DateTime UploadDate { get; set; }
-        public string UploadedBy { get; set; } = string.Empty;
-        public int RowNumber { get; set; }
+        public string? KullaniciAdi { get; set; }
+        public string? PasaportNo { get; set; }
+        public DateTime? DogumTarihi { get; set; }
+        public string? DogumYeri { get; set; }
+        public string? Cinsiyet { get; set; }
+        public string? AdresIl { get; set; }
+        public string? AdresUlke { get; set; }
+        public string? BankaHesapSahibi { get; set; }
+        public string? BankaAdi { get; set; }
+        public string? BankaSubeKodu { get; set; }
+        public string? BankaSubeAdi { get; set; }
+        public string? BankaHesapNumarasi { get; set; }
+        public string? BankaIBANNo { get; set; }
+        public string? FakulteAdi { get; set; }
+        public string? BirimAdi { get; set; }
+        public string? DiplomaDerecesi { get; set; }
+        public string? Sinif { get; set; }
+    }
+
+    public class GetTableDataRequest
+    {
+        public string TableName { get; set; } = string.Empty;
+        public int Page { get; set; } = 1;
+        public int PageSize { get; set; } = 50;
+        public string? SearchTerm { get; set; }
+        public string? SortBy { get; set; }
+        public string? SortOrder { get; set; }
+        public Dictionary<string, object>? Filters { get; set; }
+    }
+
+    public class DataRequest
+    {
+        public int? TableId { get; set; }
+        public string? TableName { get; set; }
+        public Dictionary<string, object>? Filters { get; set; }
     }
 
     public class LoginViewModel
