@@ -1,0 +1,106 @@
+# .NET Core and ASP.NET Core build outputs
+bin/
+obj/
+
+# Visual Studio files
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+.vscode/
+*.csproj.user
+
+# Visual Studio Code
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+
+# NuGet Packages
+*.nupkg
+packages/
+*.nuget.props
+*.nuget.targets
+
+# User-specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Build results
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa]rchive/
+[Bb]uild/
+*.pdb
+*.xml
+*.manifest
+*.json.deps
+*.json.runtimeconfig
+*.json.runtimeconfig.dev
+*.cache
+*.ilk
+*.meta
+*.obj
+*.iobj
+*.ipdb
+*.tlog
+*.log
+.log.
+*.tli
+*.tlh
+*.tmp
+*.tmp_proj
+*_wpftmp.csproj
+*.vsidx
+*.vstmp
+*.pidb
+*.svclog
+*.scc
+
+# Dependency directories
+node_modules/
+bower_components/
+
+# Environment-specific files
+appsettings.*.json
+wwwroot/lib/
+wwwroot/dist/
+wwwroot/build/
+
+# Rider (JetBrains) IDE
+.idea/
+*.sln.iml
+
+# Azure and deployment
+*.publishsettings
+*.pubxml
+*.pubxml.user
+*.azureKeys
+*.azurePipelines.yml
+*.azcli
+
+# Logs and diagnostics
+*.log
+logs/
+*.trx
+*.coverage
+*.coveragexml
+
+# Local environment and secrets
+.env
+.env.*
+*.local
+*.local.json
+*.secrets.json
+
+# Miscellaneous
+*.swp
+*~
+.DS_Store
+Thumbs.db
