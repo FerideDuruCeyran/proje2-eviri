@@ -4,6 +4,11 @@
     <TargetFramework>net9.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <UseRazorBuildServer>false</UseRazorBuildServer>
+    <StaticWebAssetProjectMode>Disabled</StaticWebAssetProjectMode>
+    <GenerateStaticWebAssetsManifest>false</GenerateStaticWebAssetsManifest>
+    <EnableDefaultContentItems>false</EnableDefaultContentItems>
+    <EnableDefaultWebContentItems>false</EnableDefaultWebContentItems>
   </PropertyGroup>
 
   <ItemGroup>
@@ -14,7 +19,6 @@
     <PackageReference Include="ClosedXML" Version="0.102.2" />
     <PackageReference Include="NPOI" Version="2.6.2" />
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="9.0.0" />
-    <PackageReference Include="Microsoft.AspNetCore.Identity.UI" Version="9.0.0" />
     <PackageReference Include="AutoMapper" Version="12.0.1" />
     <PackageReference Include="AutoMapper.Extensions.Microsoft.DependencyInjection" Version="12.0.1" />
   </ItemGroup>

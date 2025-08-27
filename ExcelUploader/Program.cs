@@ -8,7 +8,7 @@ using Microsoft.AspNetCore.Authorization;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddControllersWithViews();
+builder.Services.AddControllers(); // Remove Views, use only Controllers
 
 // Add DbContext
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
@@ -30,20 +30,28 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(options =>
     {
-        options.LoginPath = "/Account/Login";
-        options.LogoutPath = "/Account/Logout";
-        options.AccessDeniedPath = "/Account/AccessDenied";
+        options.LoginPath = "/api/account/login";
+        options.LogoutPath = "/api/account/logout";
+        options.AccessDeniedPath = "/api/account/access-denied";
         options.ExpireTimeSpan = TimeSpan.FromHours(2);
         options.SlidingExpiration = true;
         options.Cookie.HttpOnly = true;
         options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
     });
 
-        // Add Services
-        builder.Services.AddScoped<IExcelService, ExcelService>();
-        builder.Services.AddScoped<IDataImportService, DataImportService>();
-        builder.Services.AddScoped<IPortService, PortService>();
-        builder.Services.AddScoped<IDynamicTableService, DynamicTableService>();
+// Add Authorization - Require authentication for all pages
+builder.Services.AddAuthorization(options =>
+{
+    options.FallbackPolicy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
+});
+
+// Add Services
+builder.Services.AddScoped<IExcelService, ExcelService>();
+builder.Services.AddScoped<IDataImportService, DataImportService>();
+builder.Services.AddScoped<IPortService, PortService>();
+builder.Services.AddScoped<IDynamicTableService, DynamicTableService>();
 
 // Add AutoMapper
 builder.Services.AddAutoMapper(typeof(Program));
@@ -59,24 +67,29 @@ var app = builder.Build();
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
-    app.UseExceptionHandler("/Home/Error");
+    app.UseExceptionHandler("/api/home/error");
     app.UseHsts();
 }
 
-app.UseHttpsRedirection();
-app.UseStaticFiles();
+// Remove HTTPS redirection for development
+// app.UseHttpsRedirection();
 
 app.UseRouting();
 
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Authentication is handled automatically by ASP.NET Core
-// No custom middleware needed
+// Map controllers
+app.MapControllers();
 
-app.MapControllerRoute(
-    name: "default",
-    pattern: "{controller=Home}/{action=Index}/{id?}");
+// Map minimal API endpoints
+app.MapGet("/", () => Results.Redirect("/api/home"));
+app.MapGet("/health", () => Results.Ok(new { 
+    message = "Excel Uploader API is running",
+    version = "9.0",
+    timestamp = DateTime.UtcNow,
+    status = "Healthy"
+}));
 
 // Ensure database is created
 using (var scope = app.Services.CreateScope())

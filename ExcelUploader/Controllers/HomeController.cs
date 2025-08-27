@@ -6,7 +6,9 @@ using System.Security.Claims;
 
 namespace ExcelUploader.Controllers
 {
-    public class HomeController : Controller
+    [ApiController]
+    [Route("api/[controller]")]
+    public class HomeController : ControllerBase
     {
         private readonly IDataImportService _dataImportService;
         private readonly IExcelService _excelService;
@@ -21,8 +23,18 @@ namespace ExcelUploader.Controllers
             _logger = logger;
         }
 
+        [HttpGet]
+        [Route("")]
+        [AllowAnonymous]
+        public IActionResult Index()
+        {
+            return Ok(new { message = "Excel Uploader API", version = "9.0", status = "Running" });
+        }
+
+        [HttpGet]
+        [Route("dashboard")]
         [Authorize]
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Dashboard()
         {
             try
             {
@@ -32,49 +44,50 @@ namespace ExcelUploader.Controllers
                     TotalRecords = tables.Sum(t => t.RowCount),
                     ProcessedRecords = tables.Where(t => t.IsProcessed).Sum(t => t.RowCount),
                     PendingRecords = tables.Where(t => !t.IsProcessed).Sum(t => t.RowCount),
-                    TotalGrantAmount = 0, // Will be calculated from dynamic table data if needed
-                    TotalPaidAmount = 0,  // Will be calculated from dynamic table data if needed
-                    RecentUploads = new List<ExcelData>(), // Keep for backward compatibility
-                    MonthlyData = new List<ChartData>(),   // Keep for backward compatibility
-                    DynamicTables = tables.Take(5).ToList() // Show recent dynamic tables
+                    TotalGrantAmount = 0,
+                    TotalPaidAmount = 0,
+                    RecentUploads = new List<ExcelData>(),
+                    MonthlyData = new List<ChartData>(),
+                    DynamicTables = tables.Take(5).ToList()
                 };
-                return View(dashboardData);
+                return Ok(dashboardData);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error loading dashboard");
-                return View(new DashboardViewModel());
+                return StatusCode(500, new { error = "Internal server error" });
             }
         }
 
+        [HttpGet]
+        [Route("upload")]
         [Authorize]
         public IActionResult Upload()
         {
-            return View(new UploadViewModel());
+            return Ok(new { message = "Upload endpoint ready" });
         }
 
         [HttpPost]
+        [Route("upload")]
         [Authorize]
-        public async Task<IActionResult> Upload(UploadViewModel model)
+        public async Task<IActionResult> Upload([FromForm] UploadViewModel model)
         {
             if (!ModelState.IsValid)
             {
-                return View(model);
+                return BadRequest(ModelState);
             }
 
             try
             {
                 if (model.ExcelFile == null)
                 {
-                    ModelState.AddModelError("ExcelFile", "Lütfen bir Excel dosyası seçin");
-                    return View(model);
+                    return BadRequest(new { error = "Lütfen bir Excel dosyası seçin" });
                 }
 
                 // Validate file
                 if (!await _excelService.ValidateExcelFileAsync(model.ExcelFile))
                 {
-                    ModelState.AddModelError("ExcelFile", "Geçersiz dosya formatı veya boyut");
-                    return View(model);
+                    return BadRequest(new { error = "Geçersiz dosya formatı veya boyut" });
                 }
 
                 // Process Excel file and create dynamic table
@@ -85,190 +98,61 @@ namespace ExcelUploader.Controllers
 
                 if (dynamicTable == null)
                 {
-                    ModelState.AddModelError("", "Excel dosyasından tablo oluşturulamadı");
-                    return View(model);
+                    return BadRequest(new { error = "Excel dosyasından tablo oluşturulamadı" });
                 }
 
-                TempData["SuccessMessage"] = $"Excel dosyası başarıyla yüklendi. '{dynamicTable.TableName}' tablosu oluşturuldu ve {dynamicTable.RowCount} kayıt işlendi.";
-                return RedirectToAction(nameof(Index));
+                return Ok(new { 
+                    message = $"Excel dosyası başarıyla yüklendi", 
+                    tableName = dynamicTable.TableName,
+                    rowCount = dynamicTable.RowCount,
+                    tableId = dynamicTable.Id
+                });
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error uploading Excel file");
-                ModelState.AddModelError("", "Dosya yüklenirken hata oluştu: " + ex.Message);
-                return View(model);
+                return StatusCode(500, new { error = "Dosya yükleme sırasında hata oluştu" });
             }
         }
 
+        [HttpGet]
+        [Route("data")]
         [Authorize]
-        public async Task<IActionResult> Data(int page = 1, string? searchTerm = null, string? sortBy = null, string? sortOrder = null)
+        public async Task<IActionResult> Data(int? tableId = null)
         {
             try
             {
-                var pageSize = 20;
-                var data = await _dataImportService.GetPaginatedDataAsync(page, pageSize, searchTerm, sortBy, sortOrder);
-                return View(data);
+                if (tableId.HasValue)
+                {
+                    var table = await _dynamicTableService.GetTableByIdAsync(tableId.Value);
+                    if (table == null)
+                    {
+                        return NotFound(new { error = "Tablo bulunamadı" });
+                    }
+                    return Ok(table);
+                }
+
+                var tables = await _dynamicTableService.GetAllTablesAsync();
+                return Ok(tables);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error loading data");
-                return View(new DataListViewModel());
+                return StatusCode(500, new { error = "Veri yüklenirken hata oluştu" });
             }
         }
 
-        [Authorize]
-        public async Task<IActionResult> Edit(int id)
+        [HttpGet]
+        [Route("health")]
+        [AllowAnonymous]
+        public IActionResult Health()
         {
-            try
-            {
-                var data = await _dataImportService.GetDataByIdAsync(id);
-                if (data == null)
-                {
-                    TempData["ErrorMessage"] = "Kayıt bulunamadı";
-                    return RedirectToAction(nameof(Data));
-                }
-
-                var editModel = new EditDataViewModel
-                {
-                    Id = data.Id,
-                    BasvuruYili = data.BasvuruYili,
-                    HareketlilikTipi = data.HareketlilikTipi,
-                    BasvuruTipi = data.BasvuruTipi,
-                    Ad = data.Ad,
-                    Soyad = data.Soyad,
-                    OdemeTipi = data.OdemeTipi,
-                    Taksit = data.Taksit,
-                    Odenecek = data.Odenecek,
-                    Odendiginde = data.Odendiginde,
-                    OdemeTarihi = data.OdemeTarihi,
-                    Aciklama = data.Aciklama,
-                    OdemeOrani = data.OdemeOrani,
-                    FileName = data.FileName,
-                    UploadDate = data.UploadDate,
-                    UploadedBy = data.UploadedBy,
-                    RowNumber = data.RowNumber
-                };
-
-                return View(editModel);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"Error loading data for edit with ID {id}");
-                TempData["ErrorMessage"] = "Kayıt yüklenirken hata oluştu";
-                return RedirectToAction(nameof(Data));
-            }
-        }
-
-        [HttpPost]
-        [Authorize]
-        public async Task<IActionResult> Edit(EditDataViewModel model)
-        {
-            if (!ModelState.IsValid)
-            {
-                return View(model);
-            }
-
-            try
-            {
-                var data = await _dataImportService.GetDataByIdAsync(model.Id);
-                if (data == null)
-                {
-                    TempData["ErrorMessage"] = "Kayıt bulunamadı";
-                    return RedirectToAction(nameof(Data));
-                }
-
-                // Update data properties
-                data.BasvuruYili = model.BasvuruYili;
-                data.HareketlilikTipi = model.HareketlilikTipi;
-                data.BasvuruTipi = model.BasvuruTipi;
-                data.Ad = model.Ad;
-                data.Soyad = model.Soyad;
-                data.OdemeTipi = model.OdemeTipi;
-                data.Taksit = model.Taksit;
-                data.Odenecek = model.Odenecek;
-                data.Odendiginde = model.Odendiginde;
-                data.OdemeTarihi = model.OdemeTarihi;
-                data.Aciklama = model.Aciklama;
-                data.OdemeOrani = model.OdemeOrani;
-
-                var updateResult = await _dataImportService.UpdateDataAsync(data);
-
-                if (updateResult)
-                {
-                    TempData["SuccessMessage"] = "Kayıt başarıyla güncellendi";
-                    return RedirectToAction(nameof(Data));
-                }
-                else
-                {
-                    ModelState.AddModelError("", "Kayıt güncellenirken hata oluştu");
-                    return View(model);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"Error updating data with ID {model.Id}");
-                ModelState.AddModelError("", "Kayıt güncellenirken hata oluştu: " + ex.Message);
-                return View(model);
-            }
-        }
-
-        [HttpPost]
-        [Authorize]
-        public async Task<IActionResult> Delete(int id)
-        {
-            try
-            {
-                var deleteResult = await _dataImportService.DeleteDataAsync(id);
-
-                if (deleteResult)
-                {
-                    TempData["SuccessMessage"] = "Kayıt başarıyla silindi";
-                }
-                else
-                {
-                    TempData["ErrorMessage"] = "Kayıt silinirken hata oluştu";
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"Error deleting data with ID {id}");
-                TempData["ErrorMessage"] = "Kayıt silinirken hata oluştu";
-            }
-
-            return RedirectToAction(nameof(Data));
-        }
-
-        [HttpPost]
-        [Authorize]
-        public async Task<IActionResult> Export(string? searchTerm = null, string? filterBy = null, string? filterValue = null)
-        {
-            try
-            {
-                var data = await _dataImportService.SearchDataAsync(searchTerm ?? "", filterBy, filterValue);
-                
-                if (!data.Any())
-                {
-                    TempData["ErrorMessage"] = "Dışa aktarılacak veri bulunamadı";
-                    return RedirectToAction(nameof(Data));
-                }
-
-                var excelBytes = await _dataImportService.ExportDataToExcelAsync(data);
-                var fileName = $"ExcelData_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx";
-
-                return File(excelBytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error exporting data");
-                TempData["ErrorMessage"] = "Veri dışa aktarılırken hata oluştu";
-                return RedirectToAction(nameof(Data));
-            }
-        }
-
-        [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
-        public IActionResult Error()
-        {
-            return View();
+            return Ok(new { 
+                status = "Healthy", 
+                timestamp = DateTime.UtcNow,
+                version = "9.0",
+                environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Development"
+            });
         }
     }
 }
