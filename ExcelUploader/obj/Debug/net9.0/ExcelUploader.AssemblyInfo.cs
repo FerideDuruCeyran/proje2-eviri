@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("ExcelUploader")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+2146263977d57e87fcb66fffdffe3705585c5790")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+798689af877442b582f7a84acf8136ba2e6dce64")]
 [assembly: System.Reflection.AssemblyProductAttribute("ExcelUploader")]
 [assembly: System.Reflection.AssemblyTitleAttribute("ExcelUploader")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

@@ -9,6 +9,8 @@
     <GenerateStaticWebAssetsManifest>false</GenerateStaticWebAssetsManifest>
     <EnableDefaultContentItems>false</EnableDefaultContentItems>
     <EnableDefaultWebContentItems>false</EnableDefaultWebContentItems>
+    <UseStaticWebAssets>false</UseStaticWebAssets>
+    <StaticWebAssetsEnabled>false</StaticWebAssetsEnabled>
   </PropertyGroup>
 
   <ItemGroup>
