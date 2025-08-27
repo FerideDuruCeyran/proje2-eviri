@@ -1,0 +1,250 @@
+/* Simple Test CSS - Basic styles only */
+html, body {
+    background-color: #e8f4fd !important;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
+}
+
+.card {
+    border: 3px solid #ff6b6b !important;
+    border-radius: 15px !important;
+    background-color: #fff !important;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2) !important;
+}
+
+.btn {
+    border-radius: 25px !important;
+    background: linear-gradient(45deg, #ff6b6b, #4ecdc4) !important;
+    border: none !important;
+    color: white !important;
+    font-weight: bold !important;
+}
+
+.navbar {
+    background: linear-gradient(45deg, #667eea, #764ba2) !important;
+}
+
+.sidebar {
+    background: linear-gradient(180deg, #667eea, #764ba2) !important;
+    color: white !important;
+}
+
+.test-custom-css {
+    background: linear-gradient(45deg, #ff6b6b, #4ecdc4) !important;
+    color: white !important;
+    padding: 20px !important;
+    border-radius: 15px !important;
+    text-align: center !important;
+    margin: 20px 0 !important;
+    font-size: 24px !important;
+    font-weight: bold !important;
+    box-shadow: 0 8px 16px rgba(0,0,0,0.3) !important;
+    border: 3px solid #fff !important;
+}
+
+.test-css-loaded {
+    background-color: #ff6b6b !important;
+    color: white !important;
+    padding: 20px !important;
+    border-radius: 10px !important;
+    text-align: center !important;
+    margin: 20px 0 !important;
+    font-size: 24px !important;
+    font-weight: bold !important;
+    border: 3px solid #fff !important;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2) !important;
+}
+
+/* Hero Section */
+.hero-section {
+    background: linear-gradient(135deg, #667eea, #764ba2) !important;
+    padding: 80px 0 !important;
+    border-radius: 20px !important;
+    margin-bottom: 40px !important;
+}
+
+/* Stats Cards */
+.stats-card {
+    border-radius: 20px !important;
+    padding: 30px !important;
+    border: none !important;
+    box-shadow: 0 8px 16px rgba(0,0,0,0.1) !important;
+    transition: all 0.3s ease !important;
+}
+
+.stats-card:hover {
+    transform: translateY(-5px) !important;
+    box-shadow: 0 12px 24px rgba(0,0,0,0.2) !important;
+}
+
+.stats-card-primary {
+    background: linear-gradient(135deg, #667eea, #764ba2) !important;
+    color: white !important;
+}
+
+.stats-card-success {
+    background: linear-gradient(135deg, #4ecdc4, #44a08d) !important;
+    color: white !important;
+}
+
+.stats-card-warning {
+    background: linear-gradient(135deg, #ff6b6b, #ee5a52) !important;
+    color: white !important;
+}
+
+.stats-card-info {
+    background: linear-gradient(135deg, #a8edea, #fed6e3) !important;
+    color: #333 !important;
+}
+
+.stats-number {
+    font-size: 2.5rem !important;
+    font-weight: bold !important;
+    margin-bottom: 10px !important;
+}
+
+.stats-label {
+    font-size: 1.1rem !important;
+    opacity: 0.9 !important;
+    margin-bottom: 15px !important;
+}
+
+.stats-change {
+    font-size: 0.9rem !important;
+    opacity: 0.8 !important;
+}
+
+.stats-icon {
+    font-size: 3rem !important;
+    opacity: 0.3 !important;
+}
+
+/* Upload area styling */
+.upload-area {
+    border: 3px dashed #4ecdc4 !important;
+    border-radius: 15px !important;
+    padding: 40px !important;
+    background: linear-gradient(135deg, #f8f9fa, #e9ecef) !important;
+    transition: all 0.3s ease !important;
+}
+
+.upload-area:hover {
+    border-color: #ff6b6b !important;
+    background: linear-gradient(135deg, #e9ecef, #dee2e6) !important;
+    transform: translateY(-2px) !important;
+}
+
+/* Card enhancements */
+.card-header {
+    background: linear-gradient(45deg, #667eea, #764ba2) !important;
+    color: white !important;
+    border-radius: 15px 15px 0 0 !important;
+}
+
+/* Button enhancements */
+.btn-primary {
+    background: linear-gradient(45deg, #667eea, #764ba2) !important;
+    border: none !important;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2) !important;
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 6px 12px rgba(0,0,0,0.3) !important;
+}
+
+/* Sidebar enhancements */
+.sidebar .nav-link {
+    color: rgba(255,255,255,0.8) !important;
+    border-radius: 10px !important;
+    margin: 5px 10px !important;
+    transition: all 0.3s ease !important;
+}
+
+.sidebar .nav-link:hover,
+.sidebar .nav-link.active {
+    background: rgba(255,255,255,0.2) !important;
+    color: white !important;
+    transform: translateX(5px) !important;
+}
+
+/* Form enhancements */
+.form-control {
+    border-radius: 10px !important;
+    border: 2px solid #e9ecef !important;
+    transition: all 0.3s ease !important;
+}
+
+.form-control:focus {
+    border-color: #667eea !important;
+    box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25) !important;
+}
+
+/* Alert enhancements */
+.alert {
+    border-radius: 15px !important;
+    border: none !important;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1) !important;
+}
+
+/* Badge enhancements */
+.badge {
+    border-radius: 20px !important;
+    padding: 8px 16px !important;
+    font-size: 0.9rem !important;
+}
+
+/* Progress bar enhancements */
+.progress {
+    border-radius: 10px !important;
+    background-color: #e9ecef !important;
+}
+
+.progress-bar {
+    border-radius: 10px !important;
+    background: linear-gradient(45deg, #667eea, #764ba2) !important;
+}
+
+/* Modal enhancements */
+.modal-content {
+    border-radius: 20px !important;
+    border: none !important;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.3) !important;
+}
+
+.modal-header {
+    border-radius: 20px 20px 0 0 !important;
+}
+
+/* Animation for icons */
+.bi {
+    transition: all 0.3s ease !important;
+}
+
+.bi:hover {
+    transform: scale(1.2) !important;
+}
+
+/* Responsive improvements */
+@media (max-width: 768px) {
+    .upload-area {
+        padding: 20px !important;
+    }
+    
+    .test-custom-css,
+    .test-css-loaded {
+        font-size: 18px !important;
+        padding: 15px !important;
+    }
+    
+    .hero-section {
+        padding: 40px 0 !important;
+    }
+    
+    .stats-card {
+        padding: 20px !important;
+    }
+    
+    .stats-number {
+        font-size: 2rem !important;
+    }
+}

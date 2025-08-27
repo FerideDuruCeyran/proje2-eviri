@@ -1,0 +1,269 @@
+@model ExcelUploader.Models.EditDataViewModel
+@{
+    ViewData["Title"] = "Veri Düzenle";
+}
+
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">
+        <i class="bi bi-pencil"></i>
+        Veri Düzenle
+    </h1>
+    <div class="btn-toolbar mb-2 mb-md-0">
+        <a href="@Url.Action("Data", "Home")" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left"></i>
+            Geri Dön
+        </a>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-file-earmark-excel"></i>
+                    Kayıt Bilgileri - @Model.FileName
+                </h5>
+            </div>
+            <div class="card-body">
+                <form asp-action="Edit" method="post">
+                    <input type="hidden" asp-for="Id" />
+                    
+                    <!-- File Information -->
+                    <div class="row mb-4">
+                        <div class="col-md-4">
+                            <div class="alert alert-info">
+                                <strong>Dosya:</strong> @Model.FileName<br>
+                                <strong>Satır:</strong> @Model.RowNumber<br>
+                                <strong>Yüklenen:</strong> @Model.UploadDate.ToString("dd.MM.yyyy HH:mm")<br>
+                                <strong>Yükleyen:</strong> @Model.UploadedBy
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Basic Information -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h6 class="border-bottom pb-2">
+                                <i class="bi bi-person"></i>
+                                Temel Bilgiler
+                            </h6>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label asp-for="Ad" class="form-label">Ad *</label>
+                                <input asp-for="Ad" class="form-control" />
+                                <span asp-validation-for="Ad" class="text-danger"></span>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label asp-for="Soyad" class="form-label">Soyad *</label>
+                                <input asp-for="Soyad" class="form-control" />
+                                <span asp-validation-for="Soyad" class="text-danger"></span>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label asp-for="BasvuruYili" class="form-label">Başvuru Yılı</label>
+                                <input asp-for="BasvuruYili" class="form-control" placeholder="2018-2019" />
+                                <span asp-validation-for="BasvuruYili" class="text-danger"></span>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label asp-for="HareketlilikTipi" class="form-label">Hareketlilik Tipi</label>
+                                <select asp-for="HareketlilikTipi" class="form-select">
+                                    <option value="">Seçiniz</option>
+                                    <option value="Giden Öğrenci">Giden Öğrenci</option>
+                                    <option value="Gelen Öğrenci">Gelen Öğrenci</option>
+                                    <option value="Giden Personel">Giden Personel</option>
+                                    <option value="Gelen Personel">Gelen Personel</option>
+                                </select>
+                                <span asp-validation-for="HareketlilikTipi" class="text-danger"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Application Information -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h6 class="border-bottom pb-2">
+                                <i class="bi bi-file-text"></i>
+                                Başvuru Bilgileri
+                            </h6>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label asp-for="BasvuruTipi" class="form-label">Başvuru Tipi</label>
+                                <select asp-for="BasvuruTipi" class="form-select">
+                                    <option value="">Seçiniz</option>
+                                    <option value="Öğrenim">Öğrenim</option>
+                                    <option value="Staj">Staj</option>
+                                    <option value="Öğretim">Öğretim</option>
+                                    <option value="Eğitim">Eğitim</option>
+                                </select>
+                                <span asp-validation-for="BasvuruTipi" class="text-danger"></span>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label asp-for="OdemeTipi" class="form-label">Ödeme Tipi</label>
+                                <select asp-for="OdemeTipi" class="form-select">
+                                    <option value="">Seçiniz</option>
+                                    <option value="Hibe">Hibe</option>
+                                    <option value="Hibe Kesintisi">Hibe Kesintisi</option>
+                                    <option value="Ödeme">Ödeme</option>
+                                </select>
+                                <span asp-validation-for="OdemeTipi" class="text-danger"></span>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label asp-for="Taksit" class="form-label">Taksit</label>
+                                <input asp-for="Taksit" class="form-control" placeholder="1, 2, 3..." />
+                                <span asp-validation-for="Taksit" class="text-danger"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Payment Information -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h6 class="border-bottom pb-2">
+                                <i class="bi bi-currency-dollar"></i>
+                                Ödeme Bilgileri
+                            </h6>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label asp-for="Odenecek" class="form-label">Ödenecek Tutar</label>
+                                <div class="input-group">
+                                    <input asp-for="Odenecek" class="form-control" type="number" step="0.01" />
+                                    <span class="input-group-text">₺</span>
+                                </div>
+                                <span asp-validation-for="Odenecek" class="text-danger"></span>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label asp-for="Odendiginde" class="form-label">Ödenen Tutar</label>
+                                <div class="input-group">
+                                    <input asp-for="Odendiginde" class="form-control" type="number" step="0.01" />
+                                    <span class="input-group-text">₺</span>
+                                </div>
+                                <span asp-validation-for="Odendiginde" class="text-danger"></span>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label asp-for="OdemeTarihi" class="form-label">Ödeme Tarihi</label>
+                                <input asp-for="OdemeTarihi" class="form-control" type="date" />
+                                <span asp-validation-for="OdemeTarihi" class="text-danger"></span>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="mb-3">
+                                <label asp-for="OdemeOrani" class="form-label">Ödeme Oranı (%)</label>
+                                <input asp-for="OdemeOrani" class="form-control" type="number" step="0.01" min="0" max="100" />
+                                <span asp-validation-for="OdemeOrani" class="text-danger"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Description -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <h6 class="border-bottom pb-2">
+                                <i class="bi bi-chat-text"></i>
+                                Açıklama
+                            </h6>
+                        </div>
+                        <div class="col-12">
+                            <div class="mb-3">
+                                <label asp-for="Aciklama" class="form-label">Açıklama</label>
+                                <textarea asp-for="Aciklama" class="form-control" rows="3" 
+                                          placeholder="Kayıt hakkında açıklama ekleyin..."></textarea>
+                                <span asp-validation-for="Aciklama" class="text-danger"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="d-flex justify-content-between">
+                                <div>
+                                    <a href="@Url.Action("Data", "Home")" class="btn btn-outline-secondary">
+                                        <i class="bi bi-arrow-left"></i>
+                                        İptal
+                                    </a>
+                                </div>
+                                <div>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="bi bi-check-circle"></i>
+                                        Kaydet
+                                    </button>
+                                    <a href="@Url.Action("Data", "Home")" class="btn btn-outline-danger ms-2">
+                                        <i class="bi bi-trash"></i>
+                                        Sil
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Validation Summary -->
+@if (!ViewData.ModelState.IsValid)
+{
+    <div class="row mt-3">
+        <div class="col-12">
+            <div class="alert alert-danger">
+                <h6><i class="bi bi-exclamation-triangle"></i> Lütfen aşağıdaki hataları düzeltin:</h6>
+                <div asp-validation-summary="All" class="text-danger"></div>
+            </div>
+        </div>
+    </div>
+}
+
+@section Scripts {
+    <script>
+        // Auto-calculate payment rate
+        document.addEventListener('DOMContentLoaded', function() {
+            const odenecekInput = document.querySelector('input[name="Odenecek"]');
+            const odendigindeInput = document.querySelector('input[name="Odendiginde"]');
+            const odemeOraniInput = document.querySelector('input[name="OdemeOrani"]');
+
+            function calculatePaymentRate() {
+                const odenecek = parseFloat(odenecekInput.value) || 0;
+                const odendiginde = parseFloat(odendigindeInput.value) || 0;
+                
+                if (odenecek > 0) {
+                    const rate = (odendiginde / odenecek) * 100;
+                    odemeOraniInput.value = rate.toFixed(2);
+                }
+            }
+
+            odenecekInput.addEventListener('input', calculatePaymentRate);
+            odendigindeInput.addEventListener('input', calculatePaymentRate);
+
+            // Form validation
+            const form = document.querySelector('form');
+            form.addEventListener('submit', function(e) {
+                const ad = document.querySelector('input[name="Ad"]').value.trim();
+                const soyad = document.querySelector('input[name="Soyad"]').value.trim();
+                
+                if (!ad || !soyad) {
+                    e.preventDefault();
+                    alert('Ad ve Soyad alanları zorunludur!');
+                    return false;
+                }
+            });
+        });
+    </script>
+}

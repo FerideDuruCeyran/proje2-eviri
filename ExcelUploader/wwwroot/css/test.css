@@ -1,0 +1,49 @@
+/* Test CSS - Bu dosya yükleniyorsa CSS çalışıyor demektir */
+html, body {
+    background-color: #f0f8ff !important;
+    font-family: Arial, sans-serif !important;
+}
+
+.test-css-loaded {
+    background-color: #ff6b6b !important;
+    color: white !important;
+    padding: 20px !important;
+    border-radius: 10px !important;
+    text-align: center !important;
+    margin: 20px 0 !important;
+    font-size: 24px !important;
+    font-weight: bold !important;
+    border: 3px solid #fff !important;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2) !important;
+    animation: pulse 2s infinite !important;
+    position: relative !important;
+    z-index: 1000 !important;
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+    50% {
+        transform: scale(1.05);
+        box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+    }
+    100% {
+        transform: scale(1);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+}
+
+/* Force override for any conflicting styles */
+.test-css-loaded * {
+    color: white !important;
+    background-color: transparent !important;
+}
+
+/* Ensure visibility */
+.test-css-loaded {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}

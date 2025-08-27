@@ -1,0 +1,274 @@
+@model ExcelUploader.Models.RegisterViewModel
+@{
+    ViewData["Title"] = "Kayıt Ol";
+    Layout = "_Layout";
+}
+
+<!-- Hero Section -->
+<div class="login-hero">
+    <div class="container">
+        <div class="row align-items-center min-vh-100">
+            <div class="col-lg-6">
+                <div class="hero-content text-white">
+                    <h1 class="display-4 fw-bold mb-4">
+                        <i class="bi bi-person-plus me-3"></i>
+                        Hesap Oluştur
+                    </h1>
+                    <p class="lead mb-4">
+                        Excel Uploader sistemine katılarak Excel dosyalarınızı profesyonel bir şekilde yönetmeye başlayın.
+                    </p>
+                    <div class="hero-features">
+                        <div class="feature-item">
+                            <i class="bi bi-check-circle-fill text-success me-2"></i>
+                            <span>Ücretsiz hesap oluşturma</span>
+                        </div>
+                        <div class="feature-item">
+                            <i class="bi bi-check-circle-fill text-success me-2"></i>
+                            <span>Güvenli veri yönetimi</span>
+                        </div>
+                        <div class="feature-item">
+                            <i class="bi bi-check-circle-fill text-success me-2"></i>
+                            <span>7/24 sistem erişimi</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="login-card">
+                    <div class="card border-0 shadow-lg">
+                        <div class="card-header text-center py-4">
+                            <div class="login-icon mb-3" style="background: linear-gradient(135deg, #198754 0%, #146c43 100%);">
+                                <i class="bi bi-person-plus"></i>
+                            </div>
+                            <h3 class="mb-2 fw-bold">Yeni Hesap</h3>
+                            <p class="text-muted mb-0">Bilgilerinizi doldurun ve başlayın</p>
+                        </div>
+                        <div class="card-body p-4">
+                            <form asp-action="Register" method="post" id="registerForm">
+                                <input type="hidden" name="returnUrl" value="@ViewData["ReturnUrl"]" />
+                                
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-floating mb-3">
+                                            <input asp-for="FirstName" class="form-control" 
+                                                   placeholder="Adınız" 
+                                                   autocomplete="given-name" 
+                                                   id="firstNameInput" />
+                                            <label asp-for="FirstName" for="firstNameInput">
+                                                <i class="bi bi-person me-2"></i>
+                                                Ad *
+                                            </label>
+                                            <span asp-validation-for="FirstName" class="text-danger small"></span>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-floating mb-3">
+                                            <input asp-for="LastName" class="form-control" 
+                                                   placeholder="Soyadınız" 
+                                                   autocomplete="family-name" 
+                                                   id="lastNameInput" />
+                                            <label asp-for="LastName" for="lastNameInput">
+                                                <i class="bi bi-person me-2"></i>
+                                                Soyad *
+                                            </label>
+                                            <span asp-validation-for="LastName" class="text-danger small"></span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="form-floating mb-3">
+                                    <input asp-for="Email" class="form-control" 
+                                           placeholder="ornek@email.com" 
+                                           autocomplete="email" 
+                                           id="emailInput" />
+                                    <label asp-for="Email" for="emailInput">
+                                        <i class="bi bi-envelope me-2"></i>
+                                        E-posta Adresi *
+                                    </label>
+                                    <span asp-validation-for="Email" class="text-danger small"></span>
+                                </div>
+
+                                <div class="form-floating mb-3">
+                                    <input asp-for="Password" class="form-control" 
+                                           placeholder="Şifreniz" 
+                                           autocomplete="new-password" 
+                                           id="passwordInput" />
+                                    <label asp-for="Password" for="passwordInput">
+                                        <i class="bi bi-key me-2"></i>
+                                        Şifre *
+                                    </label>
+                                    <div class="form-text small mt-1">
+                                        <i class="bi bi-info-circle me-1"></i>
+                                        En az 6 karakter uzunluğunda olmalıdır
+                                    </div>
+                                    <span asp-validation-for="Password" class="text-danger small"></span>
+                                </div>
+
+                                <div class="form-floating mb-3">
+                                    <input asp-for="ConfirmPassword" class="form-control" 
+                                           placeholder="Şifrenizi tekrar girin" 
+                                           autocomplete="new-password" 
+                                           id="confirmPasswordInput" />
+                                    <label asp-for="ConfirmPassword" for="confirmPasswordInput">
+                                        <i class="bi bi-key-fill me-2"></i>
+                                        Şifre Onayı *
+                                    </label>
+                                    <span asp-validation-for="ConfirmPassword" class="text-danger small"></span>
+                                </div>
+
+                                <div class="mb-4 form-check">
+                                    <input type="checkbox" class="form-check-input" id="termsCheck" required />
+                                    <label class="form-check-label" for="termsCheck">
+                                        <a href="#" class="text-decoration-none" data-bs-toggle="modal" data-bs-target="#termsModal">
+                                            Kullanım şartlarını
+                                        </a> 
+                                        kabul ediyorum *
+                                    </label>
+                                </div>
+
+                                <div class="d-grid mb-4">
+                                    <button type="submit" class="btn btn-success btn-lg" id="registerBtn">
+                                        <span class="btn-text">
+                                            <i class="bi bi-person-plus me-2"></i>
+                                            Hesap Oluştur
+                                        </span>
+                                        <span class="btn-loading d-none">
+                                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                            Oluşturuluyor...
+                                        </span>
+                                    </button>
+                                </div>
+
+                                <div class="text-center">
+                                    <p class="text-muted mb-0">
+                                        Zaten hesabınız var mı? 
+                                        <a href="@Url.Action("Login", "Account")" class="text-decoration-none fw-bold">
+                                            Giriş yapın
+                                        </a>
+                                    </p>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Terms Modal -->
+<div class="modal fade" id="termsModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">
+                    <i class="bi bi-file-text me-2"></i>
+                    Kullanım Şartları
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <h6 class="text-success">Excel Uploader Kullanım Şartları</h6>
+                <p>Bu sistemi kullanarak aşağıdaki şartları kabul etmiş olursunuz:</p>
+                
+                <ol class="terms-list">
+                    <li><strong>Gizlilik:</strong> Kişisel bilgileriniz güvenli şekilde saklanacaktır.</li>
+                    <li><strong>Kullanım:</strong> Sistem sadece yasal amaçlar için kullanılmalıdır.</li>
+                    <li><strong>Veri Güvenliği:</strong> Yüklenen Excel dosyaları güvenli şekilde işlenecektir.</li>
+                    <li><strong>Sorumluluk:</strong> Yüklenen verilerden kullanıcı sorumludur.</li>
+                    <li><strong>Erişim:</strong> Sistem yöneticisi gerekli durumlarda erişimi kısıtlayabilir.</li>
+                </ol>
+                
+                <div class="alert alert-info border-0">
+                    <i class="bi bi-info-circle me-2"></i>
+                    <strong>Not:</strong> Bu şartlar sistem kullanımı süresince geçerlidir.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-success" data-bs-dismiss="modal">Anladım</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // Form submission with loading state
+        document.getElementById('registerForm').addEventListener('submit', function(e) {
+            const registerBtn = document.getElementById('registerBtn');
+            const btnText = registerBtn.querySelector('.btn-text');
+            const btnLoading = registerBtn.querySelector('.btn-loading');
+            
+            // Show loading state
+            btnText.classList.add('d-none');
+            btnLoading.classList.remove('d-none');
+            registerBtn.disabled = true;
+        });
+
+        // Password strength indicator
+        document.getElementById('passwordInput').addEventListener('input', function(e) {
+            const password = e.target.value;
+            const strengthIndicator = document.createElement('div');
+            strengthIndicator.className = 'password-strength mt-1';
+            
+            let strength = 0;
+            let strengthText = '';
+            let strengthClass = '';
+            
+            if (password.length >= 6) strength++;
+            if (password.match(/[a-z]/)) strength++;
+            if (password.match(/[A-Z]/)) strength++;
+            if (password.match(/[0-9]/)) strength++;
+            if (password.match(/[^a-zA-Z0-9]/)) strength++;
+            
+            switch(strength) {
+                case 0:
+                case 1:
+                    strengthText = 'Çok Zayıf';
+                    strengthClass = 'danger';
+                    break;
+                case 2:
+                    strengthText = 'Zayıf';
+                    strengthClass = 'warning';
+                    break;
+                case 3:
+                    strengthText = 'Orta';
+                    strengthClass = 'info';
+                    break;
+                case 4:
+                    strengthText = 'Güçlü';
+                    strengthClass = 'success';
+                    break;
+                case 5:
+                    strengthText = 'Çok Güçlü';
+                    strengthClass = 'success';
+                    break;
+            }
+            
+            // Remove existing indicator
+            const existingIndicator = document.querySelector('.password-strength');
+            if (existingIndicator) {
+                existingIndicator.remove();
+            }
+            
+            // Add new indicator
+            if (password.length > 0) {
+                strengthIndicator.innerHTML = `
+                    <div class="progress" style="height: 4px;">
+                        <div class="progress-bar bg-${strengthClass}" style="width: ${(strength / 5) * 100}%"></div>
+                    </div>
+                    <small class="text-${strengthClass}">${strengthText}</small>
+                `;
+                e.target.parentNode.appendChild(strengthIndicator);
+            }
+        });
+
+        // Add floating animation to hero icon
+        document.addEventListener('DOMContentLoaded', function() {
+            const heroIcon = document.querySelector('.bi-person-plus');
+            if (heroIcon) {
+                heroIcon.style.animation = 'float 3s ease-in-out infinite';
+            }
+        });
+    </script>
+}
