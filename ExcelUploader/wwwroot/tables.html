@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel Uploader - Dinamik Tablolar</title>
+    <link rel="stylesheet" href="css/site.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <h1><i class="fas fa-file-excel"></i> Excel Uploader</h1>
+        </div>
+    </header>
+
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="container">
+            <ul class="nav-list">
+                <li class="nav-item">
+                    <a href="index.html" class="nav-link">
+                        <i class="fas fa-home"></i> Ana Sayfa
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="upload.html" class="nav-link">
+                        <i class="fas fa-upload"></i> Dosya Yükle
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="data.html" class="nav-link">
+                        <i class="fas fa-database"></i> Veri Görüntüle
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="tables.html" class="nav-link active">
+                        <i class="fas fa-table"></i> Dinamik Tablolar
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="profile.html" class="nav-link">
+                        <i class="fas fa-user"></i> <span id="userName">Profil</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="logout.html" class="nav-link">
+                        <i class="fas fa-sign-out-alt"></i> Çıkış Yap
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <!-- Create New Table -->
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <i class="fas fa-plus"></i> Yeni Tablo Oluştur
+                    </h2>
+                </div>
+                <div class="card-body">
+                    <form id="createTableForm">
+                        <div class="form-group">
+                            <label for="tableName" class="form-label">
+                                <i class="fas fa-table"></i> Tablo Adı
+                            </label>
+                            <input type="text" id="tableName" name="tableName" class="form-control" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="tableDescription" class="form-label">
+                                <i class="fas fa-comment"></i> Açıklama
+                            </label>
+                            <textarea id="tableDescription" name="tableDescription" class="form-control" rows="3"></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-plus"></i> Tablo Oluştur
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Existing Tables -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-list"></i> Mevcut Tablolar
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div id="tablesList">
+                        <div style="text-align: center; color: #666; padding: 2rem;">
+                            <i class="fas fa-spinner fa-spin" style="font-size: 2rem; margin-bottom: 1rem;"></i>
+                            <p>Tablolar yükleniyor...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer style="background: #333; color: white; text-align: center; padding: 1rem 0; margin-top: 2rem;">
+        <div class="container">
+            <p>&copy; 2024 Excel Uploader. Tüm hakları saklıdır.</p>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="js/site.js"></script>
+    <script>
+        // Load tables when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            loadTables();
+            setupEventListeners();
+        });
+
+        // Setup event listeners
+        function setupEventListeners() {
+            document.getElementById('createTableForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                createTable();
+            });
+        }
+
+        // Load tables
+        async function loadTables() {
+            try {
+                const response = await fetch('/api/dynamic-tables', {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                    }
+                });
+
+                if (response.ok) {
+                    const tables = await response.json();
+                    displayTables(tables);
+                } else {
+                    showMessage('Tablolar yüklenirken hata oluştu', 'error');
+                }
+            } catch (error) {
+                console.error('Tables load error:', error);
+                showMessage('Tablolar yüklenirken hata oluştu', 'error');
+            }
+        }
+
+        // Display tables
+        function displayTables(tables) {
+            const container = document.getElementById('tablesList');
+            
+            if (tables.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align: center; color: #666; padding: 2rem;">
+                        <i class="fas fa-table" style="font-size: 2rem; margin-bottom: 1rem;"></i>
+                        <p>Henüz tablo oluşturulmamış</p>
+                        <p>Yukarıdaki formu kullanarak ilk tablonuzu oluşturun</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = tables.map(table => `
+                <div class="table-item" style="border: 1px solid #e1e5e9; border-radius: 8px; padding: 1.5rem; margin-bottom: 1rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h4 style="margin: 0; color: #333;">
+                            <i class="fas fa-table"></i> ${table.tableName}
+                        </h4>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button class="btn btn-sm btn-secondary" onclick="viewTable(${table.id})">
+                                <i class="fas fa-eye"></i> Görüntüle
+                            </button>
+                            <button class="btn btn-sm btn-primary" onclick="editTable(${table.id})">
+                                <i class="fas fa-edit"></i> Düzenle
+                            </button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteTable(${table.id})">
+                                <i class="fas fa-trash"></i> Sil
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div style="color: #666; margin-bottom: 1rem;">
+                        <p style="margin: 0;">${table.description || 'Açıklama yok'}</p>
+                    </div>
+                    
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem;">
+                        <div style="text-align: center;">
+                            <div style="font-size: 1.5rem; font-weight: bold; color: #667eea;">${table.recordCount || 0}</div>
+                            <div style="font-size: 0.9rem; color: #666;">Kayıt</div>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="font-size: 1.5rem; font-weight: bold; color: #28a745;">${table.columnCount || 0}</div>
+                            <div style="font-size: 0.9rem; color: #666;">Sütun</div>
+                        </div>
+                        <div style="text-align: center;">
+                            <div style="font-size: 1.5rem; font-weight: bold; color: #ffc107;">${table.lastModified ? formatDate(table.lastModified) : 'N/A'}</div>
+                            <div style="font-size: 0.9rem; color: #666;">Son Güncelleme</div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Create table
+        async function createTable() {
+            const tableName = document.getElementById('tableName').value;
+            const description = document.getElementById('tableDescription').value;
+
+            try {
+                const response = await fetch('/api/dynamic-tables', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                    },
+                    body: JSON.stringify({
+                        tableName,
+                        description
+                    })
+                });
+
+                if (response.ok) {
+                    showMessage('Tablo başarıyla oluşturuldu', 'success');
+                    document.getElementById('createTableForm').reset();
+                    loadTables();
+                } else {
+                    const error = await response.json();
+                    showMessage(error.message || 'Tablo oluşturulurken hata oluştu', 'error');
+                }
+            } catch (error) {
+                console.error('Create table error:', error);
+                showMessage('Tablo oluşturulurken hata oluştu', 'error');
+            }
+        }
+
+        // View table
+        function viewTable(id) {
+            window.location.href = `table-view.html?id=${id}`;
+        }
+
+        // Edit table
+        function editTable(id) {
+            window.location.href = `table-edit.html?id=${id}`;
+        }
+
+        // Delete table
+        async function deleteTable(id) {
+            if (confirm('Bu tabloyu silmek istediğinizden emin misiniz? Bu işlem geri alınamaz!')) {
+                try {
+                    const response = await fetch(`/api/dynamic-tables/${id}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                        }
+                    });
+
+                    if (response.ok) {
+                        showMessage('Tablo başarıyla silindi', 'success');
+                        loadTables();
+                    } else {
+                        showMessage('Tablo silinirken hata oluştu', 'error');
+                    }
+                } catch (error) {
+                    console.error('Delete table error:', error);
+                    showMessage('Tablo silinirken hata oluştu', 'error');
+                }
+            }
+        }
+
+        // Show message
+        function showMessage(message, type) {
+            // You can implement a toast or alert system here
+            console.log(`${type}: ${message}`);
+        }
+
+        // Format date
+        function formatDate(dateString) {
+            return new Date(dateString).toLocaleDateString('tr-TR');
+        }
+    </script>
+</body>
+</html>

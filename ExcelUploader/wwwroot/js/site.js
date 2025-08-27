@@ -115,10 +115,10 @@ async function handleFileUpload(file) {
             const result = await response.json();
             showAlert('Dosya başarıyla yüklendi!', 'success');
             
-            // Refresh data if on dashboard
-            if (window.location.pathname === '/') {
-                loadDashboardData();
-            }
+                    // Refresh data if on dashboard
+        if (window.location.pathname.includes('index.html') || window.location.pathname.endsWith('/')) {
+            loadDashboardData();
+        }
         } else {
             const error = await response.json();
             showAlert(error.message || 'Dosya yüklenirken hata oluştu', 'danger');
@@ -491,7 +491,7 @@ function logout() {
     
     showAlert('Başarıyla çıkış yapıldı', 'success');
     setTimeout(() => {
-        window.location.href = '/login';
+        window.location.href = 'login.html';
     }, 1000);
 }
 
@@ -558,6 +558,242 @@ function formatCurrency(amount) {
 
 function formatDate(dateString) {
     return new Date(dateString).toLocaleDateString('tr-TR');
+}
+
+// Navigation function
+function navigateTo(page) {
+    window.location.href = page;
+}
+
+// Dashboard functions
+async function loadDashboardData() {
+    try {
+        const response = await fetch('/api/dashboard/stats', {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+            }
+        });
+
+        if (response.ok) {
+            const stats = await response.json();
+            updateDashboardStats(stats);
+        }
+    } catch (error) {
+        console.error('Dashboard data load error:', error);
+    }
+}
+
+function updateDashboardStats(stats) {
+    if (stats.totalRecords !== undefined) {
+        document.getElementById('totalRecords').textContent = stats.totalRecords;
+    }
+    if (stats.processedRecords !== undefined) {
+        document.getElementById('processedRecords').textContent = stats.processedRecords;
+    }
+    if (stats.pendingRecords !== undefined) {
+        document.getElementById('pendingRecords').textContent = stats.pendingRecords;
+    }
+    if (stats.totalGrantAmount !== undefined) {
+        document.getElementById('totalGrantAmount').textContent = formatCurrency(stats.totalGrantAmount);
+    }
+    if (stats.totalPaidAmount !== undefined) {
+        document.getElementById('totalPaidAmount').textContent = formatCurrency(stats.totalPaidAmount);
+    }
+}
+
+// Setup navigation
+function setupNavigation() {
+    const navLinks = document.querySelectorAll('.nav-link');
+    navLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+            if (this.getAttribute('href').startsWith('#')) {
+                e.preventDefault();
+                const targetId = this.getAttribute('href').substring(1);
+                const targetElement = document.getElementById(targetId);
+                if (targetElement) {
+                    targetElement.scrollIntoView({ behavior: 'smooth' });
+                }
+            }
+        });
+    });
+}
+
+// Setup forms
+function setupForms() {
+    // Login form
+    const loginForm = document.getElementById('loginForm');
+    if (loginForm) {
+        loginForm.addEventListener('submit', handleLogin);
+    }
+
+    // Register form
+    const registerForm = document.getElementById('registerForm');
+    if (registerForm) {
+        registerForm.addEventListener('submit', handleRegister);
+    }
+
+    // Upload form
+    const uploadForm = document.getElementById('uploadForm');
+    if (uploadForm) {
+        uploadForm.addEventListener('submit', handleUploadForm);
+    }
+}
+
+// Setup tables
+function setupTables() {
+    // Add any table-specific event listeners here
+}
+
+// Handle login
+async function handleLogin(e) {
+    e.preventDefault();
+    
+    const email = document.getElementById('email').value;
+    const password = document.getElementById('password').value;
+    const rememberMe = document.getElementById('rememberMe')?.checked || false;
+
+    try {
+        showLoading();
+        
+        const response = await fetch('/api/account/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                email,
+                password,
+                rememberMe
+            })
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            localStorage.setItem('authToken', result.token);
+            isAuthenticated = true;
+            currentUser = result.user;
+            
+            showAlert('Başarıyla giriş yapıldı', 'success');
+            setTimeout(() => {
+                window.location.href = 'index.html';
+            }, 1000);
+        } else {
+            const error = await response.json();
+            showAlert(error.message || 'Giriş başarısız', 'danger');
+        }
+    } catch (error) {
+        console.error('Login error:', error);
+        showAlert('Giriş başarısız', 'danger');
+    } finally {
+        hideLoading();
+    }
+}
+
+// Handle register
+async function handleRegister(e) {
+    e.preventDefault();
+    
+    const firstName = document.getElementById('firstName').value;
+    const lastName = document.getElementById('lastName').value;
+    const email = document.getElementById('email').value;
+    const password = document.getElementById('password').value;
+    const confirmPassword = document.getElementById('confirmPassword').value;
+
+    if (password !== confirmPassword) {
+        showAlert('Şifreler eşleşmiyor', 'danger');
+    }
+
+    try {
+        showLoading();
+        
+        const response = await fetch('/api/account/register', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                firstName,
+                lastName,
+                email,
+                password
+            })
+        });
+
+        if (response.ok) {
+            showAlert('Kayıt başarılı! Giriş yapabilirsiniz.', 'success');
+            setTimeout(() => {
+                window.location.href = 'login.html';
+            }, 2000);
+        } else {
+            const error = await response.json();
+            showAlert(error.message || 'Kayıt başarısız', 'danger');
+        }
+    } catch (error) {
+        console.error('Register error:', error);
+        showAlert('Kayıt yapılırken hata oluştu', 'danger');
+    } finally {
+        hideLoading();
+    }
+}
+
+// Handle upload form
+async function handleUploadForm(e) {
+    e.preventDefault();
+    
+    const fileInput = document.getElementById('file');
+    const description = document.getElementById('description')?.value || '';
+    
+    if (!fileInput.files[0]) {
+        showAlert('Lütfen bir dosya seçin', 'warning');
+        return;
+    }
+
+    await handleFileUpload(fileInput.files[0], description);
+}
+
+// Load user profile
+async function loadUserProfile() {
+    try {
+        const response = await fetch('/api/account/profile', {
+            headers: {
+                'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+            }
+        });
+
+        if (response.ok) {
+            currentUser = await response.json();
+            updateUserInterface();
+        }
+    } catch (error) {
+        console.error('Profile load error:', error);
+    }
+}
+
+// Update user interface
+function updateUserInterface() {
+    if (isAuthenticated && currentUser) {
+        // Show authenticated elements
+        const authElements = document.querySelectorAll('.auth-only');
+        authElements.forEach(el => el.style.display = '');
+        
+        // Hide unauthenticated elements
+        const unauthElements = document.querySelectorAll('.unauth-only');
+        unauthElements.forEach(el => el.style.display = 'none');
+        
+        // Update user name
+        const userNameElements = document.querySelectorAll('#userName');
+        userNameElements.forEach(el => {
+            el.textContent = currentUser.firstName || 'Profil';
+        });
+    } else {
+        // Show unauthenticated elements
+        const unauthElements = document.querySelectorAll('.unauth-only');
+        unauthElements.forEach(el => el.style.display = '');
+        
+        // Hide authenticated elements
+        const authElements = document.querySelectorAll('.auth-only');
+        authElements.forEach(el => el.style.display = 'none');
+    }
 }
 
 // Export functions for global use

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Excel Uploader - Dosya Yükle</title>
-    <link rel="stylesheet" href="/css/site.css">
+    <link rel="stylesheet" href="css/site.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
@@ -20,32 +20,32 @@
         <div class="container">
             <ul class="nav-list">
                 <li class="nav-item">
-                    <a href="/" class="nav-link">
+                    <a href="index.html" class="nav-link">
                         <i class="fas fa-home"></i> Ana Sayfa
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a href="/upload" class="nav-link active">
+                    <a href="upload.html" class="nav-link active">
                         <i class="fas fa-upload"></i> Dosya Yükle
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a href="/data" class="nav-link">
+                    <a href="data.html" class="nav-link">
                         <i class="fas fa-database"></i> Veri Görüntüle
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a href="/tables" class="nav-link">
+                    <a href="tables.html" class="nav-link">
                         <i class="fas fa-table"></i> Dinamik Tablolar
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a href="/profile" class="nav-link">
+                    <a href="profile.html" class="nav-link">
                         <i class="fas fa-user"></i> <span id="userName">Profil</span>
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a href="/logout" class="nav-link">
+                    <a href="logout.html" class="nav-link">
                         <i class="fas fa-sign-out-alt"></i> Çıkış Yap
                     </a>
                 </li>
@@ -171,7 +171,7 @@
     </footer>
 
     <!-- Scripts -->
-    <script src="/js/site.js"></script>
+    <script src="js/site.js"></script>
     <script>
         // Load recent uploads when page loads
         document.addEventListener('DOMContentLoaded', function() {
@@ -244,7 +244,7 @@
         // View upload details
         function viewUploadDetails(uploadId) {
             // Navigate to data view page with upload filter
-            window.location.href = `/data?uploadId=${uploadId}`;
+            window.location.href = `data.html?uploadId=${uploadId}`;
         }
 
         // Show upload progress

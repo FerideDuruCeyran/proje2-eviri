@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel Uploader - Veri Görüntüle</title>
+    <link rel="stylesheet" href="css/site.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <h1><i class="fas fa-file-excel"></i> Excel Uploader</h1>
+        </div>
+    </header>
+
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="container">
+            <ul class="nav-list">
+                <li class="nav-item">
+                    <a href="index.html" class="nav-link">
+                        <i class="fas fa-home"></i> Ana Sayfa
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="upload.html" class="nav-link">
+                        <i class="fas fa-upload"></i> Dosya Yükle
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="data.html" class="nav-link active">
+                        <i class="fas fa-database"></i> Veri Görüntüle
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="tables.html" class="nav-link">
+                        <i class="fas fa-table"></i> Dinamik Tablolar
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="profile.html" class="nav-link">
+                        <i class="fas fa-user"></i> <span id="userName">Profil</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="logout.html" class="nav-link">
+                        <i class="fas fa-sign-out-alt"></i> Çıkış Yap
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <i class="fas fa-database"></i> Veri Görüntüle
+                    </h2>
+                </div>
+                <div class="card-body">
+                    <!-- Search and Filter Controls -->
+                    <div style="display: grid; grid-template-columns: 1fr auto; gap: 1rem; margin-bottom: 2rem; align-items: end;">
+                        <div class="form-group">
+                            <label for="searchTerm" class="form-label">
+                                <i class="fas fa-search"></i> Arama
+                            </label>
+                            <input type="text" id="searchTerm" class="form-control" placeholder="Veri içinde arama yapın...">
+                        </div>
+                        <div class="form-group">
+                            <label for="pageSize" class="form-label">
+                                <i class="fas fa-list"></i> Sayfa Başına
+                            </label>
+                            <select id="pageSize" class="form-control">
+                                <option value="20">20</option>
+                                <option value="50">50</option>
+                                <option value="100">100</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Data Table -->
+                    <div class="table-responsive">
+                        <table class="table" id="dataTable">
+                            <thead>
+                                <tr>
+                                    <th data-sort="id">ID</th>
+                                    <th data-sort="ad">Ad</th>
+                                    <th data-sort="soyad">Soyad</th>
+                                    <th data-sort="tcKimlikNo">TC Kimlik No</th>
+                                    <th data-sort="ogrenciNo">Öğrenci No</th>
+                                    <th data-sort="basvuruYili">Başvuru Yılı</th>
+                                    <th data-sort="odenecek">Ödenecek</th>
+                                    <th data-sort="odemeTarihi">Ödeme Tarihi</th>
+                                    <th>İşlemler</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dataTableBody">
+                                <tr>
+                                    <td colspan="9" style="text-align: center; color: #666;">
+                                        Veri yükleniyor...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Pagination -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 2rem;">
+                        <div>
+                            <span id="paginationInfo">Sayfa 1 / 1</span>
+                        </div>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button class="btn btn-secondary" id="prevPage" disabled>
+                                <i class="fas fa-chevron-left"></i> Önceki
+                            </button>
+                            <button class="btn btn-secondary" id="nextPage" disabled>
+                                Sonraki <i class="fas fa-chevron-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer style="background: #333; color: white; text-align: center; padding: 1rem 0; margin-top: 2rem;">
+        <div class="container">
+            <p>&copy; 2024 Excel Uploader. Tüm hakları saklıdır.</p>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="js/site.js"></script>
+    <script>
+        let currentPage = 1;
+        let pageSize = 20;
+        let totalPages = 1;
+        let allData = [];
+
+        // Load data when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            loadData();
+            setupEventListeners();
+        });
+
+        // Setup event listeners
+        function setupEventListeners() {
+            document.getElementById('searchTerm').addEventListener('input', function() {
+                filterData();
+            });
+
+            document.getElementById('pageSize').addEventListener('change', function() {
+                pageSize = parseInt(this.value);
+                currentPage = 1;
+                loadData();
+            });
+
+            document.getElementById('prevPage').addEventListener('click', function() {
+                if (currentPage > 1) {
+                    currentPage--;
+                    loadData();
+                }
+            });
+
+            document.getElementById('nextPage').addEventListener('click', function() {
+                if (currentPage < totalPages) {
+                    currentPage++;
+                    loadData();
+                }
+            });
+        }
+
+        // Load data
+        async function loadData() {
+            try {
+                const response = await fetch('/api/excel/data', {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    allData = data;
+                    filterData();
+                } else {
+                    showMessage('Veri yüklenirken hata oluştu', 'error');
+                }
+            } catch (error) {
+                console.error('Data load error:', error);
+                showMessage('Veri yüklenirken hata oluştu', 'error');
+            }
+        }
+
+        // Filter data
+        function filterData() {
+            const searchTerm = document.getElementById('searchTerm').value.toLowerCase();
+            const filteredData = allData.filter(item => {
+                return Object.values(item).some(value => 
+                    String(value).toLowerCase().includes(searchTerm)
+                );
+            });
+
+            totalPages = Math.ceil(filteredData.length / pageSize);
+            displayData(filteredData);
+            updatePagination();
+        }
+
+        // Display data
+        function displayData(data) {
+            const startIndex = (currentPage - 1) * pageSize;
+            const endIndex = startIndex + pageSize;
+            const pageData = data.slice(startIndex, endIndex);
+
+            const tbody = document.getElementById('dataTableBody');
+            
+            if (pageData.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="9" style="text-align: center; color: #666;">
+                            Veri bulunamadı
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = pageData.map(item => `
+                <tr>
+                    <td>${item.id || ''}</td>
+                    <td>${item.ad || ''}</td>
+                    <td>${item.soyad || ''}</td>
+                    <td>${item.tcKimlikNo || ''}</td>
+                    <td>${item.ogrenciNo || ''}</td>
+                    <td>${item.basvuruYili || ''}</td>
+                    <td>${item.odenecek ? formatCurrency(item.odenecek) : ''}</td>
+                    <td>${item.odemeTarihi ? formatDate(item.odemeTarihi) : ''}</td>
+                    <td>
+                        <button class="btn btn-sm btn-secondary" onclick="editRecord(${item.id})">
+                            <i class="fas fa-edit"></i> Düzenle
+                        </button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteRecord(${item.id})">
+                            <i class="fas fa-trash"></i> Sil
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // Update pagination
+        function updatePagination() {
+            document.getElementById('paginationInfo').textContent = `Sayfa ${currentPage} / ${totalPages}`;
+            document.getElementById('prevPage').disabled = currentPage <= 1;
+            document.getElementById('nextPage').disabled = currentPage >= totalPages;
+        }
+
+        // Edit record
+        function editRecord(id) {
+            // Navigate to edit page
+            window.location.href = `edit.html?id=${id}`;
+        }
+
+        // Delete record
+        async function deleteRecord(id) {
+            if (confirm('Bu kaydı silmek istediğinizden emin misiniz?')) {
+                try {
+                    const response = await fetch(`/api/excel/data/${id}`, {
+                        method: 'DELETE',
+                        headers: {
+                            'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                        }
+                    });
+
+                    if (response.ok) {
+                        showMessage('Kayıt başarıyla silindi', 'success');
+                        loadData();
+                    } else {
+                        showMessage('Kayıt silinirken hata oluştu', 'error');
+                    }
+                } catch (error) {
+                    console.error('Delete error:', error);
+                    showMessage('Kayıt silinirken hata oluştu', 'error');
+                }
+            }
+        }
+
+        // Show message
+        function showMessage(message, type) {
+            // You can implement a toast or alert system here
+            console.log(`${type}: ${message}`);
+        }
+
+        // Format currency
+        function formatCurrency(amount) {
+            return new Intl.NumberFormat('tr-TR', {
+                style: 'currency',
+                currency: 'TRY'
+            }).format(amount);
+        }
+
+        // Format date
+        function formatDate(dateString) {
+            return new Date(dateString).toLocaleDateString('tr-TR');
+        }
+    </script>
+</body>
+</html>
