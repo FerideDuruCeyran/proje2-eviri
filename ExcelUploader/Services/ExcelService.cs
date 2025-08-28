@@ -19,6 +19,134 @@ namespace ExcelUploader.Services
             ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
         }
 
+        public async Task<object> GetExcelPreviewAsync(IFormFile file)
+        {
+            try
+            {
+                if (file.FileName.EndsWith(".xlsx"))
+                {
+                    return await GetXlsxPreviewAsync(file);
+                }
+                else if (file.FileName.EndsWith(".xls"))
+                {
+                    return await GetXlsPreviewAsync(file);
+                }
+                else
+                {
+                    throw new ArgumentException("Desteklenmeyen dosya formatı. Sadece .xlsx ve .xls dosyaları desteklenir.");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Excel dosyası önizlenirken hata oluştu: {file.FileName}");
+                throw;
+            }
+        }
+
+        private Task<object> GetXlsxPreviewAsync(IFormFile file)
+        {
+            try
+            {
+                using var stream = file.OpenReadStream();
+                using var package = new ExcelPackage(stream);
+                var worksheet = package.Workbook.Worksheets.FirstOrDefault() ?? package.Workbook.Worksheets[0];
+
+                if (worksheet == null)
+                    throw new InvalidOperationException("Excel dosyasında çalışma sayfası bulunamadı.");
+
+                var rowCount = worksheet.Dimension?.Rows ?? 0;
+                var colCount = worksheet.Dimension?.Columns ?? 0;
+
+                // Get headers (first row)
+                var headers = new List<string>();
+                for (int col = 1; col <= colCount; col++)
+                {
+                    var headerValue = GetCellValue(worksheet, 1, col);
+                    headers.Add(string.IsNullOrEmpty(headerValue) ? $"Sütun_{col}" : headerValue);
+                }
+
+                // Get first 10 rows of data (excluding header)
+                var rows = new List<List<string>>();
+                for (int row = 2; row <= Math.Min(11, rowCount); row++)
+                {
+                    var rowData = new List<string>();
+                    for (int col = 1; col <= colCount; col++)
+                    {
+                        var cellValue = GetCellValue(worksheet, row, col);
+                        rowData.Add(cellValue ?? "");
+                    }
+                    rows.Add(rowData);
+                }
+
+                var result = new
+                {
+                    headers = headers,
+                    rows = rows,
+                    totalRows = rowCount - 1, // Exclude header
+                    totalColumns = colCount
+                };
+
+                return Task.FromResult<object>(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in GetXlsxPreviewAsync");
+                throw;
+            }
+        }
+
+        private Task<object> GetXlsPreviewAsync(IFormFile file)
+        {
+            try
+            {
+                using var stream = file.OpenReadStream();
+                using var workbook = new XLWorkbook(stream);
+                var worksheet = workbook.Worksheets.FirstOrDefault() ?? workbook.Worksheets.First();
+
+                if (worksheet == null)
+                    throw new InvalidOperationException("Excel dosyasında çalışma sayfası bulunamadı.");
+
+                var rowCount = worksheet.RowCount();
+                var colCount = worksheet.ColumnCount();
+
+                // Get headers (first row)
+                var headers = new List<string>();
+                for (int col = 1; col <= colCount; col++)
+                {
+                    var headerValue = worksheet.Cell(1, col).Value.ToString() ?? "";
+                    headers.Add(string.IsNullOrEmpty(headerValue) ? $"Sütun_{col}" : headerValue);
+                }
+
+                // Get first 10 rows of data (excluding header)
+                var rows = new List<List<string>>();
+                for (int row = 2; row <= Math.Min(11, rowCount); row++)
+                {
+                    var rowData = new List<string>();
+                    for (int col = 1; col <= colCount; col++)
+                    {
+                        var cellValue = worksheet.Cell(row, col).Value.ToString() ?? "";
+                        rowData.Add(cellValue);
+                    }
+                    rows.Add(rowData);
+                }
+
+                var result = new
+                {
+                    headers = headers,
+                    rows = rows,
+                    totalRows = rowCount - 1, // Exclude header
+                    totalColumns = colCount
+                };
+
+                return Task.FromResult<object>(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in GetXlsPreviewAsync");
+                throw;
+            }
+        }
+
         public async Task<List<ExcelData>> ProcessExcelFileAsync(IFormFile file, string uploadedBy)
         {
             try
@@ -150,26 +278,52 @@ namespace ExcelUploader.Services
                     FileName = file.FileName,
                     UploadDate = DateTime.UtcNow,
                     UploadedBy = uploadedBy,
-                    RowNumber = row + 1,
+                    RowNumber = row,
                     IsProcessed = false
                 };
 
-                // Map columns using NPOI
-                excelData.BasvuruYili = GetNpoiCellValue(sheetRow, 0);
-                excelData.HareketlilikTipi = GetNpoiCellValue(sheetRow, 1);
-                excelData.BasvuruTipi = GetNpoiCellValue(sheetRow, 2);
-                excelData.Ad = GetNpoiCellValue(sheetRow, 3);
-                excelData.Soyad = GetNpoiCellValue(sheetRow, 4);
-                excelData.OdemeTipi = GetNpoiCellValue(sheetRow, 5);
-                excelData.Taksit = GetNpoiCellValue(sheetRow, 6);
-                excelData.Odenecek = GetNpoiDecimalValue(sheetRow, 7);
-                excelData.Odendiginde = GetNpoiDecimalValue(sheetRow, 8);
-                excelData.OdemeTarihi = GetNpoiDateValue(sheetRow, 9);
-                excelData.Aciklama = GetNpoiCellValue(sheetRow, 10);
-                excelData.OdemeOrani = GetNpoiDecimalValue(sheetRow, 11);
+                // Map columns based on the Excel structure from the images
+                excelData.BasvuruYili = GetNpoiCellValue(sheetRow, 0); // Column A
+                excelData.HareketlilikTipi = GetNpoiCellValue(sheetRow, 1); // Column B
+                excelData.BasvuruTipi = GetNpoiCellValue(sheetRow, 2); // Column C
+                excelData.Ad = GetNpoiCellValue(sheetRow, 3); // Column D
+                excelData.Soyad = GetNpoiCellValue(sheetRow, 4); // Column E
+                excelData.OdemeTipi = GetNpoiCellValue(sheetRow, 5); // Column F
+                excelData.Taksit = GetNpoiCellValue(sheetRow, 6); // Column G
+                excelData.Odenecek = GetNpoiDecimalValue(sheetRow, 7); // Column H
+                excelData.Odendiginde = GetNpoiDecimalValue(sheetRow, 8); // Column I
+                excelData.OdemeTarihi = GetNpoiDateValue(sheetRow, 9); // Column J
+                excelData.Aciklama = GetNpoiCellValue(sheetRow, 10); // Column K
+                excelData.OdemeOrani = GetNpoiDecimalValue(sheetRow, 11); // Column L
+
+                // Additional columns for detailed student information
+                if (sheetRow.LastCellNum >= 13) excelData.KullaniciAdi = GetNpoiCellValue(sheetRow, 12);
+                if (sheetRow.LastCellNum >= 14) excelData.TCKimlikNo = GetNpoiCellValue(sheetRow, 13);
+                if (sheetRow.LastCellNum >= 15) excelData.PasaportNo = GetNpoiCellValue(sheetRow, 14);
+                if (sheetRow.LastCellNum >= 16) excelData.DogumTarihi = GetNpoiDateValue(sheetRow, 15);
+                if (sheetRow.LastCellNum >= 17) excelData.DogumYeri = GetNpoiCellValue(sheetRow, 16);
+                if (sheetRow.LastCellNum >= 18) excelData.Cinsiyet = GetNpoiCellValue(sheetRow, 17);
+
+                // Address and bank information
+                if (sheetRow.LastCellNum >= 19) excelData.AdresIl = GetNpoiCellValue(sheetRow, 18);
+                if (sheetRow.LastCellNum >= 20) excelData.AdresUlke = GetNpoiCellValue(sheetRow, 19);
+                if (sheetRow.LastCellNum >= 21) excelData.BankaHesapSahibi = GetNpoiCellValue(sheetRow, 20);
+                if (sheetRow.LastCellNum >= 22) excelData.BankaAdi = GetNpoiCellValue(sheetRow, 21);
+                if (sheetRow.LastCellNum >= 23) excelData.BankaSubeKodu = GetNpoiCellValue(sheetRow, 22);
+                if (sheetRow.LastCellNum >= 24) excelData.BankaSubeAdi = GetNpoiCellValue(sheetRow, 23);
+                if (sheetRow.LastCellNum >= 25) excelData.BankaHesapNumarasi = GetNpoiCellValue(sheetRow, 24);
+                if (sheetRow.LastCellNum >= 26) excelData.BankaIBANNo = GetNpoiCellValue(sheetRow, 25);
+
+                // Student and academic information
+                if (sheetRow.LastCellNum >= 27) excelData.OgrenciNo = GetNpoiCellValue(sheetRow, 26);
+                if (sheetRow.LastCellNum >= 28) excelData.FakulteAdi = GetNpoiCellValue(sheetRow, 27);
+                if (sheetRow.LastCellNum >= 29) excelData.BirimAdi = GetNpoiCellValue(sheetRow, 28);
+                if (sheetRow.LastCellNum >= 30) excelData.DiplomaDerecesi = GetNpoiCellValue(sheetRow, 29);
+                if (sheetRow.LastCellNum >= 31) excelData.Sinif = GetNpoiCellValue(sheetRow, 30);
 
                 // Only add if at least one field has data
-                if (!string.IsNullOrWhiteSpace(excelData.Ad) || !string.IsNullOrWhiteSpace(excelData.Soyad))
+                if (!string.IsNullOrWhiteSpace(excelData.Ad) || !string.IsNullOrWhiteSpace(excelData.Soyad) || 
+                    !string.IsNullOrWhiteSpace(excelData.TCKimlikNo) || !string.IsNullOrWhiteSpace(excelData.OgrenciNo))
                 {
                     data.Add(excelData);
                 }

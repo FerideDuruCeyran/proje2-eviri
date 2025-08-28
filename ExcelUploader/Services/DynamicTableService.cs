@@ -102,10 +102,13 @@ namespace ExcelUploader.Services
                 using var connection = new SqlConnection(connectionString);
                 await connection.OpenAsync();
 
-                var createTableSql = GenerateCreateTableSql(dynamicTable);
+                // Build CREATE TABLE SQL
+                var createTableSql = BuildCreateTableSql(dynamicTable);
+                
                 using var command = new SqlCommand(createTableSql, connection);
                 await command.ExecuteNonQueryAsync();
 
+                _logger.LogInformation("SQL table created successfully: {TableName}", dynamicTable.TableName);
                 return true;
             }
             catch (Exception ex)
@@ -113,6 +116,39 @@ namespace ExcelUploader.Services
                 _logger.LogError(ex, "Error creating SQL table: {TableName}", dynamicTable.TableName);
                 return false;
             }
+        }
+
+        private string BuildCreateTableSql(DynamicTable dynamicTable)
+        {
+            var columns = dynamicTable.Columns.OrderBy(c => c.ColumnOrder);
+            var columnDefinitions = columns.Select(c => 
+                $"[{c.ColumnName}] {GetSqlDataType(c.DataType, c.MaxLength)} {(c.IsRequired ? "NOT NULL" : "NULL")}"
+            );
+
+            return $@"
+                IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = '{dynamicTable.TableName}')
+                BEGIN
+                    CREATE TABLE [{dynamicTable.TableName}] (
+                        [Id] INT IDENTITY(1,1) PRIMARY KEY,
+                        {string.Join(",\n                        ", columnDefinitions)},
+                        [CreatedAt] DATETIME2 DEFAULT GETDATE(),
+                        [UpdatedAt] DATETIME2 DEFAULT GETDATE()
+                    )
+                END";
+        }
+
+        private string GetSqlDataType(string dataType, int? maxLength)
+        {
+            return dataType.ToLower() switch
+            {
+                "string" => maxLength.HasValue ? $"NVARCHAR({maxLength.Value})" : "NVARCHAR(MAX)",
+                "int" => "INT",
+                "decimal" => "DECIMAL(18,2)",
+                "datetime" => "DATETIME2",
+                "boolean" => "BIT",
+                "guid" => "UNIQUEIDENTIFIER",
+                _ => "NVARCHAR(MAX)"
+            };
         }
 
         public async Task<bool> InsertDataAsync(DynamicTable dynamicTable, List<Dictionary<string, object>> data)
@@ -123,38 +159,253 @@ namespace ExcelUploader.Services
                 using var connection = new SqlConnection(connectionString);
                 await connection.OpenAsync();
 
+                // Build INSERT statement
+                var columns = dynamicTable.Columns.OrderBy(c => c.ColumnOrder).ToList();
+                var columnNames = string.Join(", ", columns.Select(c => $"[{c.ColumnName}]"));
+                var parameterNames = string.Join(", ", columns.Select(c => $"@{c.ColumnName}"));
+
+                var insertSql = $"INSERT INTO [{dynamicTable.TableName}] ({columnNames}) VALUES ({parameterNames})";
+
+                using var command = new SqlCommand(insertSql, connection);
+                
+                // Add parameters
+                foreach (var column in columns)
+                {
+                    command.Parameters.AddWithValue($"@{column.ColumnName}", DBNull.Value);
+                }
+
+                // Insert data rows
                 foreach (var row in data)
                 {
-                    var insertSql = GenerateInsertSql(dynamicTable, row);
-                    using var command = new SqlCommand(insertSql, connection);
-                    
-                    // Add parameters
-                    foreach (var kvp in row)
+                    for (int i = 0; i < columns.Count; i++)
                     {
-                        var column = dynamicTable.Columns.FirstOrDefault(c => c.ColumnName == kvp.Key);
-                        if (column != null)
+                        var column = columns[i];
+                        var columnName = column.ColumnName;
+                        
+                        if (row.ContainsKey(columnName))
                         {
-                            var parameterName = $"@{kvp.Key}";
-                            var parameter = command.Parameters.AddWithValue(parameterName, kvp.Value ?? DBNull.Value);
-                            
-                            // Set parameter type if needed
-                            if (column.DataType == "nvarchar" && column.MaxLength.HasValue)
+                            var value = row[columnName];
+                            if (value == null || string.IsNullOrEmpty(value.ToString()))
                             {
-                                parameter.SqlDbType = SqlDbType.NVarChar;
-                                parameter.Size = column.MaxLength.Value;
+                                command.Parameters[$"@{columnName}"].Value = DBNull.Value;
                             }
+                            else
+                            {
+                                command.Parameters[$"@{columnName}"].Value = ConvertValue(value.ToString() ?? "", column.DataType);
+                            }
+                        }
+                        else
+                        {
+                            command.Parameters[$"@{columnName}"].Value = DBNull.Value;
                         }
                     }
                     
                     await command.ExecuteNonQueryAsync();
                 }
 
+                _logger.LogInformation("Data inserted successfully into table: {TableName}", dynamicTable.TableName);
                 return true;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error inserting data into table: {TableName}", dynamicTable.TableName);
                 return false;
+            }
+        }
+
+        private object ConvertValue(string value, string dataType)
+        {
+            if (string.IsNullOrEmpty(value)) return DBNull.Value;
+
+            return dataType.ToLower() switch
+            {
+                "int" => int.TryParse(value, out var intResult) ? intResult : DBNull.Value,
+                "decimal" => decimal.TryParse(value, out var decimalResult) ? decimalResult : DBNull.Value,
+                "datetime" => DateTime.TryParse(value, out var dateResult) ? dateResult : DBNull.Value,
+                "boolean" => bool.TryParse(value, out var boolResult) ? boolResult : DBNull.Value,
+                "guid" => Guid.TryParse(value, out var guidResult) ? guidResult : DBNull.Value,
+                _ => value
+            };
+        }
+
+        public async Task<List<object>> GetTableDataAsync(string tableName, int page = 1, int pageSize = 50)
+        {
+            try
+            {
+                var connectionString = _configuration.GetConnectionString("DefaultConnection");
+                using var connection = new SqlConnection(connectionString);
+                await connection.OpenAsync();
+
+                var offset = (page - 1) * pageSize;
+                var sql = $@"
+                    SELECT *
+                    FROM [{tableName}]
+                    ORDER BY Id
+                    OFFSET {offset} ROWS
+                    FETCH NEXT {pageSize} ROWS ONLY";
+
+                using var command = new SqlCommand(sql, connection);
+                using var reader = await command.ExecuteReaderAsync();
+
+                var results = new List<object>();
+                var columns = new List<string>();
+
+                // Get column names
+                for (int i = 0; i < reader.FieldCount; i++)
+                {
+                    columns.Add(reader.GetName(i));
+                }
+
+                // Read data
+                while (await reader.ReadAsync())
+                {
+                    var row = new Dictionary<string, object>();
+                    for (int i = 0; i < reader.FieldCount; i++)
+                    {
+                        var value = reader.IsDBNull(i) ? null : reader.GetValue(i);
+                        row[columns[i]] = value;
+                    }
+                    results.Add(row);
+                }
+
+                return results;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting table data: {TableName}", tableName);
+                throw;
+            }
+        }
+
+        public async Task<int> GetTableRowCountAsync(string tableName)
+        {
+            try
+            {
+                var connectionString = _configuration.GetConnectionString("DefaultConnection");
+                using var connection = new SqlConnection(connectionString);
+                await connection.OpenAsync();
+
+                var sql = $"SELECT COUNT(*) FROM [{tableName}]";
+                using var command = new SqlCommand(sql, connection);
+                
+                var result = await command.ExecuteScalarAsync();
+                return Convert.ToInt32(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting table row count: {TableName}", tableName);
+                return 0;
+            }
+        }
+
+        public async Task<bool> DeleteTableAsync(int id)
+        {
+            try
+            {
+                var table = await GetTableByIdAsync(id);
+                if (table == null) return false;
+
+                // Drop SQL table
+                var result = await DeleteTableAsync(table.TableName);
+                if (!result) return false;
+
+                // Remove from database
+                _context.DynamicTables.Remove(table);
+                await _context.SaveChangesAsync();
+
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deleting table: {Id}", id);
+                return false;
+            }
+        }
+
+        public async Task<bool> DeleteTableAsync(string tableName)
+        {
+            try
+            {
+                var connectionString = _configuration.GetConnectionString("DefaultConnection");
+                using var connection = new SqlConnection(connectionString);
+                await connection.OpenAsync();
+
+                var sql = $"DROP TABLE IF EXISTS [{tableName}]";
+                using var command = new SqlCommand(sql, connection);
+                
+                await command.ExecuteNonQueryAsync();
+                
+                _logger.LogInformation("Table deleted successfully: {TableName}", tableName);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deleting table: {TableName}", tableName);
+                return false;
+            }
+        }
+
+        public async Task<int> GetTableDataCountAsync(string tableName)
+        {
+            return await GetTableRowCountAsync(tableName);
+        }
+
+        public async Task<bool> ExecuteSqlQueryAsync(string sql, Dictionary<string, object>? parameters = null)
+        {
+            try
+            {
+                var connectionString = _configuration.GetConnectionString("DefaultConnection");
+                using var connection = new SqlConnection(connectionString);
+                await connection.OpenAsync();
+
+                using var command = new SqlCommand(sql, connection);
+                
+                if (parameters != null)
+                {
+                    foreach (var param in parameters)
+                    {
+                        command.Parameters.AddWithValue(param.Key, param.Value ?? DBNull.Value);
+                    }
+                }
+
+                await command.ExecuteNonQueryAsync();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error executing SQL query: {Sql}", sql);
+                return false;
+            }
+        }
+
+        public async Task<DataTable> ExecuteSqlQueryWithResultAsync(string sql, Dictionary<string, object>? parameters = null)
+        {
+            try
+            {
+                var connectionString = _configuration.GetConnectionString("DefaultConnection");
+                using var connection = new SqlConnection(connectionString);
+                await connection.OpenAsync();
+
+                using var command = new SqlCommand(sql, connection);
+                
+                if (parameters != null)
+                {
+                    foreach (var param in parameters)
+                    {
+                        command.Parameters.AddWithValue(param.Key, param.Value ?? DBNull.Value);
+                    }
+                }
+
+                using var adapter = new SqlDataAdapter(command);
+                var dataTable = new DataTable();
+                adapter.Fill(dataTable);
+                
+                return dataTable;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error executing SQL query with result: {Sql}", sql);
+                throw;
             }
         }
 
@@ -178,95 +429,6 @@ namespace ExcelUploader.Services
             return await _context.DynamicTables
                 .Include(t => t.Columns)
                 .FirstOrDefaultAsync(t => t.TableName == tableName);
-        }
-
-        public async Task<bool> DeleteTableAsync(int id)
-        {
-            try
-            {
-                var table = await GetTableByIdAsync(id);
-                if (table == null) return false;
-
-                // Drop SQL table
-                var connectionString = _configuration.GetConnectionString("DefaultConnection");
-                using var connection = new SqlConnection(connectionString);
-                await connection.OpenAsync();
-
-                var dropTableSql = $"IF OBJECT_ID('[{table.TableName}]', 'U') IS NOT NULL DROP TABLE [{table.TableName}]";
-                using var command = new SqlCommand(dropTableSql, connection);
-                await command.ExecuteNonQueryAsync();
-
-                // Remove from database
-                _context.DynamicTables.Remove(table);
-                await _context.SaveChangesAsync();
-
-                return true;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error deleting table: {Id}", id);
-                return false;
-            }
-        }
-
-        public async Task<List<Dictionary<string, object>>> GetTableDataAsync(string tableName, int page = 1, int pageSize = 50)
-        {
-            try
-            {
-                var connectionString = _configuration.GetConnectionString("DefaultConnection");
-                using var connection = new SqlConnection(connectionString);
-                await connection.OpenAsync();
-
-                var offset = (page - 1) * pageSize;
-                var selectSql = $"SELECT * FROM [{tableName}] ORDER BY (SELECT NULL) OFFSET {offset} ROWS FETCH NEXT {pageSize} ROWS ONLY";
-                
-                using var command = new SqlCommand(selectSql, connection);
-                using var reader = await command.ExecuteReaderAsync();
-
-                var data = new List<Dictionary<string, object>>();
-                while (await reader.ReadAsync())
-                {
-                    var row = new Dictionary<string, object>();
-                    for (int i = 0; i < reader.FieldCount; i++)
-                    {
-                        var columnName = reader.GetName(i);
-                        if (columnName != null)
-                        {
-                            var value = reader.IsDBNull(i) ? null : reader.GetValue(i);
-                            row[columnName] = value ?? DBNull.Value;
-                        }
-                    }
-                    data.Add(row);
-                }
-
-                return data;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error getting table data: {TableName}", tableName);
-                return new List<Dictionary<string, object>>();
-            }
-        }
-
-        public async Task<int> GetTableDataCountAsync(string tableName)
-        {
-            try
-            {
-                var connectionString = _configuration.GetConnectionString("DefaultConnection");
-                using var connection = new SqlConnection(connectionString);
-                await connection.OpenAsync();
-
-                var countSql = $"SELECT COUNT(*) FROM [{tableName}]";
-                using var command = new SqlCommand(countSql, connection);
-                var count = await command.ExecuteScalarAsync();
-                
-                return Convert.ToInt32(count);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error getting table data count: {TableName}", tableName);
-                return 0;
-            }
         }
 
         public async Task<bool> UpdateTableDataAsync(string tableName, int rowId, Dictionary<string, object> data)
@@ -329,9 +491,12 @@ namespace ExcelUploader.Services
                 
                 if (table == null || !data.Any()) return new byte[0];
 
+                // Convert List<object> to List<Dictionary<string, object>>
+                var convertedData = data.Cast<Dictionary<string, object>>().ToList();
+
                 if (format.ToLower() == "xlsx")
                 {
-                    return await ExportToXlsxAsync(data, table);
+                    return await ExportToXlsxAsync(convertedData, table);
                 }
                 
                 throw new NotSupportedException($"Export format '{format}' is not supported");
@@ -361,13 +526,13 @@ namespace ExcelUploader.Services
             return (headers, dataTypes, sampleData);
         }
 
-        private async Task AnalyzeXlsxFileAsync(IFormFile file, List<string> headers, List<string> dataTypes, List<Dictionary<string, object>> sampleData)
+        private Task AnalyzeXlsxFileAsync(IFormFile file, List<string> headers, List<string> dataTypes, List<Dictionary<string, object>> sampleData)
         {
             using var stream = file.OpenReadStream();
             using var package = new ExcelPackage(stream);
             var worksheet = package.Workbook.Worksheets.FirstOrDefault() ?? package.Workbook.Worksheets[0];
 
-            if (worksheet == null) return;
+            if (worksheet == null) return Task.CompletedTask;
 
             var rowCount = worksheet.Dimension?.Rows ?? 0;
             var colCount = worksheet.Dimension?.Columns ?? 0;
@@ -397,9 +562,11 @@ namespace ExcelUploader.Services
                 var dataType = DetermineDataType(sampleData.Select(r => r.Values.ElementAt(col)).ToList());
                 dataTypes.Add(dataType);
             }
+
+            return Task.CompletedTask;
         }
 
-        private async Task AnalyzeXlsFileAsync(IFormFile file, List<string> headers, List<string> dataTypes, List<Dictionary<string, object>> sampleData)
+        private Task AnalyzeXlsFileAsync(IFormFile file, List<string> headers, List<string> dataTypes, List<Dictionary<string, object>> sampleData)
         {
             using var stream = file.OpenReadStream();
             IWorkbook workbook;
@@ -446,6 +613,8 @@ namespace ExcelUploader.Services
                 var dataType = DetermineDataType(sampleData.Select(r => r.Values.ElementAt(col)).ToList());
                 dataTypes.Add(dataType);
             }
+
+            return Task.CompletedTask;
         }
 
         private string DetermineDataType(List<object> values)
@@ -496,36 +665,6 @@ namespace ExcelUploader.Services
             if (char.IsDigit(sanitized[0]))
                 sanitized = "Col_" + sanitized;
             return sanitized;
-        }
-
-        private string GenerateCreateTableSql(DynamicTable dynamicTable)
-        {
-            var columnDefinitions = dynamicTable.Columns
-                .OrderBy(c => c.ColumnOrder)
-                .Select(c => $"[{c.ColumnName}] {c.DataType} {(c.IsRequired ? "NOT NULL" : "NULL")}")
-                .ToList();
-
-            // Add Id column at the beginning
-            columnDefinitions.Insert(0, "[Id] int IDENTITY(1,1) PRIMARY KEY");
-
-            var createTableSql = $@"
-                CREATE TABLE [{dynamicTable.TableName}] (
-                    {string.Join(",\n                    ", columnDefinitions)}
-                )";
-
-            return createTableSql;
-        }
-
-        private string GenerateInsertSql(DynamicTable dynamicTable, Dictionary<string, object> rowData)
-        {
-            var columns = rowData.Keys.Select(k => $"[{k}]").ToList();
-            var parameters = rowData.Keys.Select(k => $"@{k}").ToList();
-
-            var insertSql = $@"
-                INSERT INTO [{dynamicTable.TableName}] ({string.Join(", ", columns)})
-                VALUES ({string.Join(", ", parameters)})";
-
-            return insertSql;
         }
 
         private string? GetCellValue(ExcelWorksheet worksheet, int row, int col)

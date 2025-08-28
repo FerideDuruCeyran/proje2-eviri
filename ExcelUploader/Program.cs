@@ -43,9 +43,10 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
 // Add Authorization - Allow anonymous access to login and register
 builder.Services.AddAuthorization(options =>
 {
-    options.FallbackPolicy = new AuthorizationPolicyBuilder()
-        .RequireAuthenticatedUser()
-        .Build();
+    // Remove fallback policy to allow anonymous access by default
+    // options.FallbackPolicy = new AuthorizationPolicyBuilder()
+    //     .RequireAuthenticatedUser()
+    //     .Build();
     
     // Allow anonymous access to specific endpoints
     options.AddPolicy("AllowAnonymous", policy =>
@@ -84,6 +85,17 @@ app.UseRouting();
 // Serve static files
 app.UseStaticFiles();
 
+// Map HTML pages BEFORE authentication middleware
+app.MapGet("/", () => Results.File("wwwroot/index.html", "text/html"));
+app.MapGet("/login", () => Results.File("wwwroot/login.html", "text/html"));
+app.MapGet("/register", () => Results.File("wwwroot/register.html", "text/html"));
+app.MapGet("/upload", () => Results.File("wwwroot/upload.html", "text/html"));
+app.MapGet("/data", () => Results.File("wwwroot/data.html", "text/html"));
+app.MapGet("/tables", () => Results.File("wwwroot/tables.html", "text/html"));
+app.MapGet("/profile", () => Results.File("wwwroot/profile.html", "text/html"));
+app.MapGet("/logout", () => Results.File("wwwroot/logout.html", "text/html"));
+app.MapGet("/sql-test", () => Results.File("wwwroot/sql-test.html", "text/html"));
+
 app.UseAuthentication();
 app.UseAuthorization();
 
@@ -91,7 +103,7 @@ app.UseAuthorization();
 app.MapControllers();
 
 // Map minimal API endpoints
-app.MapGet("/", () => Results.Ok(new { 
+app.MapGet("/api", () => Results.Ok(new { 
     message = "Excel Uploader API is running",
     version = "9.0",
     timestamp = DateTime.UtcNow,
@@ -104,11 +116,11 @@ app.MapGet("/health", () => Results.Ok(new {
     status = "Healthy"
 }));
 
-// Ensure database is created
-using (var scope = app.Services.CreateScope())
-{
-    var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-    context.Database.EnsureCreated();
-}
+// Database will be created/updated through migrations
+// using (var scope = app.Services.CreateScope())
+// {
+//     var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+//     context.Database.EnsureCreated();
+// }
 
 app.Run();

@@ -98,8 +98,6 @@ namespace ExcelUploader.Models
     public class DataRequest
     {
         public int? TableId { get; set; }
-        public string? TableName { get; set; }
-        public Dictionary<string, object>? Filters { get; set; }
     }
 
     public class LoginViewModel
@@ -155,8 +153,8 @@ namespace ExcelUploader.Models
 
     public class DynamicTableDetailsViewModel
     {
-        public DynamicTable Table { get; set; } = null!;
-        public List<Dictionary<string, object>> Data { get; set; } = new List<Dictionary<string, object>>();
+        public DynamicTable Table { get; set; } = new();
+        public List<object> Data { get; set; } = new();
         public int TotalRows { get; set; }
         public int CurrentPage { get; set; }
         public int PageSize { get; set; }
@@ -164,8 +162,8 @@ namespace ExcelUploader.Models
 
     public class DynamicTableDataViewModel
     {
-        public DynamicTable Table { get; set; } = null!;
-        public List<Dictionary<string, object>> Data { get; set; } = new List<Dictionary<string, object>>();
+        public DynamicTable Table { get; set; } = new();
+        public List<object> Data { get; set; } = new();
         public int TotalRows { get; set; }
         public int CurrentPage { get; set; }
         public int PageSize { get; set; }

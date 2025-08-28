@@ -2,7 +2,9 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using ExcelUploader.Models;
 using ExcelUploader.Services;
+using ExcelUploader.Data;
 using System.Security.Claims;
+using Microsoft.EntityFrameworkCore;
 
 namespace ExcelUploader.Controllers
 {
@@ -13,13 +15,20 @@ namespace ExcelUploader.Controllers
         private readonly IDataImportService _dataImportService;
         private readonly IExcelService _excelService;
         private readonly IDynamicTableService _dynamicTableService;
+        private readonly ApplicationDbContext _context;
         private readonly ILogger<HomeController> _logger;
 
-        public HomeController(IDataImportService dataImportService, IExcelService excelService, IDynamicTableService dynamicTableService, ILogger<HomeController> logger)
+        public HomeController(
+            IDataImportService dataImportService, 
+            IExcelService excelService, 
+            IDynamicTableService dynamicTableService,
+            ApplicationDbContext context,
+            ILogger<HomeController> logger)
         {
             _dataImportService = dataImportService;
             _excelService = excelService;
             _dynamicTableService = dynamicTableService;
+            _context = context;
             _logger = logger;
         }
 
@@ -29,6 +38,86 @@ namespace ExcelUploader.Controllers
         public IActionResult Index()
         {
             return Ok(new { message = "Excel Uploader API", version = "9.0", status = "Running" });
+        }
+
+        [HttpGet]
+        [Route("stats")]
+        [Authorize]
+        public async Task<IActionResult> Stats()
+        {
+            try
+            {
+                var tables = await _dynamicTableService.GetAllTablesAsync();
+                var stats = new
+                {
+                    totalFiles = tables.Count,
+                    totalRecords = tables.Sum(t => t.RowCount),
+                    totalTables = tables.Count
+                };
+                return Ok(stats);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error loading stats");
+                return StatusCode(500, new { error = "İstatistikler yüklenirken hata oluştu" });
+            }
+        }
+
+        [HttpGet]
+        [Route("recent-activities")]
+        [Authorize]
+        public async Task<IActionResult> RecentActivities()
+        {
+            try
+            {
+                var tables = await _dynamicTableService.GetAllTablesAsync();
+                var activities = tables
+                    .OrderByDescending(t => t.UploadDate)
+                    .Take(10)
+                    .Select(t => new
+                    {
+                        type = "upload",
+                        title = $"{t.FileName} dosyası yüklendi",
+                        timestamp = t.UploadDate
+                    })
+                    .ToList();
+
+                return Ok(activities);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error loading recent activities");
+                return StatusCode(500, new { error = "Son aktiviteler yüklenirken hata oluştu" });
+            }
+        }
+
+        [HttpPost]
+        [Route("preview")]
+        [Authorize]
+        public async Task<IActionResult> Preview([FromForm] IFormFile file)
+        {
+            if (file == null)
+            {
+                return BadRequest(new { error = "Lütfen bir dosya seçin" });
+            }
+
+            try
+            {
+                // Validate file
+                if (!await _excelService.ValidateExcelFileAsync(file))
+                {
+                    return BadRequest(new { error = "Geçersiz dosya formatı veya boyut" });
+                }
+
+                // Read Excel file and return preview data
+                var previewData = await _excelService.GetExcelPreviewAsync(file);
+                return Ok(previewData);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error previewing Excel file");
+                return StatusCode(500, new { error = "Excel dosyası önizlenirken hata oluştu" });
+            }
         }
 
         [HttpGet]
@@ -166,6 +255,85 @@ namespace ExcelUploader.Controllers
             {
                 _logger.LogError(ex, "Error loading data");
                 return StatusCode(500, new { error = "Veri yüklenirken hata oluştu" });
+            }
+        }
+
+        [HttpGet]
+        [Route("sql-test")]
+        [AllowAnonymous]
+        public async Task<IActionResult> SqlTest()
+        {
+            try
+            {
+                // Test SQL Server connection
+                var canConnect = await _context.Database.CanConnectAsync();
+                
+                if (canConnect)
+                {
+                    // Get database info
+                    var connectionString = _context.Database.GetConnectionString();
+                    var databaseName = _context.Database.GetDbConnection().Database;
+                    var serverVersion = _context.Database.GetDbConnection().ServerVersion;
+                    
+                    return Ok(new { 
+                        status = "Connected",
+                        message = "SQL Server bağlantısı başarılı",
+                        database = databaseName,
+                        serverVersion = serverVersion,
+                        timestamp = DateTime.UtcNow
+                    });
+                }
+                else
+                {
+                    return StatusCode(500, new { 
+                        status = "Failed",
+                        message = "SQL Server bağlantısı başarısız",
+                        timestamp = DateTime.UtcNow
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "SQL connection test failed");
+                return StatusCode(500, new { 
+                    status = "Error",
+                    message = "SQL Server bağlantı testi sırasında hata oluştu",
+                    error = ex.Message,
+                    timestamp = DateTime.UtcNow
+                });
+            }
+        }
+
+        [HttpGet]
+        [Route("database-info")]
+        [Authorize]
+        public async Task<IActionResult> DatabaseInfo()
+        {
+            try
+            {
+                // Get database statistics
+                var tableCount = await _context.Database.SqlQueryRaw<int>("SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE'").FirstOrDefaultAsync();
+                var totalSize = await _context.Database.SqlQueryRaw<decimal>("SELECT SUM(size * 8.0 / 1024) FROM sys.database_files").FirstOrDefaultAsync();
+                
+                // Get recent tables
+                var recentTables = await _context.DynamicTables
+                    .OrderByDescending(t => t.UploadDate)
+                    .Take(10)
+                    .Select(t => new { t.TableName, t.FileName, t.UploadDate, t.RowCount })
+                    .ToListAsync();
+
+                return Ok(new
+                {
+                    tableCount,
+                    totalSizeMB = Math.Round(totalSize, 2),
+                    recentTables,
+                    lastUpdate = DateTime.UtcNow
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting database info");
+                return StatusCode(500, new { error = "Veritabanı bilgileri alınırken hata oluştu" });
             }
         }
 

@@ -1,4 +1,5 @@
 using ExcelUploader.Models;
+using System.Data;
 
 namespace ExcelUploader.Services
 {
@@ -11,10 +12,14 @@ namespace ExcelUploader.Services
         Task<DynamicTable?> GetTableByIdAsync(int id);
         Task<DynamicTable?> GetTableByNameAsync(string tableName);
         Task<bool> DeleteTableAsync(int id);
-        Task<List<Dictionary<string, object>>> GetTableDataAsync(string tableName, int page = 1, int pageSize = 50);
+        Task<bool> DeleteTableAsync(string tableName);
+        Task<List<object>> GetTableDataAsync(string tableName, int page = 1, int pageSize = 50);
+        Task<int> GetTableRowCountAsync(string tableName);
         Task<int> GetTableDataCountAsync(string tableName);
         Task<bool> UpdateTableDataAsync(string tableName, int rowId, Dictionary<string, object> data);
         Task<bool> DeleteTableDataAsync(string tableName, int rowId);
         Task<byte[]> ExportTableDataAsync(string tableName, string format = "xlsx");
+        Task<bool> ExecuteSqlQueryAsync(string sql, Dictionary<string, object>? parameters = null);
+        Task<DataTable> ExecuteSqlQueryWithResultAsync(string sql, Dictionary<string, object>? parameters = null);
     }
 }
