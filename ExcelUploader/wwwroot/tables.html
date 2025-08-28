@@ -20,32 +20,42 @@
         <div class="container">
             <ul class="nav-list">
                 <li class="nav-item">
-                    <a href="index.html" class="nav-link">
+                    <a href="/" class="nav-link">
                         <i class="fas fa-home"></i> Ana Sayfa
                     </a>
                 </li>
-                <li class="nav-item">
-                    <a href="upload.html" class="nav-link">
+                <li class="nav-item auth-only" style="display: none;">
+                    <a href="/upload" class="nav-link">
                         <i class="fas fa-upload"></i> Dosya Yükle
                     </a>
                 </li>
-                <li class="nav-item">
-                    <a href="data.html" class="nav-link">
+                <li class="nav-item auth-only" style="display: none;">
+                    <a href="/data" class="nav-link">
                         <i class="fas fa-database"></i> Veri Görüntüle
                     </a>
                 </li>
-                <li class="nav-item">
-                    <a href="tables.html" class="nav-link active">
+                <li class="nav-item auth-only" style="display: none;">
+                    <a href="/tables" class="nav-link active">
                         <i class="fas fa-table"></i> Dinamik Tablolar
                     </a>
                 </li>
-                <li class="nav-item">
-                    <a href="profile.html" class="nav-link">
+                <li class="nav-item unauth-only">
+                    <a href="/login" class="nav-link">
+                        <i class="fas fa-sign-in-alt"></i> Giriş Yap
+                    </a>
+                </li>
+                <li class="nav-item unauth-only">
+                    <a href="/register" class="nav-link">
+                        <i class="fas fa-user-plus"></i> Kayıt Ol
+                    </a>
+                </li>
+                <li class="nav-item auth-only" style="display: none;">
+                    <a href="/profile" class="nav-link">
                         <i class="fas fa-user"></i> <span id="userName">Profil</span>
                     </a>
                 </li>
-                <li class="nav-item">
-                    <a href="logout.html" class="nav-link">
+                <li class="nav-item auth-only" style="display: none;">
+                    <a href="/logout" class="nav-link">
                         <i class="fas fa-sign-out-alt"></i> Çıkış Yap
                     </a>
                 </li>
@@ -242,12 +252,14 @@
 
         // View table
         function viewTable(id) {
-            window.location.href = `table-view.html?id=${id}`;
+            // For now, redirect to data page to view table data
+            window.location.href = `/data?tableId=${id}`;
         }
 
         // Edit table
         function editTable(id) {
-            window.location.href = `table-edit.html?id=${id}`;
+            // For now, redirect to upload page to recreate table
+            window.location.href = `/upload?editTableId=${id}`;
         }
 
         // Delete table

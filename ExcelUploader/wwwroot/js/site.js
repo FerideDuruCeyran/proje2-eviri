@@ -491,7 +491,7 @@ function logout() {
     
     showAlert('Başarıyla çıkış yapıldı', 'success');
     setTimeout(() => {
-        window.location.href = 'login.html';
+                    window.location.href = '/login';
     }, 1000);
 }
 
@@ -675,7 +675,7 @@ async function handleLogin(e) {
             
             showAlert('Başarıyla giriş yapıldı', 'success');
             setTimeout(() => {
-                window.location.href = 'index.html';
+                window.location.href = '/';
             }, 1000);
         } else {
             const error = await response.json();
@@ -722,7 +722,7 @@ async function handleRegister(e) {
         if (response.ok) {
             showAlert('Kayıt başarılı! Giriş yapabilirsiniz.', 'success');
             setTimeout(() => {
-                window.location.href = 'login.html';
+                window.location.href = '/login';
             }, 2000);
         } else {
             const error = await response.json();
@@ -796,6 +796,16 @@ function updateUserInterface() {
     }
 }
 
+// Show message function for tables page
+function showMessage(message, type) {
+    if (window.ExcelUploader && window.ExcelUploader.showAlert) {
+        window.ExcelUploader.showAlert(message, type);
+    } else {
+        // Fallback alert
+        alert(`${type}: ${message}`);
+    }
+}
+
 // Export functions for global use
 window.ExcelUploader = {
     showAlert,
@@ -804,5 +814,6 @@ window.ExcelUploader = {
     formatCurrency,
     formatDate,
     logout,
-    navigateTo
+    navigateTo,
+    showMessage
 };
