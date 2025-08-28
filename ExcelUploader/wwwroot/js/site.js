@@ -226,6 +226,9 @@ async function handleLogin(e) {
             isAuthenticated = true;
             currentUser = result.user;
             
+            // Update navigation immediately
+            updateNavigationForAuthenticated();
+            
             showAlert('Başarıyla giriş yapıldı!', 'success');
             setTimeout(() => {
                 window.location.href = '/';
@@ -455,14 +458,6 @@ function updateUserInterface() {
         if (userNameElement) {
             userNameElement.textContent = `${currentUser.firstName} ${currentUser.lastName}`;
         }
-
-        // Show authenticated elements
-        const authElements = document.querySelectorAll('.auth-only');
-        authElements.forEach(el => el.style.display = '');
-
-        // Hide unauthenticated elements
-        const unauthElements = document.querySelectorAll('.unauth-only');
-        unauthElements.forEach(el => el.style.display = 'none');
     }
 }
 
@@ -470,16 +465,75 @@ function updateUserInterface() {
 function checkAuthentication() {
     const token = localStorage.getItem('authToken');
     if (token) {
-        isAuthenticated = true;
-        loadUserProfile();
+        // Verify token is still valid
+        verifyToken(token);
     } else {
-        // Show unauthenticated elements
-        const unauthElements = document.querySelectorAll('.unauth-only');
-        unauthElements.forEach(el => el.style.display = '');
-        
-        // Hide authenticated elements
-        const authElements = document.querySelectorAll('.auth-only');
-        authElements.forEach(el => el.style.display = 'none');
+        isAuthenticated = false;
+        currentUser = null;
+        document.body.classList.remove('authenticated');
+        updateNavigationForUnauthenticated();
+    }
+}
+
+// Verify token with server
+async function verifyToken(token) {
+    try {
+        const response = await fetch('/api/account/verify', {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+
+        if (response.ok) {
+            const userData = await response.json();
+            isAuthenticated = true;
+            currentUser = userData;
+            document.body.classList.add('authenticated');
+            updateNavigationForAuthenticated();
+            loadUserProfile();
+        } else {
+            // Token is invalid, remove it
+            localStorage.removeItem('authToken');
+            isAuthenticated = false;
+            currentUser = null;
+            document.body.classList.remove('authenticated');
+            updateNavigationForUnauthenticated();
+        }
+    } catch (error) {
+        console.error('Token verification error:', error);
+        // On error, assume token is invalid
+        localStorage.removeItem('authToken');
+        isAuthenticated = false;
+        currentUser = null;
+        document.body.classList.remove('authenticated');
+        updateNavigationForUnauthenticated();
+    }
+}
+
+// Update navigation for authenticated users
+function updateNavigationForAuthenticated() {
+    // Show all authenticated features
+    document.body.classList.add('authenticated');
+    
+    // Update user name if available
+    if (currentUser) {
+        const userNameElement = document.getElementById('userName');
+        if (userNameElement) {
+            userNameElement.textContent = `${currentUser.firstName} ${currentUser.lastName}`;
+        }
+    }
+}
+
+// Update navigation for unauthenticated users
+function updateNavigationForUnauthenticated() {
+    // Hide authenticated features
+    document.body.classList.remove('authenticated');
+    
+    // Clear user name
+    const userNameElement = document.getElementById('userName');
+    if (userNameElement) {
+        userNameElement.textContent = 'Profil';
     }
 }
 
@@ -489,9 +543,12 @@ function logout() {
     isAuthenticated = false;
     currentUser = null;
     
+    // Update navigation immediately
+    updateNavigationForUnauthenticated();
+    
     showAlert('Başarıyla çıkış yapıldı', 'success');
     setTimeout(() => {
-                    window.location.href = '/login';
+        window.location.href = '/login';
     }, 1000);
 }
 
@@ -772,27 +829,11 @@ async function loadUserProfile() {
 // Update user interface
 function updateUserInterface() {
     if (isAuthenticated && currentUser) {
-        // Show authenticated elements
-        const authElements = document.querySelectorAll('.auth-only');
-        authElements.forEach(el => el.style.display = '');
-        
-        // Hide unauthenticated elements
-        const unauthElements = document.querySelectorAll('.unauth-only');
-        unauthElements.forEach(el => el.style.display = 'none');
-        
         // Update user name
         const userNameElements = document.querySelectorAll('#userName');
         userNameElements.forEach(el => {
             el.textContent = currentUser.firstName || 'Profil';
         });
-    } else {
-        // Show unauthenticated elements
-        const unauthElements = document.querySelectorAll('.unauth-only');
-        unauthElements.forEach(el => el.style.display = '');
-        
-        // Hide authenticated elements
-        const authElements = document.querySelectorAll('.auth-only');
-        authElements.forEach(el => el.style.display = 'none');
     }
 }
 

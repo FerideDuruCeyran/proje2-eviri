@@ -15,6 +15,7 @@ namespace ExcelUploader.Data
         public DbSet<DynamicTable> DynamicTables { get; set; }
         public DbSet<TableColumn> TableColumns { get; set; }
         public DbSet<TableData> TableData { get; set; }
+        public DbSet<UserLoginLog> UserLoginLogs { get; set; }
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
@@ -112,6 +113,22 @@ namespace ExcelUploader.Data
                           .WithMany()
                           .HasForeignKey(e => e.ColumnId)
                           .OnDelete(DeleteBehavior.NoAction);
+                });
+
+                // Configure UserLoginLog
+                builder.Entity<UserLoginLog>(entity =>
+                {
+                    entity.HasKey(e => e.Id);
+                    entity.Property(e => e.Id).ValueGeneratedOnAdd();
+                    entity.Property(e => e.Timestamp).HasColumnType("datetime2");
+                    entity.HasIndex(e => e.UserId);
+                    entity.HasIndex(e => e.Timestamp);
+                    entity.HasIndex(e => e.Action);
+                    entity.HasIndex(e => e.IsSuccessful);
+                    entity.HasOne(e => e.User)
+                          .WithMany()
+                          .HasForeignKey(e => e.UserId)
+                          .OnDelete(DeleteBehavior.Cascade);
                 });
 
                 // Seed default admin user

@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel Uploader - Giriş Günlükleri</title>
+    <link rel="stylesheet" href="css/site.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <h1><i class="fas fa-file-excel"></i> Excel Uploader</h1>
+        </div>
+    </header>
+
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="container">
+            <ul class="nav-list">
+                <li class="nav-item">
+                    <a href="/" class="nav-link">
+                        <i class="fas fa-home"></i> Ana Sayfa
+                    </a>
+                </li>
+                <li class="nav-item auth-only">
+                    <a href="/upload" class="nav-link">
+                        <i class="fas fa-upload"></i> Dosya Yükle
+                    </a>
+                </li>
+                <li class="nav-item auth-only">
+                    <a href="/data" class="nav-link">
+                        <i class="fas fa-database"></i> Veri Görüntüle
+                    </a>
+                </li>
+                <li class="nav-item auth-only">
+                    <a href="/tables" class="nav-link">
+                        <i class="fas fa-table"></i> Dinamik Tablolar
+                    </a>
+                </li>
+                <li class="nav-item auth-only">
+                    <a href="/login-logs" class="nav-link active">
+                        <i class="fas fa-sign-in-alt"></i> Giriş Günlükleri
+                    </a>
+                </li>
+                <li class="nav-item unauth-only">
+                    <a href="/login" class="nav-link">
+                        <i class="fas fa-sign-in-alt"></i> Giriş Yap
+                    </a>
+                </li>
+                <li class="nav-item unauth-only">
+                    <a href="/register" class="nav-link">
+                        <i class="fas fa-user-plus"></i> Kayıt Ol
+                    </a>
+                </li>
+                <li class="nav-item auth-only">
+                    <a href="/profile" class="nav-link">
+                        <i class="fas fa-user"></i> <span id="userName">Profil</span>
+                    </a>
+                </li>
+                <li class="nav-item auth-only">
+                    <a href="/logout" class="nav-link">
+                        <i class="fas fa-sign-out-alt"></i> Çıkış Yap
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <!-- Statistics Cards -->
+            <div class="row" style="margin-bottom: 2rem;">
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-calendar-day text-primary"></i> Bugün
+                            </h5>
+                            <div class="stats-container">
+                                <div class="stat-item">
+                                    <span class="stat-number" id="todayTotal">-</span>
+                                    <span class="stat-label">Toplam</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-number text-success" id="todaySuccess">-</span>
+                                    <span class="stat-label">Başarılı</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-number text-danger" id="todayFailed">-</span>
+                                    <span class="stat-label">Başarısız</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-calendar-week text-info"></i> Bu Hafta
+                            </h5>
+                            <div class="stats-container">
+                                <div class="stat-item">
+                                    <span class="stat-number" id="weekTotal">-</span>
+                                    <span class="stat-label">Toplam</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-number text-success" id="weekSuccess">-</span>
+                                    <span class="stat-label">Başarılı</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-number text-danger" id="weekFailed">-</span>
+                                    <span class="stat-label">Başarısız</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-calendar-alt text-warning"></i> Bu Ay
+                            </h5>
+                            <div class="stats-container">
+                                <div class="stat-item">
+                                    <span class="stat-number" id="monthTotal">-</span>
+                                    <span class="stat-label">Toplam</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-number text-success" id="monthSuccess">-</span>
+                                    <span class="stat-label">Başarılı</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-number text-danger" id="monthFailed">-</span>
+                                    <span class="stat-label">Başarısız</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-chart-line text-success"></i> Genel
+                            </h5>
+                            <div class="stats-container">
+                                <div class="stat-item">
+                                    <span class="stat-number" id="totalLogs">-</span>
+                                    <span class="stat-label">Toplam Kayıt</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-number text-primary" id="uniqueUsers">-</span>
+                                    <span class="stat-label">Benzersiz Kullanıcı</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filters -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-filter"></i> Filtreler
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <form id="filterForm" class="row">
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label for="actionFilter" class="form-label">İşlem Türü</label>
+                                <select id="actionFilter" class="form-control">
+                                    <option value="">Tümü</option>
+                                    <option value="Login">Giriş</option>
+                                    <option value="Logout">Çıkış</option>
+                                    <option value="FailedLogin">Başarısız Giriş</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label for="startDate" class="form-label">Başlangıç Tarihi</label>
+                                <input type="date" id="startDate" class="form-control">
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label for="endDate" class="form-label">Bitiş Tarihi</label>
+                                <input type="date" id="endDate" class="form-control">
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="form-group">
+                                <label for="userIdFilter" class="form-label">Kullanıcı ID</label>
+                                <input type="text" id="userIdFilter" class="form-control" placeholder="Kullanıcı ID">
+                            </div>
+                        </div>
+                        <div class="col-12 mt-3">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-search"></i> Filtrele
+                            </button>
+                            <button type="button" class="btn btn-secondary" onclick="clearFilters()">
+                                <i class="fas fa-times"></i> Temizle
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Login Logs Table -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-list"></i> Giriş Günlükleri
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div id="logsTable">
+                        <div style="text-align: center; color: #666; padding: 2rem;">
+                            <i class="fas fa-spinner fa-spin" style="font-size: 2rem; margin-bottom: 1rem;"></i>
+                            <p>Günlükler yükleniyor...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pagination -->
+            <div class="d-flex justify-content-between align-items-center mt-3">
+                <div>
+                    <span id="paginationInfo">Sayfa bilgisi yükleniyor...</span>
+                </div>
+                <div>
+                    <button id="prevPage" class="btn btn-outline-primary" onclick="previousPage()" disabled>
+                        <i class="fas fa-chevron-left"></i> Önceki
+                    </button>
+                    <span id="pageInfo" class="mx-3">Sayfa 1</span>
+                    <button id="nextPage" class="btn btn-outline-primary" onclick="nextPage()" disabled>
+                        Sonraki <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer style="background: #333; color: white; text-align: center; padding: 1rem 0; margin-top: 2rem;">
+        <div class="container">
+            <p>&copy; 2024 Excel Uploader. Tüm hakları saklıdır.</p>
+        </div>
+    </footer>
+
+    <!-- Scripts -->
+    <script src="js/site.js"></script>
+    <script>
+        let currentPage = 1;
+        let totalPages = 1;
+        let currentFilters = {};
+
+        // Load data when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            loadStats();
+            loadLoginLogs();
+            setupEventListeners();
+        });
+
+        // Setup event listeners
+        function setupEventListeners() {
+            document.getElementById('filterForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                currentPage = 1;
+                loadLoginLogs();
+            });
+        }
+
+        // Load statistics
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/login-logs/stats', {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                    }
+                });
+
+                if (response.ok) {
+                    const stats = await response.json();
+                    updateStats(stats);
+                }
+            } catch (error) {
+                console.error('Stats load error:', error);
+            }
+        }
+
+        // Update statistics display
+        function updateStats(stats) {
+            document.getElementById('todayTotal').textContent = stats.today.total;
+            document.getElementById('todaySuccess').textContent = stats.today.successful;
+            document.getElementById('todayFailed').textContent = stats.today.failed;
+
+            document.getElementById('weekTotal').textContent = stats.thisWeek.total;
+            document.getElementById('weekSuccess').textContent = stats.thisWeek.successful;
+            document.getElementById('weekFailed').textContent = stats.thisWeek.failed;
+
+            document.getElementById('monthTotal').textContent = stats.thisMonth.total;
+            document.getElementById('monthSuccess').textContent = stats.thisMonth.successful;
+            document.getElementById('monthFailed').textContent = stats.thisMonth.failed;
+        }
+
+        // Load login logs
+        async function loadLoginLogs() {
+            try {
+                const filters = getFilters();
+                const queryParams = new URLSearchParams({
+                    page: currentPage,
+                    pageSize: 50,
+                    ...filters
+                });
+
+                const response = await fetch(`/api/login-logs?${queryParams}`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    displayLogs(data.logs);
+                    updatePagination(data.pagination);
+                } else {
+                    showMessage('Giriş günlükleri yüklenirken hata oluştu', 'error');
+                }
+            } catch (error) {
+                console.error('Logs load error:', error);
+                showMessage('Giriş günlükleri yüklenirken hata oluştu', 'error');
+            }
+        }
+
+        // Get filters from form
+        function getFilters() {
+            const filters = {};
+            
+            const action = document.getElementById('actionFilter').value;
+            if (action) filters.action = action;
+
+            const startDate = document.getElementById('startDate').value;
+            if (startDate) filters.startDate = startDate;
+
+            const endDate = document.getElementById('endDate').value;
+            if (endDate) filters.endDate = endDate;
+
+            const userId = document.getElementById('userIdFilter').value;
+            if (userId) filters.userId = userId;
+
+            return filters;
+        }
+
+        // Display logs in table
+        function displayLogs(logs) {
+            const container = document.getElementById('logsTable');
+            
+            if (logs.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align: center; color: #666; padding: 2rem;">
+                        <i class="fas fa-info-circle" style="font-size: 2rem; margin-bottom: 1rem;"></i>
+                        <p>Giriş günlüğü bulunamadı</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const table = `
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Kullanıcı</th>
+                                <th>E-posta</th>
+                                <th>İşlem</th>
+                                <th>Tarih</th>
+                                <th>IP Adresi</th>
+                                <th>Durum</th>
+                                <th>Detay</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${logs.map(log => `
+                                <tr>
+                                    <td>${log.id}</td>
+                                    <td>${log.userName || 'N/A'}</td>
+                                    <td>${log.userEmail}</td>
+                                    <td>
+                                        <span class="badge ${getActionBadgeClass(log.action)}">
+                                            ${getActionDisplayName(log.action)}
+                                        </span>
+                                    </td>
+                                    <td>${formatDateTime(log.timestamp)}</td>
+                                    <td>${log.ipAddress || 'N/A'}</td>
+                                    <td>
+                                        <span class="badge ${log.isSuccessful ? 'bg-success' : 'bg-danger'}">
+                                            ${log.isSuccessful ? 'Başarılı' : 'Başarısız'}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <button class="btn btn-sm btn-info" onclick="showLogDetails(${log.id})">
+                                            <i class="fas fa-eye"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+
+            container.innerHTML = table;
+        }
+
+        // Get action badge class
+        function getActionBadgeClass(action) {
+            switch (action) {
+                case 'Login': return 'bg-success';
+                case 'Logout': return 'bg-info';
+                case 'FailedLogin': return 'bg-danger';
+                default: return 'bg-secondary';
+            }
+        }
+
+        // Get action display name
+        function getActionDisplayName(action) {
+            switch (action) {
+                case 'Login': return 'Giriş';
+                case 'Logout': return 'Çıkış';
+                case 'FailedLogin': return 'Başarısız Giriş';
+                default: return action;
+            }
+        }
+
+        // Update pagination
+        function updatePagination(pagination) {
+            currentPage = pagination.page;
+            totalPages = pagination.totalPages;
+
+            document.getElementById('paginationInfo').textContent = 
+                `Toplam ${pagination.totalCount} kayıt, ${pagination.totalPages} sayfa`;
+
+            document.getElementById('pageInfo').textContent = `Sayfa ${currentPage}`;
+
+            document.getElementById('prevPage').disabled = currentPage <= 1;
+            document.getElementById('nextPage').disabled = currentPage >= totalPages;
+        }
+
+        // Navigation functions
+        function previousPage() {
+            if (currentPage > 1) {
+                currentPage--;
+                loadLoginLogs();
+            }
+        }
+
+        function nextPage() {
+            if (currentPage < totalPages) {
+                currentPage++;
+                loadLoginLogs();
+            }
+        }
+
+        // Clear filters
+        function clearFilters() {
+            document.getElementById('actionFilter').value = '';
+            document.getElementById('startDate').value = '';
+            document.getElementById('endDate').value = '';
+            document.getElementById('userIdFilter').value = '';
+            currentPage = 1;
+            loadLoginLogs();
+        }
+
+        // Show log details
+        function showLogDetails(logId) {
+            // This could open a modal with detailed information
+            alert(`Log ID: ${logId} detayları burada gösterilecek`);
+        }
+
+        // Format date time
+        function formatDateTime(dateString) {
+            return new Date(dateString).toLocaleString('tr-TR');
+        }
+
+        // Show message
+        function showMessage(message, type) {
+            // You can implement a toast or alert system here
+            console.log(`${type}: ${message}`);
+        }
+    </script>
+
+    <style>
+        .stats-container {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 1rem;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-number {
+            display: block;
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+
+        .stat-label {
+            font-size: 0.8rem;
+            color: #666;
+        }
+
+        .table-responsive {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .badge {
+            font-size: 0.8rem;
+        }
+    </style>
+</body>
+</html>

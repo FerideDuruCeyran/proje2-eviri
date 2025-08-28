@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Authorization;
 using ExcelUploader.Models;
 using ExcelUploader.Data;
+using ExcelUploader.Services;
 using System.Security.Claims;
 using System.ComponentModel.DataAnnotations;
 
@@ -13,12 +14,18 @@ namespace ExcelUploader.Controllers
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly ILogger<AccountController> _logger;
+        private readonly IUserLoginLogService _userLoginLogService;
 
-        public AccountController(UserManager<ApplicationUser> userManager, SignInManager<ApplicationUser> signInManager, ILogger<AccountController> logger)
+        public AccountController(
+            UserManager<ApplicationUser> userManager, 
+            SignInManager<ApplicationUser> signInManager, 
+            ILogger<AccountController> logger,
+            IUserLoginLogService userLoginLogService)
         {
             _userManager = userManager;
             _signInManager = signInManager;
             _logger = logger;
+            _userLoginLogService = userLoginLogService;
         }
 
         [HttpGet]
@@ -38,15 +45,57 @@ namespace ExcelUploader.Controllers
 
             if (ModelState.IsValid)
             {
+                var user = await _userManager.FindByEmailAsync(model.Email);
+                var ipAddress = GetClientIpAddress();
+                var userAgent = GetUserAgent();
+
                 var result = await _signInManager.PasswordSignInAsync(model.Email, model.Password, model.RememberMe, lockoutOnFailure: false);
                 
                 if (result.Succeeded)
                 {
                     _logger.LogInformation("User logged in: {Email}", model.Email);
+                    
+                    // Log successful login
+                    if (user != null)
+                    {
+                        await _userLoginLogService.LogLoginAsync(
+                            user.Id, 
+                            user.Email!, 
+                            $"{user.FirstName} {user.LastName}", 
+                            ipAddress, 
+                            userAgent, 
+                            true);
+                    }
+                    
                     return RedirectToLocal(returnUrl);
                 }
                 else
                 {
+                    // Log failed login attempt
+                    if (user != null)
+                    {
+                        await _userLoginLogService.LogLoginAsync(
+                            user.Id, 
+                            user.Email!, 
+                            $"{user.FirstName} {user.LastName}", 
+                            ipAddress, 
+                            userAgent, 
+                            false, 
+                            "Invalid password");
+                    }
+                    else
+                    {
+                        // Log failed login for non-existent user
+                        await _userLoginLogService.LogLoginAsync(
+                            "unknown", 
+                            model.Email, 
+                            null, 
+                            ipAddress, 
+                            userAgent, 
+                            false, 
+                            "User not found");
+                    }
+                    
                     ModelState.AddModelError(string.Empty, "Geçersiz giriş denemesi.");
                     return View(model);
                 }
@@ -105,8 +154,24 @@ namespace ExcelUploader.Controllers
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Logout()
         {
+            var user = await _userManager.GetUserAsync(User);
+            var ipAddress = GetClientIpAddress();
+            var userAgent = GetUserAgent();
+
             await _signInManager.SignOutAsync();
             _logger.LogInformation("User logged out.");
+            
+            // Log logout
+            if (user != null)
+            {
+                await _userLoginLogService.LogLogoutAsync(
+                    user.Id, 
+                    user.Email!, 
+                    $"{user.FirstName} {user.LastName}", 
+                    ipAddress, 
+                    userAgent);
+            }
+            
             return RedirectToAction(nameof(HomeController.Index), "Home");
         }
 
@@ -119,97 +184,32 @@ namespace ExcelUploader.Controllers
 
         [HttpGet]
         [Authorize]
-        public async Task<IActionResult> Profile()
-        {
-            var user = await _userManager.GetUserAsync(User);
-            if (user == null)
-            {
-                return NotFound();
-            }
-
-            var profileModel = new ProfileViewModel
-            {
-                FirstName = user.FirstName ?? string.Empty,
-                LastName = user.LastName ?? string.Empty,
-                Email = user.Email ?? string.Empty,
-                CreatedAt = user.CreatedAt,
-                IsActive = user.IsActive
-            };
-
-            return View(profileModel);
-        }
-
-        [HttpPost]
-        [Authorize]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Profile(ProfileViewModel model)
-        {
-            if (!ModelState.IsValid)
-            {
-                return View(model);
-            }
-
-            var user = await _userManager.GetUserAsync(User);
-            if (user == null)
-            {
-                return NotFound();
-            }
-
-            user.FirstName = model.FirstName;
-            user.LastName = model.LastName;
-
-            var result = await _userManager.UpdateAsync(user);
-            if (result.Succeeded)
-            {
-                TempData["SuccessMessage"] = "Profil başarıyla güncellendi";
-                return RedirectToAction(nameof(Profile));
-            }
-
-            foreach (var error in result.Errors)
-            {
-                ModelState.AddModelError(string.Empty, error.Description);
-            }
-
-            return View(model);
-        }
-
-        [HttpGet]
-        [Authorize]
-        public IActionResult ChangePassword()
+        public IActionResult Profile()
         {
             return View();
         }
 
-        [HttpPost]
-        [Authorize]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> ChangePassword(ChangePasswordViewModel model)
+        private string GetClientIpAddress()
         {
-            if (!ModelState.IsValid)
+            // Try to get IP from various headers
+            var forwardedHeader = Request.Headers["X-Forwarded-For"].FirstOrDefault();
+            if (!string.IsNullOrEmpty(forwardedHeader))
             {
-                return View(model);
+                return forwardedHeader.Split(',')[0].Trim();
             }
 
-            var user = await _userManager.GetUserAsync(User);
-            if (user == null)
+            var realIpHeader = Request.Headers["X-Real-IP"].FirstOrDefault();
+            if (!string.IsNullOrEmpty(realIpHeader))
             {
-                return NotFound();
+                return realIpHeader;
             }
 
-            var result = await _userManager.ChangePasswordAsync(user, model.CurrentPassword, model.NewPassword);
-            if (result.Succeeded)
-            {
-                await _signInManager.RefreshSignInAsync(user);
-                TempData["SuccessMessage"] = "Şifre başarıyla değiştirildi";
-                return RedirectToAction(nameof(Profile));
-            }
+            return HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
+        }
 
-            foreach (var error in result.Errors)
-            {
-                ModelState.AddModelError(string.Empty, error.Description);
-            }
-
-            return View(model);
+        private string? GetUserAgent()
+        {
+            return Request.Headers["User-Agent"].FirstOrDefault();
         }
 
         private IActionResult RedirectToLocal(string? returnUrl)

@@ -2,14 +2,14 @@ using ExcelUploader.Data;
 using ExcelUploader.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Server.IIS;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddControllers(); // Remove Views, use only Controllers
+builder.Services.AddControllers();
+
+// Add HttpContextAccessor for IP address detection
+builder.Services.AddHttpContextAccessor();
 
 // Add DbContext
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
@@ -27,46 +27,12 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 .AddEntityFrameworkStores<ApplicationDbContext>()
 .AddDefaultTokenProviders();
 
-// Add Authentication
-builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
-    .AddCookie(options =>
-    {
-        options.LoginPath = "/api/account/login";
-        options.LogoutPath = "/api/account/logout";
-        options.AccessDeniedPath = "/api/account/access-denied";
-        options.ExpireTimeSpan = TimeSpan.FromHours(2);
-        options.SlidingExpiration = true;
-        options.Cookie.HttpOnly = true;
-        options.Cookie.SecurePolicy = CookieSecurePolicy.SameAsRequest;
-    });
-
-// Add Authorization - Allow anonymous access to login and register
-builder.Services.AddAuthorization(options =>
-{
-    // Remove fallback policy to allow anonymous access by default
-    // options.FallbackPolicy = new AuthorizationPolicyBuilder()
-    //     .RequireAuthenticatedUser()
-    //     .Build();
-    
-    // Allow anonymous access to specific endpoints
-    options.AddPolicy("AllowAnonymous", policy =>
-        policy.RequireAssertion(_ => true));
-});
-
 // Add Services
 builder.Services.AddScoped<IExcelService, ExcelService>();
 builder.Services.AddScoped<IDataImportService, DataImportService>();
 builder.Services.AddScoped<IPortService, PortService>();
 builder.Services.AddScoped<IDynamicTableService, DynamicTableService>();
-
-// Add AutoMapper
-builder.Services.AddAutoMapper(typeof(Program).Assembly);
-
-// Add File Upload Configuration
-builder.Services.Configure<IISServerOptions>(options =>
-{
-    options.MaxRequestBodySize = 52428800; // 50MB
-});
+builder.Services.AddScoped<IUserLoginLogService, UserLoginLogService>();
 
 var app = builder.Build();
 
@@ -77,50 +43,25 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
-// Remove HTTPS redirection for development
-// app.UseHttpsRedirection();
-
 app.UseRouting();
-
-// Serve static files
 app.UseStaticFiles();
 
-// Map HTML pages BEFORE authentication middleware
-app.MapGet("/", () => Results.File("wwwroot/index.html", "text/html"));
-app.MapGet("/login", () => Results.File("wwwroot/login.html", "text/html"));
-app.MapGet("/register", () => Results.File("wwwroot/register.html", "text/html"));
-app.MapGet("/upload", () => Results.File("wwwroot/upload.html", "text/html"));
-app.MapGet("/data", () => Results.File("wwwroot/data.html", "text/html"));
-app.MapGet("/tables", () => Results.File("wwwroot/tables.html", "text/html"));
-app.MapGet("/profile", () => Results.File("wwwroot/profile.html", "text/html"));
-app.MapGet("/logout", () => Results.File("wwwroot/logout.html", "text/html"));
-app.MapGet("/sql-test", () => Results.File("wwwroot/sql-test.html", "text/html"));
+// Map HTML pages
+app.MapGet("/", () => Results.File("index.html", "text/html"));
+app.MapGet("/login", () => Results.File("login.html", "text/html"));
+app.MapGet("/register", () => Results.File("register.html", "text/html"));
+app.MapGet("/upload", () => Results.File("upload.html", "text/html"));
+app.MapGet("/data", () => Results.File("data.html", "text/html"));
+app.MapGet("/tables", () => Results.File("tables.html", "text/html"));
+app.MapGet("/profile", () => Results.File("profile.html", "text/html"));
+app.MapGet("/logout", () => Results.File("logout.html", "text/html"));
+app.MapGet("/login-logs", () => Results.File("login-logs.html", "text/html"));
+app.MapGet("/sql-test", () => Results.File("tables.html", "text/html"));
 
 app.UseAuthentication();
 app.UseAuthorization();
 
 // Map controllers
 app.MapControllers();
-
-// Map minimal API endpoints
-app.MapGet("/api", () => Results.Ok(new { 
-    message = "Excel Uploader API is running",
-    version = "9.0",
-    timestamp = DateTime.UtcNow,
-    status = "Healthy"
-}));
-app.MapGet("/health", () => Results.Ok(new { 
-    message = "Excel Uploader API is running",
-    version = "9.0",
-    timestamp = DateTime.UtcNow,
-    status = "Healthy"
-}));
-
-// Database will be created/updated through migrations
-// using (var scope = app.Services.CreateScope())
-// {
-//     var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
-//     context.Database.EnsureCreated();
-// }
 
 app.Run();

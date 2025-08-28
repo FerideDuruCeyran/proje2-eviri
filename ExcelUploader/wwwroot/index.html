@@ -24,17 +24,17 @@
                         <i class="fas fa-home"></i> Ana Sayfa
                     </a>
                 </li>
-                <li class="nav-item auth-only" style="display: none;">
+                <li class="nav-item auth-only">
                     <a href="/upload" class="nav-link">
                         <i class="fas fa-upload"></i> Dosya Yükle
                     </a>
                 </li>
-                <li class="nav-item auth-only" style="display: none;">
+                <li class="nav-item auth-only">
                     <a href="/data" class="nav-link">
                         <i class="fas fa-database"></i> Veri Görüntüle
                     </a>
                 </li>
-                <li class="nav-item auth-only" style="display: none;">
+                <li class="nav-item auth-only">
                     <a href="/tables" class="nav-link">
                         <i class="fas fa-table"></i> Dinamik Tablolar
                     </a>
@@ -49,12 +49,12 @@
                         <i class="fas fa-user-plus"></i> Kayıt Ol
                     </a>
                 </li>
-                <li class="nav-item auth-only" style="display: none;">
+                <li class="nav-item auth-only">
                     <a href="/profile" class="nav-link">
                         <i class="fas fa-user"></i> <span id="userName">Profil</span>
                     </a>
                 </li>
-                <li class="nav-item auth-only" style="display: none;">
+                <li class="nav-item auth-only">
                     <a href="/logout" class="nav-link">
                         <i class="fas fa-sign-out-alt"></i> Çıkış Yap
                     </a>
@@ -75,7 +75,7 @@
                         verilerinizi görüntüleyin ve dinamik tablolar oluşturun.
                     </p>
                     <div class="hero-buttons">
-                        <a href="/upload" class="btn btn-primary btn-large auth-only" style="display: none;">
+                        <a href="/upload" class="btn btn-primary btn-large auth-only">
                             <i class="fas fa-upload"></i> Hemen Başla
                         </a>
                         <a href="/login" class="btn btn-primary btn-large unauth-only">
@@ -91,33 +91,53 @@
                 </div>
             </div>
 
+            <!-- Login Required Message -->
+            <div class="login-required-message unauth-only">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i>
+                    <strong>Giriş Gerekli:</strong> Excel dosyalarını yüklemek ve yönetmek için lütfen giriş yapın veya yeni hesap oluşturun.
+                </div>
+            </div>
+
             <!-- Features Section -->
             <div class="features-section">
                 <h2 class="section-title">Özellikler</h2>
                 <div class="features-grid">
-                    <div class="feature-card">
+                    <div class="feature-card auth-only">
                         <div class="feature-icon">📊</div>
                         <h3>Excel Yükleme</h3>
                         <p>Excel dosyalarını kolayca yükleyin ve verileri analiz edin</p>
                         <a href="/upload" class="btn btn-primary">Excel Yükle</a>
                     </div>
-                    <div class="feature-card">
+                    <div class="feature-card auth-only">
                         <div class="feature-icon">🔍</div>
                         <h3>Veri Görüntüleme</h3>
                         <p>Yüklenen verileri detaylı olarak inceleyin ve filtreleyin</p>
                         <a href="/data" class="btn btn-primary">Veri Görüntüle</a>
                     </div>
-                    <div class="feature-card">
+                    <div class="feature-card auth-only">
                         <div class="feature-icon">⚡</div>
                         <h3>Dinamik Tablolar</h3>
                         <p>Dinamik tablolar oluşturun ve yönetin</p>
                         <a href="/tables" class="btn btn-primary">Dinamik Tablolar</a>
                     </div>
+                    <div class="feature-card unauth-only">
+                        <div class="feature-icon">🔐</div>
+                        <h3>Güvenli Giriş</h3>
+                        <p>Hesabınıza güvenli bir şekilde giriş yapın ve tüm özelliklere erişin</p>
+                        <a href="/login" class="btn btn-primary">Giriş Yap</a>
+                    </div>
+                    <div class="feature-card unauth-only">
+                        <div class="feature-icon">📝</div>
+                        <h3>Hızlı Kayıt</h3>
+                        <p>Ücretsiz hesap oluşturun ve hemen kullanmaya başlayın</p>
+                        <a href="/register" class="btn btn-primary">Kayıt Ol</a>
+                    </div>
                 </div>
             </div>
 
             <!-- Stats Section -->
-            <div class="stats-section auth-only" style="display: none;">
+            <div class="stats-section auth-only">
                 <h2 class="section-title">İstatistikler</h2>
                 <div class="stats-grid">
                     <div class="stat-card">
@@ -136,7 +156,7 @@
             </div>
 
             <!-- Recent Activity -->
-            <div class="recent-activity auth-only" style="display: none;">
+            <div class="recent-activity auth-only">
                 <h2 class="section-title">Son Aktiviteler</h2>
                 <div class="activity-list" id="activityList">
                     <!-- Activity items will be loaded here -->

@@ -24,17 +24,17 @@
                         <i class="fas fa-home"></i> Ana Sayfa
                     </a>
                 </li>
-                <li class="nav-item auth-only" style="display: none;">
+                <li class="nav-item auth-only">
                     <a href="/upload" class="nav-link active">
                         <i class="fas fa-upload"></i> Dosya Yükle
                     </a>
                 </li>
-                <li class="nav-item auth-only" style="display: none;">
+                <li class="nav-item auth-only">
                     <a href="/data" class="nav-link">
                         <i class="fas fa-database"></i> Veri Görüntüle
                     </a>
                 </li>
-                <li class="nav-item auth-only" style="display: none;">
+                <li class="nav-item auth-only">
                     <a href="/tables" class="nav-link">
                         <i class="fas fa-table"></i> Dinamik Tablolar
                     </a>
@@ -49,12 +49,12 @@
                         <i class="fas fa-user-plus"></i> Kayıt Ol
                     </a>
                 </li>
-                <li class="nav-item auth-only" style="display: none;">
+                <li class="nav-item auth-only">
                     <a href="/profile" class="nav-link">
                         <i class="fas fa-user"></i> <span id="userName">Profil</span>
                     </a>
                 </li>
-                <li class="nav-item auth-only" style="display: none;">
+                <li class="nav-item auth-only">
                     <a href="/logout" class="nav-link">
                         <i class="fas fa-sign-out-alt"></i> Çıkış Yap
                     </a>
@@ -508,6 +508,16 @@
         // Load Excel preview
         async function loadExcelPreview() {
             try {
+                // Check if user is authenticated
+                if (!isAuthenticated) {
+                    showAlert('Dosya yüklemek için giriş yapmanız gerekiyor. Lütfen önce giriş yapın.', 'warning');
+                    // Redirect to login page
+                    setTimeout(() => {
+                        window.location.href = '/login';
+                    }, 2000);
+                    return;
+                }
+
                 const formData = new FormData();
                 formData.append('file', excelData.file);
 
@@ -522,8 +532,14 @@
                 if (response.ok) {
                     const previewData = await response.json();
                     displayExcelPreview(previewData);
+                } else if (response.status === 401) {
+                    showAlert('Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.', 'warning');
+                    setTimeout(() => {
+                        window.location.href = '/login';
+                    }, 2000);
                 } else {
-                    showAlert('Excel dosyası yüklenirken hata oluştu', 'danger');
+                    const errorData = await response.json();
+                    showAlert(errorData.error || 'Excel dosyası yüklenirken hata oluştu', 'danger');
                 }
             } catch (error) {
                 console.error('Error loading preview:', error);
