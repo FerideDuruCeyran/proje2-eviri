@@ -114,15 +114,24 @@ namespace ExcelUploader.Services
             try
             {
                 var connectionString = BuildConnectionString(connection);
+                _logger.LogInformation("Test connection string: {ConnectionString}", 
+                    connectionString.Replace(connection.Password, "***"));
+                
                 using var sqlConnection = new SqlConnection(connectionString);
                 await sqlConnection.OpenAsync();
                 
-                _logger.LogInformation("Veritabanı bağlantısı test edildi: {Name}", connection.Name);
+                // Test query çalıştır
+                using var command = new SqlCommand("SELECT 1", sqlConnection);
+                await command.ExecuteScalarAsync();
+                
+                _logger.LogInformation("Veritabanı bağlantısı başarıyla test edildi: {Name} -> {Server}:{Port}", 
+                    connection.Name, connection.ServerName, connection.Port);
                 return true;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Veritabanı bağlantısı test edilirken hata oluştu: {Name}", connection.Name);
+                _logger.LogError(ex, "Veritabanı bağlantısı test edilirken hata oluştu: {Name} -> {Server}:{Port}, Hata: {Message}", 
+                    connection.Name, connection.ServerName, connection.Port, ex.Message);
                 return false;
             }
         }
@@ -240,7 +249,11 @@ namespace ExcelUploader.Services
         private string BuildConnectionString(DatabaseConnection connection, string? databaseName = null)
         {
             var dbName = databaseName ?? connection.DatabaseName;
-            return $"Server={connection.ServerName},{connection.Port};Database={dbName};User Id={connection.Username};Password={connection.Password};TrustServerCertificate=true;";
+            
+            // SQL Server'da port numarası sadece varsayılan port (1433) değilse belirtilir
+            string serverPart = connection.Port == 1433 ? connection.ServerName : $"{connection.ServerName},{connection.Port}";
+            
+            return $"Server={serverPart};Database={dbName};User Id={connection.Username};Password={connection.Password};TrustServerCertificate=true;MultipleActiveResultSets=true;Connection Timeout=30;";
         }
     }
 }

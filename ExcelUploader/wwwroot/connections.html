@@ -210,10 +210,56 @@
         let currentConnectionId = null;
 
         // Load connections on page load
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', async function() {
             checkAuth();
-            loadConnections();
+            await loadConnections();
+            
+            // Otomatik olarak varsayılan bağlantı oluştur
+            await createDefaultConnectionIfNeeded();
         });
+        
+        // Varsayılan bağlantıyı otomatik oluştur
+        async function createDefaultConnectionIfNeeded() {
+            try {
+                const connections = await fetch('/api/databaseconnection', {
+                    headers: {
+                        'Authorization': `Bearer ${getToken()}`
+                    }
+                }).then(r => r.json());
+                
+                // Eğer hiç bağlantı yoksa varsayılan bağlantı oluştur
+                if (connections.length === 0) {
+                                         const defaultConnection = {
+                         name: "Varsayılan SQL Server",
+                         serverName: "10.5.10.11",
+                         port: 1433,
+                         databaseName: "Excel",
+                         username: "duru",
+                         password: "duru123.",
+                         description: "Otomatik oluşturulan varsayılan bağlantı",
+                         isActive: true
+                     };
+                    
+                    const response = await fetch('/api/databaseconnection', {
+                        method: 'POST',
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${getToken()}`
+                        },
+                        body: JSON.stringify(defaultConnection)
+                    });
+                    
+                    if (response.ok) {
+                        console.log('Varsayılan bağlantı otomatik oluşturuldu');
+                        showSuccess('Varsayılan veritabanı bağlantısı otomatik oluşturuldu');
+                        await loadConnections(); // Listeyi yenile
+                    }
+                }
+            } catch (error) {
+                console.error('Varsayılan bağlantı oluşturulurken hata:', error);
+            }
+        }
 
         async function loadConnections() {
             try {
@@ -226,12 +272,15 @@
                 if (response.ok) {
                     currentConnections = await response.json();
                     displayConnections();
+                    return currentConnections; // Bağlantıları döndür
                 } else {
                     showError('Bağlantılar yüklenirken hata oluştu');
+                    return [];
                 }
             } catch (error) {
                 console.error('Error loading connections:', error);
                 showError('Bağlantılar yüklenirken hata oluştu');
+                return [];
             }
         }
 

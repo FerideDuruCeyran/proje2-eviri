@@ -246,7 +246,7 @@
                 }
 
                 // Load user profile for last login
-                const profileResponse = await fetch('/api/api-account/profile', {
+                const profileResponse = await fetch('/api/account/profile', {
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('authToken')}`
                     }
