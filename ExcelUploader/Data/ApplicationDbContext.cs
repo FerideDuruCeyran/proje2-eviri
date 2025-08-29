@@ -16,6 +16,7 @@ namespace ExcelUploader.Data
         public DbSet<TableColumn> TableColumns { get; set; }
         public DbSet<TableData> TableData { get; set; }
         public DbSet<UserLoginLog> UserLoginLogs { get; set; }
+        public DbSet<DatabaseConnection> DatabaseConnections { get; set; }
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
@@ -129,6 +130,21 @@ namespace ExcelUploader.Data
                           .WithMany()
                           .HasForeignKey(e => e.UserId)
                           .OnDelete(DeleteBehavior.Cascade);
+                });
+
+                // Configure DatabaseConnection
+                builder.Entity<DatabaseConnection>(entity =>
+                {
+                    entity.HasKey(e => e.Id);
+                    entity.Property(e => e.Id).ValueGeneratedOnAdd();
+                    entity.Property(e => e.Name).HasMaxLength(100).IsRequired();
+                    entity.Property(e => e.ServerName).HasMaxLength(255).IsRequired();
+                    entity.Property(e => e.DatabaseName).HasMaxLength(128).IsRequired();
+                    entity.Property(e => e.Username).HasMaxLength(100).IsRequired();
+                    entity.Property(e => e.Password).HasMaxLength(255).IsRequired();
+                    entity.Property(e => e.Description).HasMaxLength(1000);
+                    entity.HasIndex(e => e.Name).IsUnique();
+                    entity.HasIndex(e => e.IsActive);
                 });
 
                 // Seed default admin user

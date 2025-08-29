@@ -12,6 +12,9 @@ namespace ExcelUploader.Models
         [Display(Name = "Açıklama")]
         public string? Description { get; set; }
         
+        [Display(Name = "Veritabanı Bağlantısı")]
+        public int? DatabaseConnectionId { get; set; }
+        
         public bool IsProcessing { get; set; }
         public string? ProcessingMessage { get; set; }
     }

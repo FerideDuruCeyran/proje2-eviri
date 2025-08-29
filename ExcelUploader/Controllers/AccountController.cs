@@ -224,45 +224,4 @@ namespace ExcelUploader.Controllers
             }
         }
     }
-
-    public class ProfileViewModel
-    {
-        [Required(ErrorMessage = "Ad gereklidir")]
-        [Display(Name = "Ad")]
-        public string FirstName { get; set; } = string.Empty;
-
-        [Required(ErrorMessage = "Soyad gereklidir")]
-        [Display(Name = "Soyad")]
-        public string LastName { get; set; } = string.Empty;
-
-        [Required(ErrorMessage = "E-posta adresi gereklidir")]
-        [EmailAddress(ErrorMessage = "Geçerli bir e-posta adresi girin")]
-        [Display(Name = "E-posta")]
-        public string Email { get; set; } = string.Empty;
-
-        [Display(Name = "Kayıt Tarihi")]
-        public DateTime CreatedAt { get; set; }
-
-        [Display(Name = "Aktif")]
-        public bool IsActive { get; set; }
-    }
-
-    public class ChangePasswordViewModel
-    {
-        [Required(ErrorMessage = "Mevcut şifre gereklidir")]
-        [DataType(DataType.Password)]
-        [Display(Name = "Mevcut Şifre")]
-        public string CurrentPassword { get; set; } = string.Empty;
-
-        [Required(ErrorMessage = "Yeni şifre gereklidir")]
-        [StringLength(100, ErrorMessage = "{0} en az {2} karakter uzunluğunda olmalıdır.", MinimumLength = 6)]
-        [DataType(DataType.Password)]
-        [Display(Name = "Yeni Şifre")]
-        public string NewPassword { get; set; } = string.Empty;
-
-        [DataType(DataType.Password)]
-        [Display(Name = "Yeni Şifre Onayı")]
-        [Compare("NewPassword", ErrorMessage = "Yeni şifre ve şifre onayı eşleşmiyor.")]
-        public string ConfirmPassword { get; set; } = string.Empty;
-    }
 }

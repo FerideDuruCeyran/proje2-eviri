@@ -5,8 +5,8 @@ namespace ExcelUploader.Services
 {
     public interface IDynamicTableService
     {
-        Task<DynamicTable> CreateTableFromExcelAsync(IFormFile file, string uploadedBy, string? description = null);
-        Task<bool> CreateSqlTableAsync(DynamicTable dynamicTable);
+        Task<DynamicTable> CreateTableFromExcelAsync(IFormFile file, string uploadedBy, int? databaseConnectionId = null, string? description = null);
+        Task<bool> CreateSqlTableAsync(DynamicTable dynamicTable, int? databaseConnectionId = null);
         Task<bool> InsertDataAsync(DynamicTable dynamicTable, List<Dictionary<string, object>> data);
         Task<List<DynamicTable>> GetAllTablesAsync();
         Task<DynamicTable?> GetTableByIdAsync(int id);

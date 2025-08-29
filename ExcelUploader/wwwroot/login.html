@@ -41,6 +41,9 @@
     <!-- Main Content -->
     <main class="main-content">
         <div class="container">
+            <!-- Alert Container -->
+            <div id="alertContainer" style="position: fixed; top: 20px; right: 20px; z-index: 9999; max-width: 400px;"></div>
+            
             <div style="max-width: 500px; margin: 0 auto;">
                 <div class="card">
                     <div class="card-header">
@@ -96,5 +99,75 @@
 
     <!-- Scripts -->
     <script src="js/site.js"></script>
+    <script>
+        // Add event listener for form submission
+        document.addEventListener('DOMContentLoaded', function() {
+            const loginForm = document.getElementById('loginForm');
+            
+            if (loginForm) {
+                loginForm.addEventListener('submit', async function(e) {
+                    e.preventDefault();
+                    
+                    const formData = new FormData(this);
+                    const email = formData.get('email');
+                    const password = formData.get('password');
+                    const rememberMe = formData.get('rememberMe');
+
+                    try {
+                        console.log('Attempting login with:', { email, password, rememberMe });
+                        
+                        const response = await fetch('/api/api-account/login', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ email, password, rememberMe })
+                        });
+
+                        console.log('Login response status:', response.status);
+                        
+                        if (response.ok) {
+                            const result = await response.json();
+                            console.log('Login successful:', result);
+                            
+                            // Store token and user info
+                            localStorage.setItem('authToken', result.token);
+                            
+                            // Show success message using showAlert from site.js
+                            if (typeof showAlert === 'function') {
+                                showAlert('Başarıyla giriş yapıldı! Ana sayfaya yönlendiriliyorsunuz...', 'success');
+                            } else {
+                                alert('Başarıyla giriş yapıldı! Ana sayfaya yönlendiriliyorsunuz...');
+                            }
+                            
+                            // Redirect to home page
+                            setTimeout(() => {
+                                window.location.href = '/home';
+                            }, 1000);
+                        } else {
+                            const error = await response.json();
+                            console.error('Login failed:', error);
+                            
+                            if (typeof showAlert === 'function') {
+                                showAlert(error.message || 'Giriş başarısız: Geçersiz e-posta veya şifre', 'danger');
+                            } else {
+                                alert(error.message || 'Giriş başarısız: Geçersiz e-posta veya şifre');
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Login error:', error);
+                        
+                        if (typeof showAlert === 'function') {
+                            showAlert('Giriş yapılırken hata oluştu: ' + error.message, 'danger');
+                        } else {
+                            alert('Giriş yapılırken hata oluştu: ' + error.message);
+                        }
+                    }
+                });
+            } else {
+                console.error('Login form not found');
+            }
+        });
+    </script>
 </body>
 </html>

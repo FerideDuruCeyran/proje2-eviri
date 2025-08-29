@@ -23,7 +23,7 @@ namespace ExcelUploader.Services
             _logger = logger;
         }
 
-        public async Task<DynamicTable> CreateTableFromExcelAsync(IFormFile file, string uploadedBy, string? description = null)
+        public async Task<DynamicTable> CreateTableFromExcelAsync(IFormFile file, string uploadedBy, int? databaseConnectionId = null, string? description = null)
         {
             try
             {
@@ -67,7 +67,7 @@ namespace ExcelUploader.Services
                 await _context.SaveChangesAsync();
 
                 // Create SQL table
-                var sqlTableCreated = await CreateSqlTableAsync(dynamicTable);
+                var sqlTableCreated = await CreateSqlTableAsync(dynamicTable, databaseConnectionId);
                 if (!sqlTableCreated)
                 {
                     throw new InvalidOperationException("SQL table creation failed");
@@ -94,11 +94,27 @@ namespace ExcelUploader.Services
             }
         }
 
-        public async Task<bool> CreateSqlTableAsync(DynamicTable dynamicTable)
+        public async Task<bool> CreateSqlTableAsync(DynamicTable dynamicTable, int? databaseConnectionId = null)
         {
             try
             {
-                var connectionString = _configuration.GetConnectionString("DefaultConnection");
+                string connectionString;
+                
+                if (databaseConnectionId.HasValue)
+                {
+                    // Use specific database connection
+                    var dbConnection = await _context.DatabaseConnections.FindAsync(databaseConnectionId.Value);
+                    if (dbConnection == null)
+                        throw new ArgumentException($"Database connection with ID {databaseConnectionId.Value} not found");
+                    
+                    connectionString = $"Server={dbConnection.ServerName},{dbConnection.Port};Database={dbConnection.DatabaseName};User Id={dbConnection.Username};Password={dbConnection.Password};TrustServerCertificate=true;";
+                }
+                else
+                {
+                    // Use default connection
+                    connectionString = _configuration.GetConnectionString("DefaultConnection");
+                }
+                
                 using var connection = new SqlConnection(connectionString);
                 await connection.OpenAsync();
 
@@ -108,7 +124,8 @@ namespace ExcelUploader.Services
                 using var command = new SqlCommand(createTableSql, connection);
                 await command.ExecuteNonQueryAsync();
 
-                _logger.LogInformation("SQL table created successfully: {TableName}", dynamicTable.TableName);
+                _logger.LogInformation("SQL table created successfully: {TableName} using connection {ConnectionId}", 
+                    dynamicTable.TableName, databaseConnectionId ?? 0);
                 return true;
             }
             catch (Exception ex)

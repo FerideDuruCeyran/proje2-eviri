@@ -183,7 +183,11 @@ namespace ExcelUploader.Controllers
                 var userName = User.FindFirstValue(ClaimTypes.Name) ?? User.Identity?.Name ?? "Unknown";
                 
                 // Create dynamic table from Excel file
-                var dynamicTable = await _dynamicTableService.CreateTableFromExcelAsync(model.ExcelFile, userName, model.Description);
+                var dynamicTable = await _dynamicTableService.CreateTableFromExcelAsync(
+                    model.ExcelFile, 
+                    userName, 
+                    model.DatabaseConnectionId, 
+                    model.Description);
 
                 if (dynamicTable == null)
                 {

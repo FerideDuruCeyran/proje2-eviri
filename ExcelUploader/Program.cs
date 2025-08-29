@@ -2,6 +2,9 @@ using ExcelUploader.Data;
 using ExcelUploader.Services;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -10,6 +13,17 @@ builder.Services.AddControllers();
 
 // Add HttpContextAccessor for IP address detection
 builder.Services.AddHttpContextAccessor();
+
+// Add CORS
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
+});
 
 // Add DbContext
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
@@ -27,12 +41,37 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 .AddEntityFrameworkStores<ApplicationDbContext>()
 .AddDefaultTokenProviders();
 
+// Add JWT Authentication
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    var jwtSettings = builder.Configuration.GetSection("Jwt");
+    var key = Encoding.UTF8.GetBytes(jwtSettings["SecretKey"] ?? "your-super-secret-key-with-at-least-32-characters");
+    
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = jwtSettings["Issuer"],
+        ValidAudience = jwtSettings["Audience"],
+        IssuerSigningKey = new SymmetricSecurityKey(key),
+        ClockSkew = TimeSpan.Zero
+    };
+});
+
 // Add Services
 builder.Services.AddScoped<IExcelService, ExcelService>();
 builder.Services.AddScoped<IDataImportService, DataImportService>();
 builder.Services.AddScoped<IPortService, PortService>();
 builder.Services.AddScoped<IDynamicTableService, DynamicTableService>();
 builder.Services.AddScoped<IUserLoginLogService, UserLoginLogService>();
+builder.Services.AddScoped<IJwtService, JwtService>();
 
 var app = builder.Build();
 
@@ -43,11 +82,20 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
-app.UseRouting();
+app.UseHttpsRedirection();
 app.UseStaticFiles();
+app.UseRouting();
+
+// Use CORS
+app.UseCors("AllowAll");
+
+// Use Authentication and Authorization
+app.UseAuthentication();
+app.UseAuthorization();
 
 // Map HTML pages
-app.MapGet("/", () => Results.File("index.html", "text/html"));
+app.MapGet("/", () => Results.File("home.html", "text/html"));
+app.MapGet("/home", () => Results.File("home.html", "text/html"));
 app.MapGet("/login", () => Results.File("login.html", "text/html"));
 app.MapGet("/register", () => Results.File("register.html", "text/html"));
 app.MapGet("/upload", () => Results.File("upload.html", "text/html"));
@@ -56,10 +104,7 @@ app.MapGet("/tables", () => Results.File("tables.html", "text/html"));
 app.MapGet("/profile", () => Results.File("profile.html", "text/html"));
 app.MapGet("/logout", () => Results.File("logout.html", "text/html"));
 app.MapGet("/login-logs", () => Results.File("login-logs.html", "text/html"));
-app.MapGet("/sql-test", () => Results.File("tables.html", "text/html"));
-
-app.UseAuthentication();
-app.UseAuthorization();
+app.MapGet("/connections", () => Results.File("connections.html", "text/html"));
 
 // Map controllers
 app.MapControllers();

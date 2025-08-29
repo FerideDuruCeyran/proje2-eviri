@@ -298,6 +298,16 @@
                                           placeholder="Bu tablo ne için kullanılacak?"></textarea>
                             </div>
 
+                            <div class="form-group">
+                                <label for="databaseConnection" class="form-label">
+                                    <i class="fas fa-plug"></i> Veritabanı Bağlantısı
+                                </label>
+                                <select id="databaseConnection" class="form-control">
+                                    <option value="">Varsayılan bağlantı kullan</option>
+                                </select>
+                                <small class="form-text">Özel bir veritabanı bağlantısı seçin veya varsayılan bağlantıyı kullanın.</small>
+                            </div>
+
                             <div class="table-preview">
                                 <h5>Tablo Önizlemesi</h5>
                                 <div class="preview-schema" id="previewSchema">
@@ -643,6 +653,38 @@
             
             document.getElementById('tableName').value = defaultName;
             updateSchemaPreview();
+            
+            // Load database connections
+            loadDatabaseConnections();
+        }
+
+        // Load database connections
+        async function loadDatabaseConnections() {
+            try {
+                const response = await fetch('/api/databaseconnection', {
+                    headers: {
+                        'Authorization': `Bearer ${getToken()}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const connections = await response.json();
+                    const select = document.getElementById('databaseConnection');
+                    
+                    // Clear existing options except the first one
+                    select.innerHTML = '<option value="">Varsayılan bağlantı kullan</option>';
+                    
+                    // Add active connections
+                    connections.filter(conn => conn.isActive).forEach(conn => {
+                        const option = document.createElement('option');
+                        option.value = conn.id;
+                        option.textContent = `${conn.name} (${conn.serverName}:${conn.port}/${conn.databaseName})`;
+                        select.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading database connections:', error);
+            }
         }
 
         // Update schema preview
@@ -724,10 +766,14 @@
 
                 // Prepare data
                 const formData = new FormData();
-                formData.append('file', excelData.file);
-                formData.append('tableName', document.getElementById('tableName').value);
-                formData.append('description', document.getElementById('tableDescription').value);
-                formData.append('columns', JSON.stringify(selectedColumns.filter(col => col.selected)));
+                formData.append('ExcelFile', excelData.file);
+                formData.append('Description', document.getElementById('tableDescription').value);
+                
+                // Add database connection ID if selected
+                const databaseConnectionId = document.getElementById('databaseConnection').value;
+                if (databaseConnectionId) {
+                    formData.append('DatabaseConnectionId', databaseConnectionId);
+                }
 
                 // Update progress
                 updateProgress(25, 'Dosya yükleniyor...');

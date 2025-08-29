@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel Uploader - Veritabanı Bağlantıları</title>
+    <link rel="stylesheet" href="css/site.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <h1><i class="fas fa-database"></i> Veritabanı Bağlantıları</h1>
+        </div>
+    </header>
+
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="container">
+            <ul class="nav-list">
+                <li class="nav-item">
+                    <a href="/" class="nav-link">
+                        <i class="fas fa-home"></i> Ana Sayfa
+                    </a>
+                </li>
+                <li class="nav-item auth-only">
+                    <a href="/upload" class="nav-link">
+                        <i class="fas fa-upload"></i> Dosya Yükle
+                    </a>
+                </li>
+                <li class="nav-item auth-only">
+                    <a href="/data" class="nav-link">
+                        <i class="fas fa-database"></i> Veri Görüntüle
+                    </a>
+                </li>
+                <li class="nav-item auth-only">
+                    <a href="/tables" class="nav-link">
+                        <i class="fas fa-table"></i> Dinamik Tablolar
+                    </a>
+                </li>
+                <li class="nav-item auth-only">
+                    <a href="/connections" class="nav-link active">
+                        <i class="fas fa-plug"></i> Veritabanı Bağlantıları
+                    </a>
+                </li>
+                <li class="nav-item unauth-only">
+                    <a href="/login" class="nav-link">
+                        <i class="fas fa-sign-in-alt"></i> Giriş Yap
+                    </a>
+                </li>
+                <li class="nav-item unauth-only">
+                    <a href="/register" class="nav-link">
+                        <i class="fas fa-user-plus"></i> Kayıt Ol
+                    </a>
+                </li>
+                <li class="nav-item auth-only">
+                    <a href="/profile" class="nav-link">
+                        <i class="fas fa-user"></i> <span id="userName">Profil</span>
+                    </a>
+                </li>
+                <li class="nav-item auth-only">
+                    <a href="/logout" class="nav-link">
+                        <i class="fas fa-sign-out-alt"></i> Çıkış Yap
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <!-- Page Header -->
+            <div class="page-header">
+                <h2>Veritabanı Bağlantıları</h2>
+                <button class="btn btn-primary" onclick="showCreateConnectionModal()">
+                    <i class="fas fa-plus"></i> Yeni Bağlantı
+                </button>
+            </div>
+
+            <!-- Connections List -->
+            <div class="connections-list" id="connectionsList">
+                <!-- Connections will be loaded here -->
+            </div>
+        </div>
+    </main>
+
+    <!-- Create/Edit Connection Modal -->
+    <div class="modal" id="connectionModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">Yeni Veritabanı Bağlantısı</h3>
+                <span class="close" onclick="closeConnectionModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <form id="connectionForm">
+                    <input type="hidden" id="connectionId" />
+                    
+                    <div class="form-group">
+                        <label for="connectionName">Bağlantı Adı *</label>
+                        <input type="text" id="connectionName" required maxlength="100" />
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="serverName">Sunucu Adı *</label>
+                        <input type="text" id="serverName" required maxlength="255" />
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="port">Port *</label>
+                        <input type="number" id="port" value="1433" required min="1" max="65535" />
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="databaseName">Veritabanı Adı *</label>
+                        <input type="text" id="databaseName" required maxlength="128" />
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="username">Kullanıcı Adı *</label>
+                        <input type="text" id="username" required maxlength="100" />
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="password">Şifre *</label>
+                        <input type="password" id="password" required maxlength="255" />
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="description">Açıklama</label>
+                        <textarea id="description" maxlength="1000" rows="3"></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="isActive" checked />
+                            Aktif
+                        </label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeConnectionModal()">İptal</button>
+                <button class="btn btn-primary" onclick="saveConnection()">Kaydet</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Test Connection Modal -->
+    <div class="modal" id="testModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Bağlantı Testi</h3>
+                <span class="close" onclick="closeTestModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div id="testResult">
+                    <p>Bağlantı test ediliyor...</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeTestModal()">Kapat</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Query Modal -->
+    <div class="modal" id="queryModal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3>SQL Sorgusu Çalıştır</h3>
+                <span class="close" onclick="closeQueryModal()">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="queryDatabase">Veritabanı</label>
+                    <select id="queryDatabase" required>
+                        <option value="">Veritabanı seçin</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="sqlQuery">SQL Sorgusu</label>
+                    <textarea id="sqlQuery" rows="8" placeholder="SELECT * FROM TableName" required></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="withResult" checked />
+                        Sonuçları göster
+                    </label>
+                </div>
+                
+                <div id="queryResult" style="display: none;">
+                    <h4>Sorgu Sonucu:</h4>
+                    <div id="resultTable"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeQueryModal()">İptal</button>
+                <button class="btn btn-primary" onclick="executeQuery()">Çalıştır</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/site.js"></script>
+    <script>
+        let currentConnections = [];
+        let currentConnectionId = null;
+
+        // Load connections on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            checkAuth();
+            loadConnections();
+        });
+
+        async function loadConnections() {
+            try {
+                const response = await fetch('/api/databaseconnection', {
+                    headers: {
+                        'Authorization': `Bearer ${getToken()}`
+                    }
+                });
+                
+                if (response.ok) {
+                    currentConnections = await response.json();
+                    displayConnections();
+                } else {
+                    showError('Bağlantılar yüklenirken hata oluştu');
+                }
+            } catch (error) {
+                console.error('Error loading connections:', error);
+                showError('Bağlantılar yüklenirken hata oluştu');
+            }
+        }
+
+        function displayConnections() {
+            const container = document.getElementById('connectionsList');
+            
+            if (currentConnections.length === 0) {
+                container.innerHTML = '<div class="empty-state"><p>Henüz veritabanı bağlantısı bulunmuyor.</p></div>';
+                return;
+            }
+
+            const connectionsHtml = currentConnections.map(conn => `
+                <div class="connection-card ${conn.isActive ? 'active' : 'inactive'}">
+                    <div class="connection-header">
+                        <h3>${conn.name}</h3>
+                        <div class="connection-status ${conn.isActive ? 'active' : 'inactive'}">
+                            ${conn.isActive ? 'Aktif' : 'Pasif'}
+                        </div>
+                    </div>
+                    
+                    <div class="connection-details">
+                        <p><strong>Sunucu:</strong> ${conn.serverName}:${conn.port}</p>
+                        <p><strong>Veritabanı:</strong> ${conn.databaseName}</p>
+                        <p><strong>Kullanıcı:</strong> ${conn.username}</p>
+                        ${conn.description ? `<p><strong>Açıklama:</strong> ${conn.description}</p>` : ''}
+                        <p><strong>Oluşturulma:</strong> ${new Date(conn.createdDate).toLocaleDateString('tr-TR')}</p>
+                    </div>
+                    
+                    <div class="connection-actions">
+                        <button class="btn btn-sm btn-info" onclick="testConnection(${conn.id})">
+                            <i class="fas fa-plug"></i> Test Et
+                        </button>
+                        <button class="btn btn-sm btn-primary" onclick="showQueryModal(${conn.id})">
+                            <i class="fas fa-code"></i> Sorgu Çalıştır
+                        </button>
+                        <button class="btn btn-sm btn-warning" onclick="editConnection(${conn.id})">
+                            <i class="fas fa-edit"></i> Düzenle
+                        </button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteConnection(${conn.id})">
+                            <i class="fas fa-trash"></i> Sil
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+
+            container.innerHTML = connectionsHtml;
+        }
+
+        function showCreateConnectionModal() {
+            currentConnectionId = null;
+            document.getElementById('modalTitle').textContent = 'Yeni Veritabanı Bağlantısı';
+            document.getElementById('connectionForm').reset();
+            document.getElementById('connectionModal').style.display = 'block';
+        }
+
+        function editConnection(id) {
+            const connection = currentConnections.find(c => c.id === id);
+            if (!connection) return;
+
+            currentConnectionId = id;
+            document.getElementById('modalTitle').textContent = 'Veritabanı Bağlantısını Düzenle';
+            
+            document.getElementById('connectionId').value = connection.id;
+            document.getElementById('connectionName').value = connection.name;
+            document.getElementById('serverName').value = connection.serverName;
+            document.getElementById('port').value = connection.port;
+            document.getElementById('databaseName').value = connection.databaseName;
+            document.getElementById('username').value = connection.username;
+            document.getElementById('password').value = connection.password;
+            document.getElementById('description').value = connection.description || '';
+            document.getElementById('isActive').checked = connection.isActive;
+
+            document.getElementById('connectionModal').style.display = 'block';
+        }
+
+        async function saveConnection() {
+            const form = document.getElementById('connectionForm');
+            if (!form.checkValidity()) {
+                form.reportValidity();
+                return;
+            }
+
+            const connectionData = {
+                id: currentConnectionId ? parseInt(currentConnectionId) : 0,
+                name: document.getElementById('connectionName').value,
+                serverName: document.getElementById('serverName').value,
+                port: parseInt(document.getElementById('port').value),
+                databaseName: document.getElementById('databaseName').value,
+                username: document.getElementById('username').value,
+                password: document.getElementById('password').value,
+                description: document.getElementById('description').value,
+                isActive: document.getElementById('isActive').checked
+            };
+
+            try {
+                const url = currentConnectionId ? 
+                    `/api/databaseconnection/${currentConnectionId}` : 
+                    '/api/databaseconnection';
+                
+                const method = currentConnectionId ? 'PUT' : 'POST';
+                
+                const response = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${getToken()}`
+                    },
+                    body: JSON.stringify(connectionData)
+                });
+
+                if (response.ok) {
+                    closeConnectionModal();
+                    await loadConnections();
+                    showSuccess(currentConnectionId ? 'Bağlantı güncellendi' : 'Bağlantı oluşturuldu');
+                } else {
+                    const error = await response.text();
+                    showError(error);
+                }
+            } catch (error) {
+                console.error('Error saving connection:', error);
+                showError('Bağlantı kaydedilirken hata oluştu');
+            }
+        }
+
+        async function deleteConnection(id) {
+            if (!confirm('Bu bağlantıyı silmek istediğinizden emin misiniz?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/databaseconnection/${id}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${getToken()}`
+                    }
+                });
+
+                if (response.ok) {
+                    await loadConnections();
+                    showSuccess('Bağlantı silindi');
+                } else {
+                    const error = await response.text();
+                    showError(error);
+                }
+            } catch (error) {
+                console.error('Error deleting connection:', error);
+                showError('Bağlantı silinirken hata oluştu');
+            }
+        }
+
+        async function testConnection(id) {
+            try {
+                const response = await fetch(`/api/databaseconnection/${id}/test`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${getToken()}`
+                    }
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    showSuccess('Bağlantı başarılı!');
+                } else {
+                    showError('Bağlantı başarısız!');
+                }
+            } catch (error) {
+                console.error('Error testing connection:', error);
+                showError('Bağlantı test edilirken hata oluştu');
+            }
+        }
+
+        function showQueryModal(connectionId) {
+            currentConnectionId = connectionId;
+            loadDatabases(connectionId);
+            document.getElementById('queryModal').style.display = 'block';
+        }
+
+        async function loadDatabases(connectionId) {
+            try {
+                const response = await fetch(`/api/databaseconnection/${connectionId}/databases`, {
+                    headers: {
+                        'Authorization': `Bearer ${getToken()}`
+                    }
+                });
+
+                if (response.ok) {
+                    const databases = await response.json();
+                    const select = document.getElementById('queryDatabase');
+                    select.innerHTML = '<option value="">Veritabanı seçin</option>' +
+                        databases.map(db => `<option value="${db}">${db}</option>`).join('');
+                }
+            } catch (error) {
+                console.error('Error loading databases:', error);
+            }
+        }
+
+        async function executeQuery() {
+            const database = document.getElementById('queryDatabase').value;
+            const query = document.getElementById('sqlQuery').value;
+            const withResult = document.getElementById('withResult').checked;
+
+            if (!database || !query) {
+                showError('Lütfen veritabanı ve sorgu girin');
+                return;
+            }
+
+            try {
+                const url = withResult ? 
+                    `/api/databaseconnection/${currentConnectionId}/execute-with-result?databaseName=${encodeURIComponent(database)}` :
+                    `/api/databaseconnection/${currentConnectionId}/execute?databaseName=${encodeURIComponent(database)}`;
+
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${getToken()}`
+                    },
+                    body: JSON.stringify({ query: query })
+                });
+
+                if (response.ok) {
+                    if (withResult) {
+                        const result = await response.json();
+                        displayQueryResult(result);
+                    } else {
+                        showSuccess('Sorgu başarıyla çalıştırıldı');
+                    }
+                } else {
+                    const error = await response.text();
+                    showError(error);
+                }
+            } catch (error) {
+                console.error('Error executing query:', error);
+                showError('Sorgu çalıştırılırken hata oluştu');
+            }
+        }
+
+        function displayQueryResult(result) {
+            const resultDiv = document.getElementById('queryResult');
+            const tableDiv = document.getElementById('resultTable');
+            
+            if (result && result.length > 0) {
+                const columns = Object.keys(result[0]);
+                let tableHtml = '<table class="data-table"><thead><tr>';
+                
+                // Headers
+                columns.forEach(col => {
+                    tableHtml += `<th>${col}</th>`;
+                });
+                tableHtml += '</tr></thead><tbody>';
+                
+                // Data rows
+                result.forEach(row => {
+                    tableHtml += '<tr>';
+                    columns.forEach(col => {
+                        tableHtml += `<td>${row[col] || ''}</td>`;
+                    });
+                    tableHtml += '</tr>';
+                });
+                
+                tableHtml += '</tbody></table>';
+                tableDiv.innerHTML = tableHtml;
+                resultDiv.style.display = 'block';
+            } else {
+                tableDiv.innerHTML = '<p>Sonuç bulunamadı</p>';
+                resultDiv.style.display = 'block';
+            }
+        }
+
+        function closeConnectionModal() {
+            document.getElementById('connectionModal').style.display = 'none';
+        }
+
+        function closeTestModal() {
+            document.getElementById('testModal').style.display = 'none';
+        }
+
+        function closeQueryModal() {
+            document.getElementById('queryModal').style.display = 'none';
+            document.getElementById('queryResult').style.display = 'none';
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const connectionModal = document.getElementById('connectionModal');
+            const testModal = document.getElementById('testModal');
+            const queryModal = document.getElementById('queryModal');
+            
+            if (event.target === connectionModal) {
+                closeConnectionModal();
+            }
+            if (event.target === testModal) {
+                closeTestModal();
+            }
+            if (event.target === queryModal) {
+                closeQueryModal();
+            }
+        }
+    </script>
+</body>
+</html>

@@ -101,7 +101,8 @@ async function handleFileUpload(file) {
     try {
         const formData = new FormData();
         formData.append('file', file);
-        formData.append('description', document.getElementById('description')?.value || '');
+        const descriptionElement = document.getElementById('description');
+        formData.append('description', descriptionElement ? descriptionElement.value : '');
 
         const response = await fetch('/api/excel/upload', {
             method: 'POST',
@@ -212,6 +213,8 @@ async function handleLogin(e) {
     const rememberMe = formData.get('rememberMe');
 
     try {
+        console.log('Attempting login with:', { email, password, rememberMe });
+        
         const response = await fetch('/api/account/login', {
             method: 'POST',
             headers: {
@@ -220,8 +223,12 @@ async function handleLogin(e) {
             body: JSON.stringify({ email, password, rememberMe })
         });
 
+        console.log('Login response status:', response.status);
+        
         if (response.ok) {
             const result = await response.json();
+            console.log('Login successful:', result);
+            
             localStorage.setItem('authToken', result.token);
             isAuthenticated = true;
             currentUser = result.user;
@@ -235,6 +242,7 @@ async function handleLogin(e) {
             }, 1000);
         } else {
             const error = await response.json();
+            console.error('Login failed:', error);
             showAlert(error.message || 'Giriş başarısız', 'danger');
         }
     } catch (error) {
@@ -333,8 +341,10 @@ function sortTable(column, order) {
     const rows = Array.from(tbody.querySelectorAll('tr'));
 
     rows.sort((a, b) => {
-        const aValue = a.querySelector(`td[data-${column}]`)?.textContent || '';
-        const bValue = b.querySelector(`td[data-${column}]`)?.textContent || '';
+        const aElement = a.querySelector(`td[data-${column}]`);
+        const bElement = b.querySelector(`td[data-${column}]`);
+        const aValue = aElement ? aElement.textContent : '';
+        const bValue = bElement ? bElement.textContent : '';
 
         if (order === 'asc') {
             return aValue.localeCompare(bValue);
@@ -379,19 +389,24 @@ async function loadDashboardData() {
 function updateDashboard(data) {
     // Update stats
     if (data.totalRecords !== undefined) {
-        document.getElementById('totalRecords')?.textContent = data.totalRecords;
+        const element = document.getElementById('totalRecords');
+        if (element) element.textContent = data.totalRecords;
     }
     if (data.processedRecords !== undefined) {
-        document.getElementById('processedRecords')?.textContent = data.processedRecords;
+        const element = document.getElementById('processedRecords');
+        if (element) element.textContent = data.processedRecords;
     }
     if (data.pendingRecords !== undefined) {
-        document.getElementById('pendingRecords')?.textContent = data.pendingRecords;
+        const element = document.getElementById('pendingRecords');
+        if (element) element.textContent = data.pendingRecords;
     }
     if (data.totalGrantAmount !== undefined) {
-        document.getElementById('totalGrantAmount')?.textContent = formatCurrency(data.totalGrantAmount);
+        const element = document.getElementById('totalGrantAmount');
+        if (element) element.textContent = formatCurrency(data.totalGrantAmount);
     }
     if (data.totalPaidAmount !== undefined) {
-        document.getElementById('totalPaidAmount')?.textContent = formatCurrency(data.totalPaidAmount);
+        const element = document.getElementById('totalPaidAmount');
+        if (element) element.textContent = formatCurrency(data.totalPaidAmount);
     }
 
     // Update recent uploads
@@ -452,7 +467,7 @@ async function loadUserProfile() {
 }
 
 // Update user interface
-function updateUserInterface() {
+function updateUserProfile() {
     if (currentUser) {
         const userNameElement = document.getElementById('userName');
         if (userNameElement) {
@@ -548,7 +563,7 @@ function logout() {
     
     showAlert('Başarıyla çıkış yapıldı', 'success');
     setTimeout(() => {
-        window.location.href = '/login';
+        window.location.href = '/home';
     }, 1000);
 }
 
@@ -707,7 +722,8 @@ async function handleLogin(e) {
     
     const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
-    const rememberMe = document.getElementById('rememberMe')?.checked || false;
+            const rememberMeElement = document.getElementById('rememberMe');
+        const rememberMe = rememberMeElement ? rememberMeElement.checked : false;
 
     try {
         showLoading();
@@ -798,7 +814,8 @@ async function handleUploadForm(e) {
     e.preventDefault();
     
     const fileInput = document.getElementById('file');
-    const description = document.getElementById('description')?.value || '';
+            const descriptionElement = document.getElementById('description');
+        const description = descriptionElement ? descriptionElement.value : '';
     
     if (!fileInput.files[0]) {
         showAlert('Lütfen bir dosya seçin', 'warning');
