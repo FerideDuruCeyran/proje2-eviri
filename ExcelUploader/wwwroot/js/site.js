@@ -210,17 +210,19 @@ async function handleLogin(e) {
     const formData = new FormData(e.target);
     const email = formData.get('email');
     const password = formData.get('password');
-    const rememberMe = formData.get('rememberMe');
+    const rememberMe = formData.get('rememberMe') === 'on' || formData.get('rememberMe') === 'true';
 
     try {
-        console.log('Attempting login with:', { email, password, rememberMe });
+        const loginData = { email, password, rememberMe };
+        console.log('Attempting login with:', { email, password: '***', rememberMe });
+        console.log('Full login data:', loginData);
         
         const response = await fetch('/api/account/login', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ email, password, rememberMe })
+            body: JSON.stringify(loginData)
         });
 
         console.log('Login response status:', response.status);
@@ -238,12 +240,22 @@ async function handleLogin(e) {
             
             showAlert('Başarıyla giriş yapıldı!', 'success');
             setTimeout(() => {
-                window.location.href = '/';
+                window.location.href = '/upload';
             }, 1000);
         } else {
             const error = await response.json();
             console.error('Login failed:', error);
-            showAlert(error.message || 'Giriş başarısız', 'danger');
+            
+            // Show detailed error information
+            let errorMessage = 'Giriş başarısız';
+            if (error.message) {
+                errorMessage = error.message;
+            }
+            if (error.errors && Array.isArray(error.errors)) {
+                errorMessage += ': ' + error.errors.join(', ');
+            }
+            
+            showAlert(errorMessage, 'danger');
         }
     } catch (error) {
         console.error('Login error:', error);
@@ -716,51 +728,7 @@ function setupTables() {
     // Add any table-specific event listeners here
 }
 
-// Handle login
-async function handleLogin(e) {
-    e.preventDefault();
-    
-    const email = document.getElementById('email').value;
-    const password = document.getElementById('password').value;
-            const rememberMeElement = document.getElementById('rememberMe');
-        const rememberMe = rememberMeElement ? rememberMeElement.checked : false;
 
-    try {
-        showLoading();
-        
-        const response = await fetch('/api/account/login', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                email,
-                password,
-                rememberMe
-            })
-        });
-
-        if (response.ok) {
-            const result = await response.json();
-            localStorage.setItem('authToken', result.token);
-            isAuthenticated = true;
-            currentUser = result.user;
-            
-            showAlert('Başarıyla giriş yapıldı', 'success');
-            setTimeout(() => {
-                window.location.href = '/';
-            }, 1000);
-        } else {
-            const error = await response.json();
-            showAlert(error.message || 'Giriş başarısız', 'danger');
-        }
-    } catch (error) {
-        console.error('Login error:', error);
-        showAlert('Giriş başarısız', 'danger');
-    } finally {
-        hideLoading();
-    }
-}
 
 // Handle register
 async function handleRegister(e) {
