@@ -108,8 +108,8 @@ namespace ExcelUploader.Migrations
                         {
                             Id = "1",
                             AccessFailedCount = 0,
-                            ConcurrencyStamp = "2b3657b1-fff3-402e-a918-44c0dcd1a272",
-                            CreatedAt = new DateTime(2025, 8, 28, 9, 56, 50, 563, DateTimeKind.Utc).AddTicks(9997),
+                            ConcurrencyStamp = "acec07c4-e38d-4f58-8de7-660f8dc6765a",
+                            CreatedAt = new DateTime(2025, 8, 29, 7, 45, 48, 874, DateTimeKind.Utc).AddTicks(3183),
                             Email = "admin@exceluploader.com",
                             EmailConfirmed = true,
                             FirstName = "Admin",
@@ -118,12 +118,77 @@ namespace ExcelUploader.Migrations
                             LockoutEnabled = false,
                             NormalizedEmail = "ADMIN@EXCELUPLOADER.COM",
                             NormalizedUserName = "ADMIN@EXCELUPLOADER.COM",
-                            PasswordHash = "AQAAAAIAAYagAAAAENDXVHJo8a6gMcwfNZQrwXtXioHI7xCb/V7ts3CQTK3E3JsDHqnvAU1KJAmV12zhug==",
+                            PasswordHash = "AQAAAAIAAYagAAAAEFrv79kNe61x1x1N+nBKCUU/3/p44ua0l7Qwszrk9ctxNx6G/galWv7HMEQhX1MIjg==",
                             PhoneNumberConfirmed = false,
-                            SecurityStamp = "6d98fa86-cba4-4b4d-bc4c-1d66bc063e20",
+                            SecurityStamp = "9d056241-c713-4d03-a583-83eda4c8dde3",
                             TwoFactorEnabled = false,
                             UserName = "admin@exceluploader.com"
                         });
+                });
+
+            modelBuilder.Entity("ExcelUploader.Models.DatabaseConnection", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DatabaseName")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime?>("LastTestDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<bool?>("LastTestResult")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Password")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<int>("Port")
+                        .HasColumnType("int");
+
+                    b.Property<string>("ServerName")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<DateTime?>("UpdatedDate")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Username")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IsActive");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.ToTable("DatabaseConnections");
                 });
 
             modelBuilder.Entity("ExcelUploader.Models.DynamicTable", b =>
