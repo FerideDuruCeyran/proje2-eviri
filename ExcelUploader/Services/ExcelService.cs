@@ -100,50 +100,119 @@ namespace ExcelUploader.Services
             try
             {
                 using var stream = file.OpenReadStream();
-                using var workbook = new XLWorkbook(stream);
-                var worksheet = workbook.Worksheets.FirstOrDefault() ?? workbook.Worksheets.First();
-
-                if (worksheet == null)
-                    throw new InvalidOperationException("Excel dosyasında çalışma sayfası bulunamadı.");
-
-                var rowCount = worksheet.RowCount();
-                var colCount = worksheet.ColumnCount();
-
-                // Get headers (first row)
-                var headers = new List<string>();
-                for (int col = 1; col <= colCount; col++)
+                
+                // Try to read as XLSX first (some .xls files are actually XLSX)
+                try
                 {
-                    var headerValue = worksheet.Cell(1, col).Value.ToString() ?? "";
-                    headers.Add(string.IsNullOrEmpty(headerValue) ? $"Sütun_{col}" : headerValue);
-                }
+                    using var workbook = new XLWorkbook(stream);
+                    var worksheet = workbook.Worksheets.FirstOrDefault() ?? workbook.Worksheets.First();
 
-                // Get first 10 rows of data (excluding header)
-                var rows = new List<List<string>>();
-                for (int row = 2; row <= Math.Min(11, rowCount); row++)
-                {
-                    var rowData = new List<string>();
+                    if (worksheet == null)
+                        throw new InvalidOperationException("Excel dosyasında çalışma sayfası bulunamadı.");
+
+                    var rowCount = worksheet.RowCount();
+                    var colCount = worksheet.ColumnCount();
+
+                    // Get headers (first row)
+                    var headers = new List<string>();
                     for (int col = 1; col <= colCount; col++)
                     {
-                        var cellValue = worksheet.Cell(row, col).Value.ToString() ?? "";
-                        rowData.Add(cellValue);
+                        var headerValue = worksheet.Cell(1, col).Value.ToString() ?? "";
+                        headers.Add(string.IsNullOrEmpty(headerValue) ? $"Sütun_{col}" : headerValue);
                     }
-                    rows.Add(rowData);
+
+                    // Get first 10 rows of data (excluding header)
+                    var rows = new List<List<string>>();
+                    for (int row = 2; row <= Math.Min(11, rowCount); row++)
+                    {
+                        var rowData = new List<string>();
+                        for (int col = 1; col <= colCount; col++)
+                        {
+                            var cellValue = worksheet.Cell(row, col).Value.ToString() ?? "";
+                            rowData.Add(cellValue);
+                        }
+                        rows.Add(rowData);
+                    }
+
+                    var result = new
+                    {
+                        headers = headers,
+                        rows = rows,
+                        totalRows = rowCount - 1, // Exclude header
+                        totalColumns = colCount
+                    };
+
+                    return Task.FromResult<object>(result);
                 }
-
-                var result = new
+                catch
                 {
-                    headers = headers,
-                    rows = rows,
-                    totalRows = rowCount - 1, // Exclude header
-                    totalColumns = colCount
-                };
+                    // If XLSX reading fails, try alternative approach
+                    stream.Position = 0;
+                    
+                    // Check if file is empty or corrupted
+                    if (file.Length == 0)
+                    {
+                        throw new InvalidOperationException("Excel dosyası boş.");
+                    }
+                    
+                    // Try to read with basic validation
+                    using var workbook = new XLWorkbook(stream);
+                    var worksheet = workbook.Worksheets.FirstOrDefault();
+                    
+                    if (worksheet == null)
+                        throw new InvalidOperationException("Excel dosyasında çalışma sayfası bulunamadı veya dosya bozuk.");
 
-                return Task.FromResult<object>(result);
+                    var rowCount = worksheet.RowCount();
+                    var colCount = worksheet.ColumnCount();
+
+                    // Get headers (first row)
+                    var headers = new List<string>();
+                    for (int col = 1; col <= colCount; col++)
+                    {
+                        var headerValue = worksheet.Cell(1, col).Value.ToString() ?? "";
+                        headers.Add(string.IsNullOrEmpty(headerValue) ? $"Sütun_{col}" : headerValue);
+                    }
+
+                    // Get first 10 rows of data (excluding header)
+                    var rows = new List<List<string>>();
+                    for (int row = 2; row <= Math.Min(11, rowCount); row++)
+                    {
+                        var rowData = new List<string>();
+                        for (int col = 1; col <= colCount; col++)
+                        {
+                            var cellValue = worksheet.Cell(row, col).Value.ToString() ?? "";
+                            rowData.Add(cellValue);
+                        }
+                        rows.Add(rowData);
+                    }
+
+                    var result = new
+                    {
+                        headers = headers,
+                        rows = rows,
+                        totalRows = rowCount - 1, // Exclude header
+                        totalColumns = colCount
+                    };
+
+                    return Task.FromResult<object>(result);
+                }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error in GetXlsPreviewAsync");
-                throw;
+                _logger.LogError(ex, "Error in GetXlsPreviewAsync for file: {FileName}", file.FileName);
+                
+                // Return a more user-friendly error
+                var errorResult = new
+                {
+                    error = true,
+                    message = $"Excel dosyası okunamadı: {ex.Message}",
+                    headers = new List<string>(),
+                    rows = new List<List<string>>(),
+                    totalRows = 0,
+                    totalColumns = 0
+                };
+                
+                return Task.FromResult<object>(errorResult);
             }
         }
 
