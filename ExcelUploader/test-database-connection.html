@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Database Connection Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        .btn:hover {
+            background: #0056b3;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            border-left: 4px solid #007bff;
+            background: #f8f9fa;
+        }
+        .success {
+            border-left-color: #28a745;
+            background: #d4edda;
+        }
+        .error {
+            border-left-color: #dc3545;
+            background: #f8d7da;
+        }
+        .info {
+            border-left-color: #17a2b8;
+            background: #d1ecf1;
+        }
+        pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔗 Database Connection Test</h1>
+        <p>This page tests the connection to your SQL Server database.</p>
+        
+        <div>
+            <button class="btn" onclick="testConnection()">Test Database Connection</button>
+            <button class="btn" onclick="getDatabaseInfo()">Get Database Info</button>
+            <button class="btn" onclick="clearResults()">Clear Results</button>
+        </div>
+        
+        <div id="results"></div>
+    </div>
+
+    <script>
+        async function testConnection() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<div class="result info">Testing database connection...</div>';
+            
+            try {
+                const response = await fetch('/api/home/test-database', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    const statusClass = result.isConnected ? 'success' : 'error';
+                    const statusText = result.isConnected ? '✅ Connected' : '❌ Failed';
+                    
+                    resultsDiv.innerHTML = `
+                        <div class="result ${statusClass}">
+                            <h3>${statusText}</h3>
+                            <p><strong>Message:</strong> ${result.message}</p>
+                            <h4>Database Information:</h4>
+                            <pre>${JSON.stringify(result.databaseInfo, null, 2)}</pre>
+                        </div>
+                    `;
+                } else {
+                    resultsDiv.innerHTML = `
+                        <div class="result error">
+                            <h3>❌ Error</h3>
+                            <p><strong>Error:</strong> ${result.error}</p>
+                            <p><strong>Details:</strong> ${result.details || 'No details available'}</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultsDiv.innerHTML = `
+                    <div class="result error">
+                        <h3>❌ Network Error</h3>
+                        <p><strong>Error:</strong> ${error.message}</p>
+                        <p>Make sure the application is running on http://localhost:5001</p>
+                    </div>
+                `;
+            }
+        }
+        
+        async function getDatabaseInfo() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<div class="result info">Getting database information...</div>';
+            
+            try {
+                const response = await fetch('/api/home/test-database', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    resultsDiv.innerHTML = `
+                        <div class="result info">
+                            <h3>📊 Database Information</h3>
+                            <pre>${JSON.stringify(result.databaseInfo, null, 2)}</pre>
+                        </div>
+                    `;
+                } else {
+                    resultsDiv.innerHTML = `
+                        <div class="result error">
+                            <h3>❌ Error</h3>
+                            <p><strong>Error:</strong> ${result.error}</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultsDiv.innerHTML = `
+                    <div class="result error">
+                        <h3>❌ Network Error</h3>
+                        <p><strong>Error:</strong> ${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+        
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+        
+        // Auto-test on page load
+        window.onload = function() {
+            setTimeout(testConnection, 1000);
+        };
+    </script>
+</body>
+</html>

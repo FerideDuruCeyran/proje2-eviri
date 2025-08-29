@@ -98,6 +98,17 @@ namespace ExcelUploader.Models
         public Dictionary<string, object>? Filters { get; set; }
     }
 
+    public class InsertDataViewModel
+    {
+        [Required(ErrorMessage = "Lütfen bir Excel dosyası seçin")]
+        [Display(Name = "Excel Dosyası")]
+        public IFormFile? ExcelFile { get; set; }
+        
+        [Required(ErrorMessage = "Tablo ID gereklidir")]
+        [Display(Name = "Tablo ID")]
+        public int TableId { get; set; }
+    }
+
     public class DataRequest
     {
         public int? TableId { get; set; }

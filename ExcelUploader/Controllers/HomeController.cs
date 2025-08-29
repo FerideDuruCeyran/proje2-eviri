@@ -208,6 +208,110 @@ namespace ExcelUploader.Controllers
             }
         }
 
+        // New endpoint for two-stage process: Stage 1 - Create table structure only
+        [HttpPost]
+        [Route("create-table-structure")]
+        [Authorize]
+        public async Task<IActionResult> CreateTableStructure([FromForm] UploadViewModel model)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            try
+            {
+                if (model.ExcelFile == null)
+                {
+                    return BadRequest(new { error = "Lütfen bir Excel dosyası seçin" });
+                }
+
+                // Validate file
+                if (!await _excelService.ValidateExcelFileAsync(model.ExcelFile))
+                {
+                    return BadRequest(new { error = "Geçersiz dosya formatı veya boyut" });
+                }
+
+                // Process Excel file and create table structure only
+                var userName = User.FindFirstValue(ClaimTypes.Name) ?? User.Identity?.Name ?? "Unknown";
+                
+                // Create table structure from Excel file
+                var dynamicTable = await _dynamicTableService.CreateTableStructureAsync(
+                    model.ExcelFile, 
+                    userName, 
+                    model.DatabaseConnectionId, 
+                    model.Description);
+
+                if (dynamicTable == null)
+                {
+                    return BadRequest(new { error = "Excel dosyasından tablo yapısı oluşturulamadı" });
+                }
+
+                return Ok(new { 
+                    message = $"Tablo yapısı başarıyla oluşturuldu", 
+                    tableName = dynamicTable.TableName,
+                    tableId = dynamicTable.Id,
+                    columnCount = dynamicTable.ColumnCount,
+                    stage = "structure_created"
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating table structure");
+                return StatusCode(500, new { error = "Tablo yapısı oluşturulurken hata oluştu" });
+            }
+        }
+
+        // New endpoint for two-stage process: Stage 2 - Insert data into existing table
+        [HttpPost]
+        [Route("insert-data")]
+        [Authorize]
+        public async Task<IActionResult> InsertData([FromForm] InsertDataViewModel model)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            try
+            {
+                if (model.ExcelFile == null)
+                {
+                    return BadRequest(new { error = "Lütfen bir Excel dosyası seçin" });
+                }
+
+                if (model.TableId <= 0)
+                {
+                    return BadRequest(new { error = "Geçersiz tablo ID" });
+                }
+
+                // Validate file
+                if (!await _excelService.ValidateExcelFileAsync(model.ExcelFile))
+                {
+                    return BadRequest(new { error = "Geçersiz dosya formatı veya boyut" });
+                }
+
+                // Insert data into existing table
+                var success = await _dynamicTableService.InsertDataIntoTableAsync(model.TableId, model.ExcelFile);
+
+                if (!success)
+                {
+                    return BadRequest(new { error = "Veriler tabloya eklenemedi" });
+                }
+
+                return Ok(new { 
+                    message = $"Veriler başarıyla tabloya eklendi", 
+                    tableId = model.TableId,
+                    stage = "data_inserted"
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error inserting data into table");
+                return StatusCode(500, new { error = "Veriler eklenirken hata oluştu" });
+            }
+        }
+
         [HttpPost]
         [Route("data")]
         [Authorize]
@@ -352,6 +456,30 @@ namespace ExcelUploader.Controllers
                 version = "9.0",
                 environment = Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Development"
             });
+        }
+
+        // Test database connection endpoint
+        [HttpGet]
+        [Route("test-database")]
+        [Authorize]
+        public async Task<IActionResult> TestDatabase()
+        {
+            try
+            {
+                var isConnected = await _dynamicTableService.TestDatabaseConnectionAsync();
+                var dbInfo = await _dynamicTableService.GetDatabaseInfoAsync();
+                
+                return Ok(new { 
+                    isConnected = isConnected,
+                    databaseInfo = dbInfo,
+                    message = isConnected ? "Database connection successful" : "Database connection failed"
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error testing database connection");
+                return StatusCode(500, new { error = "Database connection test failed", details = ex.Message });
+            }
         }
     }
 }

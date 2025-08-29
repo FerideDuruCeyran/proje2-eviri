@@ -185,7 +185,12 @@
 
                 <!-- Database Status -->
                 <div class="database-status">
-                    <h3>Veritabanı Durumu</h3>
+                    <div class="status-header">
+                        <h3>Veritabanı Durumu</h3>
+                        <button class="btn btn-sm btn-outline" onclick="checkDatabaseStatus()" title="Yenile">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                    </div>
                     <div class="status-card" id="dbStatus">
                         <div class="status-icon">
                             <i class="fas fa-spinner fa-spin"></i>
@@ -213,6 +218,9 @@
             if (isAuthenticated) {
                 loadDashboardData();
                 checkDatabaseStatus();
+                
+                // Refresh database status every 30 seconds
+                setInterval(checkDatabaseStatus, 30000);
             }
         });
 
@@ -310,21 +318,49 @@
 
         // Check database status
         async function checkDatabaseStatus() {
+            const statusElement = document.getElementById('dbStatus');
+            
+            // Show loading state
+            statusElement.innerHTML = `
+                <div class="status-icon">
+                    <i class="fas fa-spinner fa-spin"></i>
+                </div>
+                <div class="status-text">
+                    <div class="status-title">Bağlantı Kontrol Ediliyor</div>
+                    <div class="status-details">Lütfen bekleyin...</div>
+                </div>
+            `;
+            
             try {
-                const response = await fetch('/api/home/sql-test');
-                const statusElement = document.getElementById('dbStatus');
+                const response = await fetch('/api/home/test-database', {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                    }
+                });
                 
                 if (response.ok) {
                     const result = await response.json();
-                    statusElement.innerHTML = `
-                        <div class="status-icon success">
-                            <i class="fas fa-check-circle"></i>
-                        </div>
-                        <div class="status-text">
-                            <div class="status-title">Bağlantı Başarılı</div>
-                            <div class="status-details">${result.database} - ${result.serverVersion}</div>
-                        </div>
-                    `;
+                    if (result.isConnected) {
+                        statusElement.innerHTML = `
+                            <div class="status-icon success">
+                                <i class="fas fa-check-circle"></i>
+                            </div>
+                            <div class="status-text">
+                                <div class="status-title">Bağlantı Başarılı</div>
+                                <div class="status-details">${result.databaseInfo.Database} - ${result.databaseInfo.Server}</div>
+                            </div>
+                        `;
+                    } else {
+                        statusElement.innerHTML = `
+                            <div class="status-icon error">
+                                <i class="fas fa-times-circle"></i>
+                            </div>
+                            <div class="status-text">
+                                <div class="status-title">Bağlantı Hatası</div>
+                                <div class="status-details">Veritabanına bağlanılamıyor</div>
+                            </div>
+                        `;
+                    }
                 } else {
                     statusElement.innerHTML = `
                         <div class="status-icon error">

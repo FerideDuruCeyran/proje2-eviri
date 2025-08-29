@@ -333,7 +333,7 @@
                 <div class="card">
                     <div class="card-header">
                         <h2 class="card-title">
-                            <i class="fas fa-database"></i> Tablo Oluştur
+                            <i class="fas fa-database"></i> Tablo Oluştur ve Veri Yükle
                         </h2>
                     </div>
                     <div class="card-body">
@@ -341,6 +341,26 @@
                             <h4>Oluşturulacak Tablo Özeti</h4>
                             <div class="summary-details" id="summaryDetails">
                                 <!-- Summary will be populated here -->
+                            </div>
+                        </div>
+
+                        <div class="two-stage-process">
+                            <div class="stage-section">
+                                <h5><i class="fas fa-layer-group"></i> Aşama 1: Tablo Yapısı Oluştur</h5>
+                                <p class="text-muted">Excel dosyasından tablo yapısı oluşturulacak ve veritabanında tablo oluşturulacak.</p>
+                                <button type="button" class="btn btn-primary" id="createStructureBtn" onclick="createTableStructure()">
+                                    <i class="fas fa-table"></i> Tablo Yapısını Oluştur
+                                </button>
+                                <div class="stage-status" id="stage1Status"></div>
+                            </div>
+
+                            <div class="stage-section" id="stage2Section" style="display: none;">
+                                <h5><i class="fas fa-database"></i> Aşama 2: Verileri Yükle</h5>
+                                <p class="text-muted">Oluşturulan tabloya Excel verileri yüklenecek.</p>
+                                <button type="button" class="btn btn-success" id="insertDataBtn" onclick="insertData()">
+                                    <i class="fas fa-upload"></i> Verileri Yükle
+                                </button>
+                                <div class="stage-status" id="stage2Status"></div>
                             </div>
                         </div>
 
@@ -355,8 +375,8 @@
                             <button type="button" class="btn btn-secondary" onclick="previousStep()">
                                 <i class="fas fa-arrow-left"></i> Geri
                             </button>
-                            <button type="button" class="btn btn-success btn-large" id="createTableBtn" onclick="createTable()">
-                                <i class="fas fa-magic"></i> Tabloyu Oluştur
+                            <button type="button" class="btn btn-info" id="viewTableBtn" onclick="viewCreatedTable()" style="display: none;">
+                                <i class="fas fa-eye"></i> Oluşturulan Tabloyu Görüntüle
                             </button>
                         </div>
                     </div>
@@ -756,17 +776,26 @@
         }
 
         // Create table
-        async function createTable() {
+        async function createTableStructure() {
             try {
-                const createTableBtn = document.getElementById('createTableBtn');
+                const createStructureBtn = document.getElementById('createStructureBtn');
+                const stage1Status = document.getElementById('stage1Status');
+                const stage2Section = document.getElementById('stage2Section');
+                const viewTableBtn = document.getElementById('viewTableBtn');
                 const creationProgress = document.getElementById('creationProgress');
                 
-                createTableBtn.disabled = true;
-                creationProgress.style.display = 'block';
+                                 createStructureBtn.disabled = true;
+                 stage1Status.textContent = 'Oluşturuluyor...';
+                 stage1Status.style.background = '#fff3cd';
+                 stage1Status.style.color = '#856404';
+                 stage2Section.style.display = 'none';
+                 viewTableBtn.style.display = 'none';
+                 creationProgress.style.display = 'block';
 
                 // Prepare data
                 const formData = new FormData();
                 formData.append('ExcelFile', excelData.file);
+                                 // Table name is already included in the form data
                 formData.append('Description', document.getElementById('tableDescription').value);
                 
                 // Add database connection ID if selected
@@ -778,7 +807,73 @@
                 // Update progress
                 updateProgress(25, 'Dosya yükleniyor...');
 
-                const response = await fetch('/api/home/upload', {
+                                 const response = await fetch('/api/home/create-table-structure', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                    }
+                });
+
+                updateProgress(50, 'Tablo yapısı oluşturuluyor...');
+
+                if (response.ok) {
+                    updateProgress(75, 'Veriler işleniyor...');
+                    const result = await response.json();
+                    
+                    updateProgress(100, 'Tamamlandı!');
+                    
+                                         setTimeout(() => {
+                         showAlert(`Tablo yapısı başarıyla oluşturuldu: ${result.tableName}`, 'success');
+                         stage1Status.textContent = '✓ Tamamlandı!';
+                         stage1Status.style.background = '#d4edda';
+                         stage1Status.style.color = '#155724';
+                         stage2Section.style.display = 'block';
+                         viewTableBtn.style.display = 'inline-block';
+                         createStructureBtn.disabled = false;
+                         window.createdTableId = result.tableId; // Store table ID for stage 2
+                     }, 1000);
+                                 } else {
+                     const error = await response.json();
+                     showAlert(error.error || 'Tablo yapısı oluşturulurken hata oluştu', 'danger');
+                     createStructureBtn.disabled = false;
+                     stage1Status.textContent = '✗ Hata!';
+                     stage1Status.style.background = '#f8d7da';
+                     stage1Status.style.color = '#721c24';
+                     creationProgress.style.display = 'none';
+                 }
+                         } catch (error) {
+                 console.error('Error creating table structure:', error);
+                 showAlert('Tablo yapısı oluşturulurken hata oluştu', 'danger');
+                 createStructureBtn.disabled = false;
+                 stage1Status.textContent = '✗ Hata!';
+                 stage1Status.style.background = '#f8d7da';
+                 stage1Status.style.color = '#721c24';
+                 creationProgress.style.display = 'none';
+             }
+        }
+
+        async function insertData() {
+            try {
+                const insertDataBtn = document.getElementById('insertDataBtn');
+                const stage2Status = document.getElementById('stage2Status');
+                const creationProgress = document.getElementById('creationProgress');
+                
+                                 insertDataBtn.disabled = true;
+                 stage2Status.textContent = 'Yükleniyor...';
+                 stage2Status.style.background = '#fff3cd';
+                 stage2Status.style.color = '#856404';
+                 creationProgress.style.display = 'block';
+
+                                 // Prepare data
+                 const formData = new FormData();
+                 formData.append('ExcelFile', excelData.file);
+                 formData.append('TableId', window.createdTableId); // Use the table ID from stage 1
+
+                // Update progress
+                updateProgress(25, 'Dosya yükleniyor...');
+
+                const response = await fetch('/api/home/insert-data', {
                     method: 'POST',
                     body: formData,
                     headers: {
@@ -789,27 +884,77 @@
                 updateProgress(50, 'Veriler işleniyor...');
 
                 if (response.ok) {
-                    updateProgress(75, 'Tablo oluşturuluyor...');
+                    updateProgress(75, 'Veriler yükleniyor...');
                     const result = await response.json();
                     
                     updateProgress(100, 'Tamamlandı!');
                     
-                    setTimeout(() => {
-                        showAlert(`Tablo başarıyla oluşturuldu: ${result.tableName}`, 'success');
-                        // Redirect to tables page
-                        window.location.href = '/tables';
-                    }, 1000);
+                                         setTimeout(() => {
+                         showAlert(`Veriler başarıyla yüklendi!`, 'success');
+                         stage2Status.textContent = '✓ Tamamlandı!';
+                         stage2Status.style.background = '#d4edda';
+                         stage2Status.style.color = '#155724';
+                         insertDataBtn.disabled = false;
+                     }, 1000);
+                                 } else {
+                     const error = await response.json();
+                     showAlert(error.error || 'Veriler yüklenirken hata oluştu', 'danger');
+                     insertDataBtn.disabled = false;
+                     stage2Status.textContent = '✗ Hata!';
+                     stage2Status.style.background = '#f8d7da';
+                     stage2Status.style.color = '#721c24';
+                     creationProgress.style.display = 'none';
+                 }
+                         } catch (error) {
+                 console.error('Error inserting data:', error);
+                 showAlert('Veriler yüklenirken hata oluştu', 'danger');
+                 insertDataBtn.disabled = false;
+                 stage2Status.textContent = '✗ Hata!';
+                 stage2Status.style.background = '#f8d7da';
+                 stage2Status.style.color = '#721c24';
+                 creationProgress.style.display = 'none';
+             }
+        }
+
+        async function viewCreatedTable() {
+            try {
+                const viewTableBtn = document.getElementById('viewTableBtn');
+                const tableName = document.getElementById('tableName').value;
+                const databaseConnectionId = document.getElementById('databaseConnection').value;
+
+                if (!tableName) {
+                    showAlert('Lütfen tablo adını girin.', 'warning');
+                    return;
+                }
+
+                if (!databaseConnectionId) {
+                    showAlert('Lütfen bir veritabanı bağlantısı seçin.', 'warning');
+                    return;
+                }
+
+                viewTableBtn.disabled = true;
+                showAlert(`${tableName} tablosunun verileri görüntüleniyor...`, 'info');
+
+                const response = await fetch(`/api/home/view-table?TableName=${tableName}&DatabaseConnectionId=${databaseConnectionId}`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                    }
+                });
+
+                if (response.ok) {
+                    const tableData = await response.json();
+                    showAlert(`${tableName} tablosundan ${tableData.rowCount} satır görüntülendi.`, 'success');
+                    // Optionally, display the data in a modal or new tab
+                    console.log('Viewed Table Data:', tableData);
                 } else {
                     const error = await response.json();
-                    showAlert(error.error || 'Tablo oluşturulurken hata oluştu', 'danger');
-                    createTableBtn.disabled = false;
-                    creationProgress.style.display = 'none';
+                    showAlert(error.error || 'Tablo verileri görüntülenirken hata oluştu', 'danger');
                 }
+                viewTableBtn.disabled = false;
             } catch (error) {
-                console.error('Error creating table:', error);
-                showAlert('Tablo oluşturulurken hata oluştu', 'danger');
-                createTableBtn.disabled = false;
-                creationProgress.style.display = 'none';
+                console.error('Error viewing table:', error);
+                showAlert('Tablo verileri görüntülenirken hata oluştu', 'danger');
             }
         }
 

@@ -94,6 +94,68 @@ namespace ExcelUploader.Services
             }
         }
 
+        // New method for two-stage process: Stage 1 - Create table structure only
+        public async Task<DynamicTable> CreateTableStructureAsync(IFormFile file, string uploadedBy, int? databaseConnectionId = null, string? description = null)
+        {
+            try
+            {
+                // Generate unique table name
+                var tableName = GenerateTableName(file.FileName);
+                
+                // Read Excel headers and determine data types
+                var (headers, dataTypes, sampleData) = await AnalyzeExcelFileAsync(file);
+                
+                // Create DynamicTable entity
+                var dynamicTable = new DynamicTable
+                {
+                    TableName = tableName,
+                    FileName = file.FileName,
+                    UploadedBy = uploadedBy,
+                    Description = description,
+                    RowCount = sampleData.Count,
+                    ColumnCount = headers.Count,
+                    UploadDate = DateTime.UtcNow,
+                    IsProcessed = false // Not processed yet
+                };
+
+                // Create table columns
+                for (int i = 0; i < headers.Count; i++)
+                {
+                    var column = new TableColumn
+                    {
+                        ColumnName = SanitizeColumnName(headers[i]),
+                        DisplayName = headers[i],
+                        DataType = dataTypes[i],
+                        ColumnOrder = i + 1,
+                        MaxLength = dataTypes[i] == "nvarchar" ? 1000 : null,
+                        IsRequired = false,
+                        IsUnique = false
+                    };
+                    
+                    dynamicTable.Columns.Add(column);
+                }
+
+                // Save to database
+                _context.DynamicTables.Add(dynamicTable);
+                await _context.SaveChangesAsync();
+
+                // Create SQL table structure only
+                var sqlTableCreated = await CreateSqlTableAsync(dynamicTable, databaseConnectionId);
+                if (!sqlTableCreated)
+                {
+                    throw new InvalidOperationException("SQL table creation failed");
+                }
+
+                _logger.LogInformation("Table structure created successfully: {TableName}", dynamicTable.TableName);
+                return dynamicTable;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error creating table structure from Excel file: {FileName}", file.FileName);
+                throw;
+            }
+        }
+
         public async Task<bool> CreateSqlTableAsync(DynamicTable dynamicTable, int? databaseConnectionId = null)
         {
             try
@@ -741,6 +803,116 @@ namespace ExcelUploader.Services
             worksheet.Cells.AutoFitColumns();
 
             return await package.GetAsByteArrayAsync();
+        }
+
+        // New method for two-stage process: Stage 2 - Insert data into existing table
+        public async Task<bool> InsertDataIntoTableAsync(int tableId, IFormFile file)
+        {
+            try
+            {
+                // Get the dynamic table
+                var dynamicTable = await _context.DynamicTables
+                    .Include(t => t.Columns.OrderBy(c => c.ColumnOrder))
+                    .FirstOrDefaultAsync(t => t.Id == tableId);
+
+                if (dynamicTable == null)
+                {
+                    throw new ArgumentException($"Table with ID {tableId} not found");
+                }
+
+                // Read Excel data
+                var (headers, dataTypes, sampleData) = await AnalyzeExcelFileAsync(file);
+
+                // Validate that headers match the table structure
+                var tableColumns = dynamicTable.Columns.OrderBy(c => c.ColumnOrder).ToList();
+                if (headers.Count != tableColumns.Count)
+                {
+                    throw new InvalidOperationException($"Column count mismatch. Expected: {tableColumns.Count}, Found: {headers.Count}");
+                }
+
+                // Validate column names match
+                for (int i = 0; i < headers.Count; i++)
+                {
+                    var expectedColumn = tableColumns[i];
+                    var actualHeader = headers[i];
+                    
+                    if (SanitizeColumnName(actualHeader) != expectedColumn.ColumnName)
+                    {
+                        throw new InvalidOperationException($"Column mismatch at position {i + 1}. Expected: {expectedColumn.ColumnName}, Found: {SanitizeColumnName(actualHeader)}");
+                    }
+                }
+
+                // Insert data
+                var dataInserted = await InsertDataAsync(dynamicTable, sampleData);
+                if (!dataInserted)
+                {
+                    throw new InvalidOperationException("Data insertion failed");
+                }
+
+                // Mark as processed
+                dynamicTable.IsProcessed = true;
+                dynamicTable.ProcessedDate = DateTime.UtcNow;
+                await _context.SaveChangesAsync();
+
+                _logger.LogInformation("Data inserted successfully into table: {TableName}", dynamicTable.TableName);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error inserting data into table ID: {TableId}", tableId);
+                throw;
+            }
+        }
+
+        // Method to test database connection
+        public async Task<bool> TestDatabaseConnectionAsync()
+        {
+            try
+            {
+                string connectionString = _configuration.GetConnectionString("DefaultConnection");
+                using var connection = new SqlConnection(connectionString);
+                await connection.OpenAsync();
+                
+                _logger.LogInformation("Database connection test successful. Connected to: {Server}/{Database}", 
+                    connection.DataSource, connection.Database);
+                
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Database connection test failed. Error: {ErrorMessage}", ex.Message);
+                return false;
+            }
+        }
+
+        // Method to get database information
+        public async Task<Dictionary<string, string>> GetDatabaseInfoAsync()
+        {
+            try
+            {
+                string connectionString = _configuration.GetConnectionString("DefaultConnection");
+                using var connection = new SqlConnection(connectionString);
+                await connection.OpenAsync();
+                
+                var info = new Dictionary<string, string>
+                {
+                    ["Server"] = connection.DataSource,
+                    ["Database"] = connection.Database,
+                    ["ServerVersion"] = connection.ServerVersion,
+                    ["ConnectionTimeout"] = connection.ConnectionTimeout.ToString(),
+                    ["State"] = connection.State.ToString()
+                };
+                
+                return info;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting database info: {ErrorMessage}", ex.Message);
+                return new Dictionary<string, string>
+                {
+                    ["Error"] = ex.Message
+                };
+            }
         }
     }
 }
