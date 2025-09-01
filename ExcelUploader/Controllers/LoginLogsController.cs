@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using ExcelUploader.Services;
 using ExcelUploader.Models;
+using System.Security.Claims;
 
 namespace ExcelUploader.Controllers
 {
@@ -10,44 +11,24 @@ namespace ExcelUploader.Controllers
     [Authorize]
     public class LoginLogsController : ControllerBase
     {
-        private readonly IUserLoginLogService _userLoginLogService;
-        private readonly ILogger<LoginLogsController> _logger;
+        private readonly ILoginLogService _loginLogService;
 
-        public LoginLogsController(IUserLoginLogService userLoginLogService, ILogger<LoginLogsController> logger)
+        public LoginLogsController(ILoginLogService loginLogService)
         {
-            _userLoginLogService = userLoginLogService;
-            _logger = logger;
+            _loginLogService = loginLogService;
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetLoginLogs(
-            [FromQuery] int page = 1,
-            [FromQuery] int pageSize = 50,
-            [FromQuery] string? userId = null,
-            [FromQuery] string? action = null,
-            [FromQuery] DateTime? startDate = null,
-            [FromQuery] DateTime? endDate = null)
+        public async Task<IActionResult> GetLoginLogs([FromQuery] int page = 1, [FromQuery] int pageSize = 50)
         {
             try
             {
-                var logs = await _userLoginLogService.GetLoginLogsAsync(page, pageSize, userId, action, startDate, endDate);
-                var totalCount = await _userLoginLogService.GetTotalLoginLogsCountAsync(userId, action, startDate, endDate);
+                var logs = await _loginLogService.GetAllLoginLogsAsync(page, pageSize);
+                var totalCount = await _loginLogService.GetTotalLoginLogsCountAsync();
 
-                var result = new
+                return Ok(new
                 {
-                    logs = logs.Select(l => new
-                    {
-                        l.Id,
-                        l.UserId,
-                        l.UserEmail,
-                        l.UserName,
-                        l.Action,
-                        l.Timestamp,
-                        l.IpAddress,
-                        l.UserAgent,
-                        l.IsSuccessful,
-                        l.FailureReason
-                    }),
+                    logs,
                     pagination = new
                     {
                         page,
@@ -55,161 +36,111 @@ namespace ExcelUploader.Controllers
                         totalCount,
                         totalPages = (int)Math.Ceiling((double)totalCount / pageSize)
                     }
-                };
-
-                return Ok(result);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving login logs");
-                return StatusCode(500, new { error = "Login günlükleri alınırken hata oluştu" });
-            }
-        }
-
-        [HttpGet("recent")]
-        public async Task<IActionResult> GetRecentLoginAttempts([FromQuery] int count = 10)
-        {
-            try
-            {
-                var logs = await _userLoginLogService.GetRecentLoginAttemptsAsync(count);
-                
-                var result = logs.Select(l => new
-                {
-                    l.Id,
-                    l.UserId,
-                    l.UserEmail,
-                    l.UserName,
-                    l.Action,
-                    l.Timestamp,
-                    l.IpAddress,
-                    l.UserAgent,
-                    l.IsSuccessful,
-                    l.FailureReason
                 });
-
-                return Ok(result);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving recent login attempts");
-                return StatusCode(500, new { error = "Son giriş denemeleri alınırken hata oluştu" });
-            }
-        }
-
-        [HttpGet("failed")]
-        public async Task<IActionResult> GetFailedLoginAttempts(
-            [FromQuery] DateTime? startDate = null,
-            [FromQuery] DateTime? endDate = null)
-        {
-            try
-            {
-                var logs = await _userLoginLogService.GetFailedLoginAttemptsAsync(startDate, endDate);
-                
-                var result = logs.Select(l => new
-                {
-                    l.Id,
-                    l.UserId,
-                    l.UserEmail,
-                    l.UserName,
-                    l.Action,
-                    l.Timestamp,
-                    l.IpAddress,
-                    l.UserAgent,
-                    l.IsSuccessful,
-                    l.FailureReason
-                });
-
-                return Ok(result);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving failed login attempts");
-                return StatusCode(500, new { error = "Başarısız giriş denemeleri alınırken hata oluştu" });
+                return StatusCode(500, new { message = "Giriş günlükleri alınırken hata oluştu", error = ex.Message });
             }
         }
 
         [HttpGet("user/{userId}")]
-        public async Task<IActionResult> GetUserLoginHistory(
-            string userId,
-            [FromQuery] int page = 1,
-            [FromQuery] int pageSize = 20)
+        public async Task<IActionResult> GetUserLoginLogs(string userId, [FromQuery] int page = 1, [FromQuery] int pageSize = 20)
         {
             try
             {
-                var logs = await _userLoginLogService.GetUserLoginHistoryAsync(userId, page, pageSize);
-                
-                var result = logs.Select(l => new
-                {
-                    l.Id,
-                    l.UserId,
-                    l.UserEmail,
-                    l.UserName,
-                    l.Action,
-                    l.Timestamp,
-                    l.IpAddress,
-                    l.UserAgent,
-                    l.IsSuccessful,
-                    l.FailureReason
-                });
+                var logs = await _loginLogService.GetUserLoginLogsAsync(userId, page, pageSize);
+                var totalCount = await _loginLogService.GetUserLoginLogsCountAsync(userId);
 
-                return Ok(result);
+                return Ok(new
+                {
+                    logs,
+                    pagination = new
+                    {
+                        page,
+                        pageSize,
+                        totalCount,
+                        totalPages = (int)Math.Ceiling((double)totalCount / pageSize)
+                    }
+                });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving user login history for user {UserId}", userId);
-                return StatusCode(500, new { error = "Kullanıcı giriş geçmişi alınırken hata oluştu" });
+                return StatusCode(500, new { message = "Kullanıcı giriş günlükleri alınırken hata oluştu", error = ex.Message });
+            }
+        }
+
+        [HttpGet("my-logs")]
+        public async Task<IActionResult> GetMyLoginLogs([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+        {
+            try
+            {
+                var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return Unauthorized(new { message = "Kullanıcı kimliği bulunamadı" });
+                }
+
+                var logs = await _loginLogService.GetUserLoginLogsAsync(userId, page, pageSize);
+                var totalCount = await _loginLogService.GetUserLoginLogsCountAsync(userId);
+
+                return Ok(new
+                {
+                    logs,
+                    pagination = new
+                    {
+                        page,
+                        pageSize,
+                        totalCount,
+                        totalPages = (int)Math.Ceiling((double)totalCount / pageSize)
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Giriş günlükleriniz alınırken hata oluştu", error = ex.Message });
+            }
+        }
+
+        [HttpGet("statistics")]
+        public async Task<IActionResult> GetLoginStatistics()
+        {
+            try
+            {
+                var totalLogs = await _loginLogService.GetTotalLoginLogsCountAsync();
+                
+                // Burada daha detaylı istatistikler eklenebilir
+                // Örneğin: başarılı/başarısız giriş sayıları, günlük/haftalık trendler vb.
+
+                return Ok(new
+                {
+                    totalLogs,
+                    message = "Giriş günlüğü istatistikleri başarıyla alındı"
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "İstatistikler alınırken hata oluştu", error = ex.Message });
             }
         }
 
         [HttpGet("stats")]
-        public async Task<IActionResult> GetLoginStats()
+        public async Task<IActionResult> GetStats()
         {
             try
             {
-                var today = DateTime.UtcNow.Date;
-                var yesterday = today.AddDays(-1);
-                var thisWeek = today.AddDays(-7);
-                var thisMonth = today.AddDays(-30);
-
-                var todayLogs = await _userLoginLogService.GetLoginLogsAsync(1, 1000, null, null, today, today.AddDays(1));
-                var yesterdayLogs = await _userLoginLogService.GetLoginLogsAsync(1, 1000, null, null, yesterday, today);
-                var thisWeekLogs = await _userLoginLogService.GetLoginLogsAsync(1, 1000, null, null, thisWeek, today.AddDays(1));
-                var thisMonthLogs = await _userLoginLogService.GetLoginLogsAsync(1, 1000, null, null, thisMonth, today.AddDays(1));
-
-                var stats = new
+                var totalLogs = await _loginLogService.GetTotalLoginLogsCountAsync();
+                
+                // Bu endpoint /stats için alias olarak çalışır
+                return Ok(new
                 {
-                    today = new
-                    {
-                        total = todayLogs.Count(),
-                        successful = todayLogs.Count(l => l.IsSuccessful),
-                        failed = todayLogs.Count(l => !l.IsSuccessful)
-                    },
-                    yesterday = new
-                    {
-                        total = yesterdayLogs.Count(),
-                        successful = yesterdayLogs.Count(l => l.IsSuccessful),
-                        failed = yesterdayLogs.Count(l => !l.IsSuccessful)
-                    },
-                    thisWeek = new
-                    {
-                        total = thisWeekLogs.Count(),
-                        successful = thisWeekLogs.Count(l => l.IsSuccessful),
-                        failed = thisWeekLogs.Count(l => !l.IsSuccessful)
-                    },
-                    thisMonth = new
-                    {
-                        total = thisMonthLogs.Count(),
-                        successful = thisMonthLogs.Count(l => l.IsSuccessful),
-                        failed = thisMonthLogs.Count(l => !l.IsSuccessful)
-                    }
-                };
-
-                return Ok(stats);
+                    totalLogs,
+                    message = "Giriş günlüğü istatistikleri başarıyla alındı"
+                });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error retrieving login stats");
-                return StatusCode(500, new { error = "Giriş istatistikleri alınırken hata oluştu" });
+                return StatusCode(500, new { message = "İstatistikler alınırken hata oluştu", error = ex.Message });
             }
         }
     }

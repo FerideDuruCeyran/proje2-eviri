@@ -71,6 +71,7 @@ builder.Services.AddScoped<IDataImportService, DataImportService>();
 builder.Services.AddScoped<IPortService, PortService>();
 builder.Services.AddScoped<IDynamicTableService, DynamicTableService>();
 builder.Services.AddScoped<IUserLoginLogService, UserLoginLogService>();
+builder.Services.AddScoped<ILoginLogService, LoginLogService>();
 builder.Services.AddScoped<IJwtService, JwtService>();
 
 var app = builder.Build();
@@ -82,8 +83,9 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
-app.UseHttpsRedirection();
-app.UseStaticFiles();
+// Remove HTTPS redirection for development
+// app.UseHttpsRedirection();
+// app.UseStaticFiles(); // Remove this since we don't have wwwroot
 app.UseRouting();
 
 // Use CORS
@@ -93,18 +95,8 @@ app.UseCors("AllowAll");
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Map HTML pages
-app.MapGet("/", () => Results.File("home.html", "text/html"));
-app.MapGet("/home", () => Results.File("home.html", "text/html"));
-app.MapGet("/login", () => Results.File("login.html", "text/html"));
-app.MapGet("/register", () => Results.File("register.html", "text/html"));
-app.MapGet("/upload", () => Results.File("upload.html", "text/html"));
-app.MapGet("/data", () => Results.File("data.html", "text/html"));
-app.MapGet("/tables", () => Results.File("tables.html", "text/html"));
-app.MapGet("/profile", () => Results.File("profile.html", "text/html"));
-app.MapGet("/logout", () => Results.File("logout.html", "text/html"));
-app.MapGet("/login-logs", () => Results.File("login-logs.html", "text/html"));
-app.MapGet("/connections", () => Results.File("connections.html", "text/html"));
+// Map API root endpoint
+app.MapGet("/", () => Results.Redirect("/api/home"));
 
 // Map controllers
 app.MapControllers();

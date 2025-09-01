@@ -9,40 +9,34 @@ using System.ComponentModel.DataAnnotations;
 
 namespace ExcelUploader.Controllers
 {
-    public class AccountController : Controller
+    [ApiController]
+    [Route("api/[controller]")]
+    public class AccountController : ControllerBase
     {
         private readonly UserManager<ApplicationUser> _userManager;
         private readonly SignInManager<ApplicationUser> _signInManager;
         private readonly ILogger<AccountController> _logger;
         private readonly IUserLoginLogService _userLoginLogService;
+        private readonly ILoginLogService _loginLogService;
 
         public AccountController(
             UserManager<ApplicationUser> userManager, 
             SignInManager<ApplicationUser> signInManager, 
             ILogger<AccountController> logger,
-            IUserLoginLogService userLoginLogService)
+            IUserLoginLogService userLoginLogService,
+            ILoginLogService loginLogService)
         {
             _userManager = userManager;
             _signInManager = signInManager;
             _logger = logger;
             _userLoginLogService = userLoginLogService;
+            _loginLogService = loginLogService;
         }
 
-        [HttpGet]
+        [HttpPost("login")]
         [AllowAnonymous]
-        public IActionResult Login(string? returnUrl = null)
+        public async Task<IActionResult> Login([FromBody] LoginViewModel model)
         {
-            ViewData["ReturnUrl"] = returnUrl;
-            return View();
-        }
-
-        [HttpPost]
-        [AllowAnonymous]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Login(LoginViewModel model, string? returnUrl = null)
-        {
-            ViewData["ReturnUrl"] = returnUrl;
-
             if (ModelState.IsValid)
             {
                 var user = await _userManager.FindByEmailAsync(model.Email);
@@ -55,70 +49,66 @@ namespace ExcelUploader.Controllers
                 {
                     _logger.LogInformation("User logged in: {Email}", model.Email);
                     
-                    // Log successful login
+                    // Log successful login with LoginLogService
                     if (user != null)
                     {
-                        await _userLoginLogService.LogLoginAsync(
+                        await _loginLogService.LogLoginAsync(
                             user.Id, 
-                            user.Email!, 
                             $"{user.FirstName} {user.LastName}", 
+                            user.Email!, 
                             ipAddress, 
                             userAgent, 
                             true);
                     }
                     
-                    return RedirectToLocal(returnUrl);
+                    return Ok(new { 
+                        message = "Giriş başarılı", 
+                        user = new { 
+                            id = user?.Id, 
+                            email = user?.Email, 
+                            firstName = user?.FirstName, 
+                            lastName = user?.LastName 
+                        } 
+                    });
                 }
                 else
                 {
-                    // Log failed login attempt
+                    // Log failed login attempt with LoginLogService
                     if (user != null)
                     {
-                        await _userLoginLogService.LogLoginAsync(
+                        await _loginLogService.LogLoginAsync(
                             user.Id, 
-                            user.Email!, 
                             $"{user.FirstName} {user.LastName}", 
+                            user.Email!, 
                             ipAddress, 
                             userAgent, 
                             false, 
-                            "Invalid password");
+                            "Geçersiz şifre");
                     }
                     else
                     {
                         // Log failed login for non-existent user
-                        await _userLoginLogService.LogLoginAsync(
+                        await _loginLogService.LogLoginAsync(
                             "unknown", 
+                            "Bilinmeyen Kullanıcı", 
                             model.Email, 
-                            null, 
                             ipAddress, 
                             userAgent, 
                             false, 
-                            "User not found");
+                            "Kullanıcı bulunamadı");
                     }
                     
-                    ModelState.AddModelError(string.Empty, "Geçersiz giriş denemesi.");
-                    return View(model);
+                    return BadRequest(new { message = "Geçersiz giriş denemesi." });
                 }
             }
 
-            return View(model);
+            return BadRequest(new { message = "Geçersiz model verisi", errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage) });
         }
 
-        [HttpGet]
+        [HttpPost("register")]
         [AllowAnonymous]
-        public IActionResult Register(string? returnUrl = null)
+        public async Task<IActionResult> Register([FromBody] RegisterViewModel model)
         {
-            ViewData["ReturnUrl"] = returnUrl;
-            return View();
-        }
-
-        [HttpPost]
-        [AllowAnonymous]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Register(RegisterViewModel model, string? returnUrl = null)
-        {
-            ViewData["ReturnUrl"] = returnUrl;
-
             if (ModelState.IsValid)
             {
                 var user = new ApplicationUser
@@ -138,20 +128,17 @@ namespace ExcelUploader.Controllers
                     _logger.LogInformation("User created a new account with password: {Email}", model.Email);
 
                     await _signInManager.SignInAsync(user, isPersistent: false);
-                    return RedirectToLocal(returnUrl);
+                    return Ok(new { message = "Kullanıcı başarıyla oluşturuldu", user = new { id = user.Id, email = user.Email } });
                 }
 
-                foreach (var error in result.Errors)
-                {
-                    ModelState.AddModelError(string.Empty, error.Description);
-                }
+                return BadRequest(new { message = "Kullanıcı oluşturulamadı", errors = result.Errors.Select(e => e.Description) });
             }
 
-            return View(model);
+            return BadRequest(new { message = "Geçersiz model verisi", errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage) });
         }
 
-        [HttpPost]
-        [ValidateAntiForgeryToken]
+        [HttpPost("logout")]
+        [Authorize]
         public async Task<IActionResult> Logout()
         {
             var user = await _userManager.GetUserAsync(User);
@@ -161,32 +148,43 @@ namespace ExcelUploader.Controllers
             await _signInManager.SignOutAsync();
             _logger.LogInformation("User logged out.");
             
-            // Log logout
+            // Log logout with LoginLogService
             if (user != null)
             {
-                await _userLoginLogService.LogLogoutAsync(
-                    user.Id, 
-                    user.Email!, 
-                    $"{user.FirstName} {user.LastName}", 
-                    ipAddress, 
-                    userAgent);
+                // For now, we'll use a placeholder session ID since ApplicationUser doesn't have SessionId
+                await _loginLogService.LogLogoutAsync(user.Id, "session-" + user.Id);
             }
             
-            return RedirectToAction(nameof(HomeController.Index), "Home");
+            return Ok(new { message = "Çıkış başarılı" });
         }
 
-        [HttpGet]
+        [HttpGet("access-denied")]
         [AllowAnonymous]
         public IActionResult AccessDenied()
         {
-            return View();
+            return Unauthorized(new { message = "Bu sayfaya erişim yetkiniz yok" });
         }
 
-        [HttpGet]
+        [HttpGet("profile")]
         [Authorize]
-        public IActionResult Profile()
+        public async Task<IActionResult> Profile()
         {
-            return View();
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return NotFound(new { message = "Kullanıcı bulunamadı" });
+            }
+
+            return Ok(new { 
+                user = new { 
+                    id = user.Id, 
+                    email = user.Email, 
+                    firstName = user.FirstName, 
+                    lastName = user.LastName,
+                    createdAt = user.CreatedAt,
+                    isActive = user.IsActive
+                } 
+            });
         }
 
         private string GetClientIpAddress()

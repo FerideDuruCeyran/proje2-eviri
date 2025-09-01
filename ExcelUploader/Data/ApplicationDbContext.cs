@@ -16,6 +16,7 @@ namespace ExcelUploader.Data
         public DbSet<TableColumn> TableColumns { get; set; }
         public DbSet<TableData> TableData { get; set; }
         public DbSet<UserLoginLog> UserLoginLogs { get; set; }
+        public DbSet<LoginLog> LoginLogs { get; set; }
         public DbSet<DatabaseConnection> DatabaseConnections { get; set; }
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
@@ -145,6 +146,30 @@ namespace ExcelUploader.Data
                     entity.Property(e => e.Description).HasMaxLength(1000);
                     entity.HasIndex(e => e.Name).IsUnique();
                     entity.HasIndex(e => e.IsActive);
+                });
+
+                // Configure LoginLog
+                builder.Entity<LoginLog>(entity =>
+                {
+                    entity.HasKey(e => e.Id);
+                    entity.Property(e => e.Id).ValueGeneratedOnAdd();
+                    entity.Property(e => e.UserId).HasMaxLength(450).IsRequired();
+                    entity.Property(e => e.UserName).HasMaxLength(256).IsRequired();
+                    entity.Property(e => e.Email).HasMaxLength(256).IsRequired();
+                    entity.Property(e => e.IpAddress).HasMaxLength(45);
+                    entity.Property(e => e.UserAgent).HasMaxLength(500);
+                    entity.Property(e => e.FailureReason).HasMaxLength(500);
+                    entity.Property(e => e.SessionId).HasMaxLength(100);
+                    entity.Property(e => e.LoginTime).HasColumnType("datetime2");
+                    entity.Property(e => e.LogoutTime).HasColumnType("datetime2");
+                    entity.HasIndex(e => e.UserId);
+                    entity.HasIndex(e => e.LoginTime);
+                    entity.HasIndex(e => e.IsSuccess);
+                    entity.HasIndex(e => e.SessionId);
+                    entity.HasOne(e => e.User)
+                          .WithMany()
+                          .HasForeignKey(e => e.UserId)
+                          .OnDelete(DeleteBehavior.Cascade);
                 });
 
                 // Seed default admin user
