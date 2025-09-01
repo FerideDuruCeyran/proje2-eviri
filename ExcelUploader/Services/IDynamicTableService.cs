@@ -26,5 +26,11 @@ namespace ExcelUploader.Services
 
         Task<bool> TableExistsAsync(string tableName, int? databaseConnectionId = null);
         Task<int?> GetTableIdByNameAsync(string tableName);
+        Task<int> InsertDataIntoExistingTableAsync(IFormFile file, string existingTableName, int? databaseConnectionId = null);
+        Task<bool> CheckExactTableExistsAsync(string tableName, int? databaseConnectionId = null);
+        Task<string?> FindExistingTableNameAsync(string tableName, int? databaseConnectionId = null);
+        Task<(List<string> headers, List<string> dataTypes, List<Dictionary<string, object>> sampleData)> AnalyzeExcelFileAsync(IFormFile file);
+        string SanitizeColumnName(string name);
+        Task<List<Dictionary<string, object>>> ReadAllExcelDataAsync(IFormFile file);
     }
 }

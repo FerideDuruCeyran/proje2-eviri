@@ -354,15 +354,15 @@
                             </div>
                         </div>
 
-                        <div class="two-stage-process">
-                            <div class="stage-section">
-                                <h5><i class="fas fa-layer-group"></i> Aşama 1: Tablo Yapısı Oluştur</h5>
-                                <p class="text-muted">Excel dosyasından tablo yapısı oluşturulacak ve veritabanında tablo oluşturulacak.</p>
-                                <button type="button" class="btn btn-primary" id="createStructureBtn" onclick="createTableStructure()">
-                                    <i class="fas fa-table"></i> Tablo Yapısını Oluştur
-                                </button>
-                                <div class="stage-status" id="stage1Status"></div>
-                            </div>
+                                                 <div class="two-stage-process">
+                             <div class="stage-section" id="stage1Section">
+                                 <h5><i class="fas fa-layer-group"></i> Aşama 1: Tablo Yapısı Oluştur</h5>
+                                 <p class="text-muted">Excel dosyasından tablo yapısı oluşturulacak ve veritabanında tablo oluşturulacak.</p>
+                                 <button type="button" class="btn btn-primary" id="createStructureBtn" onclick="createTableStructure()">
+                                     <i class="fas fa-table"></i> Tablo Yapısını Oluştur
+                                 </button>
+                                 <div class="stage-status" id="stage1Status"></div>
+                             </div>
 
                             <div class="stage-section" id="stage2Section" style="display: none;">
                                 <h5><i class="fas fa-database"></i> Aşama 2: Verileri Yükle</h5>
@@ -572,6 +572,9 @@
                 if (response.ok) {
                     const previewData = await response.json();
                     displayExcelPreview(previewData);
+                    
+                    // Check if table already exists after Excel file is processed
+                    await checkTableExistsAfterUpload();
                 } else if (response.status === 401) {
                     showAlert('Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.', 'warning');
                     setTimeout(() => {
@@ -622,6 +625,21 @@
 
             // Store data for later use
             excelData.preview = data;
+            
+            // Show table existence status if available
+            if (window.tableExists !== undefined && window.expectedTableName) {
+                const previewHeader = document.querySelector('.preview-header h4');
+                if (previewHeader && window.tableExists) {
+                    const statusDiv = document.createElement('div');
+                    statusDiv.className = 'alert alert-info';
+                    statusDiv.style.marginTop = '10px';
+                    statusDiv.innerHTML = `
+                        <i class="fas fa-info-circle"></i>
+                        <strong>Tablo Durumu:</strong> "${window.expectedTableName}" tablosu zaten mevcut. Veriler mevcut tabloya eklenecek.
+                    `;
+                    previewHeader.parentElement.appendChild(statusDiv);
+                }
+            }
         }
 
         // Setup column selection
@@ -672,32 +690,127 @@
             selectedColumns[index].type = type;
         }
 
-                 // Setup table naming
-         function setupTableNaming() {
-             // Generate default table name
-             const fileName = excelData.file.name.replace(/\.[^/.]+$/, "");
-             const defaultName = fileName.toLowerCase()
-                 .replace(/[^a-z0-9]/g, '_')
-                 .replace(/_+/g, '_')
-                 .replace(/^_|_$/g, '');
-             
-             document.getElementById('tableName').value = defaultName;
-             updateSchemaPreview();
-             
-             // Add event listener for table name changes
-             document.getElementById('tableName').addEventListener('input', function() {
-                 updateSchemaPreview();
-                 // Reset table exists status when user changes table name
-                 window.tableExists = false;
-             });
-             
-             // Load database connections
-             loadDatabaseConnections();
-         }
+                         // Setup table naming
+        function setupTableNaming() {
+            // Generate default table name from Excel file name
+            const fileName = excelData.file.name.replace(/\.[^/.]+$/, "");
+            const defaultName = fileName.replace(/ /g, '_'); // Only replace spaces with underscores
+            
+            document.getElementById('tableName').value = defaultName;
+            document.getElementById('tableName').readOnly = true; // Make it read-only
+            
+            // Use pre-checked table existence status if available
+            if (window.expectedTableName === defaultName && window.tableExists !== undefined) {
+                // Table existence was already checked after upload
+                if (window.tableExists) {
+                    // Show message that table exists and data will be inserted
+                    const tableNameElement = document.getElementById('tableName');
+                    tableNameElement.style.backgroundColor = '#fff3cd';
+                    tableNameElement.style.borderColor = '#ffc107';
+                    
+                    // Add info message
+                    const infoDiv = document.createElement('div');
+                    infoDiv.id = 'tableExistsInfo';
+                    infoDiv.className = 'alert alert-info';
+                    infoDiv.innerHTML = `
+                        <i class="fas fa-info-circle"></i>
+                        <strong>Bilgi:</strong> "${defaultName}" tablosu zaten mevcut. Veriler mevcut tabloya eklenecek.
+                    `;
+                    
+                    const tableNameContainer = tableNameElement.parentElement;
+                    if (!document.getElementById('tableExistsInfo')) {
+                        tableNameContainer.appendChild(infoDiv);
+                    }
+                }
+            } else {
+                // Fallback: Check if table exists now
+                checkTableExists(defaultName);
+            }
+            
+            updateSchemaPreview();
+            
+            // Load database connections
+            loadDatabaseConnections();
+        }
 
         // Get authentication token
         function getToken() {
             return localStorage.getItem('authToken');
+        }
+
+        // Check if table already exists after Excel file upload
+        async function checkTableExistsAfterUpload() {
+            try {
+                // Generate table name from Excel file name
+                const fileName = excelData.file.name.replace(/\.[^/.]+$/, "");
+                const tableName = fileName.replace(/ /g, '_'); // Only replace spaces with underscores
+                
+                const databaseConnectionId = document.getElementById('databaseConnection').value;
+                const response = await fetch(`/api/home/check-table-exists?tableName=${encodeURIComponent(tableName)}&databaseConnectionId=${databaseConnectionId || ''}`, {
+                    headers: {
+                        'Authorization': `Bearer ${getToken()}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    window.tableExists = result.exists;
+                    window.expectedTableName = tableName;
+                    
+                    if (result.exists) {
+                        // Show notification that table exists
+                        showAlert(`"${tableName}" tablosu zaten mevcut. Veriler mevcut tabloya eklenecek.`, 'info');
+                    }
+                }
+            } catch (error) {
+                console.error('Error checking table exists after upload:', error);
+            }
+        }
+
+        // Check if table already exists
+        async function checkTableExists(tableName) {
+            try {
+                const databaseConnectionId = document.getElementById('databaseConnection').value;
+                const response = await fetch(`/api/home/check-table-exists?tableName=${encodeURIComponent(tableName)}&databaseConnectionId=${databaseConnectionId || ''}`, {
+                    headers: {
+                        'Authorization': `Bearer ${getToken()}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    window.tableExists = result.exists;
+                    
+                    if (result.exists) {
+                        // Show message that table exists and data will be inserted
+                        const tableNameElement = document.getElementById('tableName');
+                        tableNameElement.style.backgroundColor = '#fff3cd';
+                        tableNameElement.style.borderColor = '#ffc107';
+                        
+                        // Add info message
+                        const infoDiv = document.createElement('div');
+                        infoDiv.id = 'tableExistsInfo';
+                        infoDiv.className = 'alert alert-info';
+                        infoDiv.innerHTML = `
+                            <i class="fas fa-info-circle"></i>
+                            <strong>Bilgi:</strong> "${tableName}" tablosu zaten mevcut. Veriler mevcut tabloya eklenecek.
+                        `;
+                        
+                        const tableNameContainer = tableNameElement.parentElement;
+                        if (!document.getElementById('tableExistsInfo')) {
+                            tableNameContainer.appendChild(infoDiv);
+                        }
+                        
+                        // Update button text to indicate data will be inserted into existing table
+                        const createStructureBtn = document.getElementById('createStructureBtn');
+                        if (createStructureBtn) {
+                            createStructureBtn.innerHTML = '<i class="fas fa-plus"></i> Verileri Mevcut Tabloya Ekle';
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Error checking table exists:', error);
+            }
         }
 
         // Load database connections
@@ -736,11 +849,27 @@
             
             if (!tableName) return;
 
-            let schemaHtml = `
-                <div class="schema-table">
-                    <h6>CREATE TABLE ${tableName} (</h6>
-                    <div class="schema-columns">
-            `;
+            let schemaHtml = '';
+            
+            if (window.tableExists) {
+                // Table exists - show INSERT preview
+                schemaHtml = `
+                    <div class="schema-table">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i>
+                            <strong>Mevcut Tablo:</strong> "${tableName}" tablosu zaten mevcut. Veriler mevcut tabloya eklenecek.
+                        </div>
+                        <h6>INSERT INTO ${tableName} (</h6>
+                        <div class="schema-columns">
+                `;
+            } else {
+                // New table - show CREATE preview
+                schemaHtml = `
+                    <div class="schema-table">
+                        <h6>CREATE TABLE ${tableName} (</h6>
+                        <div class="schema-columns">
+                `;
+            }
 
             selectedColumns.filter(col => col.selected).forEach((col, index) => {
                 const sqlType = getSqlType(col.type);
@@ -752,11 +881,19 @@
                 `;
             });
 
-            schemaHtml += `
+            if (window.tableExists) {
+                schemaHtml += `
+                        </div>
+                        ) VALUES (...);
                     </div>
-                    );
-                </div>
-            `;
+                `;
+            } else {
+                schemaHtml += `
+                        </div>
+                        );
+                    </div>
+                `;
+            }
 
             previewSchema.innerHTML = schemaHtml;
         }
@@ -772,30 +909,52 @@
             }
         }
 
-        // Show creation summary
-        function showCreationSummary() {
-            const summaryDetails = document.getElementById('summaryDetails');
-            const tableName = document.getElementById('tableName').value;
-            const tableDescription = document.getElementById('tableDescription').value;
+                 // Show creation summary
+         function showCreationSummary() {
+             const summaryDetails = document.getElementById('summaryDetails');
+             const tableName = document.getElementById('tableName').value;
+             const tableDescription = document.getElementById('tableDescription').value;
+             const stage1Section = document.getElementById('stage1Section');
+             const stage2Section = document.getElementById('stage2Section');
 
-            summaryDetails.innerHTML = `
-                <div class="summary-item">
-                    <strong>Tablo Adı:</strong> ${tableName}
-                </div>
-                <div class="summary-item">
-                    <strong>Açıklama:</strong> ${tableDescription || 'Açıklama yok'}
-                </div>
-                <div class="summary-item">
-                    <strong>Sütun Sayısı:</strong> ${selectedColumns.filter(col => col.selected).length}
-                </div>
-                <div class="summary-item">
-                    <strong>Veri Sayısı:</strong> ${excelData.preview.rows.length}
-                </div>
-                <div class="summary-item">
-                    <strong>Dosya:</strong> ${excelData.file.name}
-                </div>
-            `;
-        }
+             summaryDetails.innerHTML = `
+                 <div class="summary-item">
+                     <strong>Tablo Adı:</strong> ${tableName}
+                 </div>
+                 <div class="summary-item">
+                     <strong>Açıklama:</strong> ${tableDescription || 'Açıklama yok'}
+                 </div>
+                 <div class="summary-item">
+                     <strong>Sütun Sayısı:</strong> ${selectedColumns.filter(col => col.selected).length}
+                 </div>
+                 <div class="summary-item">
+                     <strong>Veri Sayısı:</strong> ${excelData.preview.rows.length}
+                 </div>
+                 <div class="summary-item">
+                     <strong>Dosya:</strong> ${excelData.file.name}
+                 </div>
+             `;
+
+             // Check if table exists and adjust UI accordingly
+             if (window.tableExists) {
+                 // Hide stage 1 (create structure) and show stage 2 (insert data) directly
+                 stage1Section.style.display = 'none';
+                 stage2Section.style.display = 'block';
+                 
+                 // Update stage 2 title and description for existing table
+                 const stage2Title = stage2Section.querySelector('h5');
+                 const stage2Description = stage2Section.querySelector('p');
+                 const insertDataBtn = document.getElementById('insertDataBtn');
+                 
+                 if (stage2Title) stage2Title.innerHTML = '<i class="fas fa-database"></i> Verileri Mevcut Tabloya Ekle';
+                 if (stage2Description) stage2Description.textContent = 'Mevcut tabloya Excel verileri eklenecek.';
+                 if (insertDataBtn) insertDataBtn.innerHTML = '<i class="fas fa-plus"></i> Verileri Ekle';
+             } else {
+                 // Show stage 1 for new table creation
+                 stage1Section.style.display = 'block';
+                 stage2Section.style.display = 'none';
+             }
+         }
 
         // Create table
         async function createTableStructure() {
@@ -869,23 +1028,48 @@
                     showSqlOutput(result);
                     
                                          setTimeout(() => {
-                         const message = result.tableExists ? 
-                             `Mevcut tablo bulundu: ${result.tableName}` : 
+                         const message = result.dataInserted ? 
+                             `Veriler mevcut tabloya başarıyla eklendi: ${result.tableName} (${result.rowCount} satır)` : 
                              `Tablo yapısı başarıyla oluşturuldu: ${result.tableName}`;
                          
                          showAlert(message, 'success');
-                         stage1Status.textContent = result.tableExists ? '✓ Mevcut Tablo Bulundu!' : '✓ Tamamlandı!';
+                         stage1Status.textContent = result.dataInserted ? '✓ Veriler Eklendi!' : '✓ Tamamlandı!';
                          stage1Status.style.background = '#d4edda';
                          stage1Status.style.color = '#155724';
-                         stage2Section.style.display = 'block';
+                         
+                         // Only show stage 2 if data was not already inserted
+                         if (!result.dataInserted) {
+                             stage2Section.style.display = 'block';
+                         } else {
+                             // If data was already inserted, hide the create structure button and show completion message
+                             createStructureBtn.style.display = 'none';
+                             
+                             // Add a completion message
+                             const completionMessage = document.createElement('div');
+                             completionMessage.className = 'alert alert-success mt-3';
+                             completionMessage.innerHTML = `
+                                 <i class="fas fa-check-circle"></i>
+                                 <strong>İşlem Tamamlandı!</strong> Veriler mevcut tabloya başarıyla eklendi. 
+                                 <a href="/tables" class="btn btn-sm btn-outline-success ml-2">
+                                     <i class="fas fa-table"></i> Tabloları Görüntüle
+                                 </a>
+                             `;
+                             
+                             // Insert the completion message after the stage1Status
+                             const stage1Status = document.getElementById('stage1Status');
+                             stage1Status.parentNode.insertBefore(completionMessage, stage1Status.nextSibling);
+                         }
+                         
                          viewTableBtn.style.display = 'inline-block';
                          createStructureBtn.disabled = false;
                          window.createdTableId = result.tableId; // Store table ID for stage 2
                          window.tableExists = result.tableExists; // Store table exists status
+                         window.dataInserted = result.dataInserted; // Store data inserted status
                          
-                         // Update button text if table exists
-                         if (result.tableExists) {
+                         // Update button text if table exists but data wasn't inserted yet
+                         if (result.tableExists && !result.dataInserted) {
                              document.getElementById('insertDataBtn').innerHTML = '<i class="fas fa-plus"></i> Verileri Ekle';
+                             document.getElementById('createStructureBtn').innerHTML = '<i class="fas fa-plus"></i> Verileri Mevcut Tabloya Ekle';
                          }
                      }, 1000);
                 } else {
@@ -918,7 +1102,15 @@
                     <h6 style="margin-bottom: 0.5rem; color: #495057;"><i class="fas fa-code"></i> SQL Çıktısı:</h6>
                     <pre style="background: #fff; padding: 1rem; border-radius: 3px; font-size: 0.9rem; overflow-x: auto; margin: 0;">`;
             
-            if (result.sqlScript) {
+            if (result.dataInserted) {
+                // Show INSERT statement for existing table
+                const tableName = document.getElementById('tableName').value;
+                const selectedCols = selectedColumns.filter(col => col.selected);
+                const columnNames = selectedCols.map(col => col.name).join(', ');
+                
+                sqlOutput += `INSERT INTO ${tableName} (${columnNames}) VALUES (...);\n`;
+                sqlOutput += `-- ${result.rowCount} satır eklendi`;
+            } else if (result.sqlScript) {
                 sqlOutput += result.sqlScript;
             } else {
                 // Generate SQL script from selected columns
@@ -940,17 +1132,17 @@
             stage1Status.innerHTML = '✓ Tamamlandı!' + sqlOutput;
         }
 
-        async function insertData() {
-            try {
-                const insertDataBtn = document.getElementById('insertDataBtn');
-                const stage2Status = document.getElementById('stage2Status');
-                const creationProgress = document.getElementById('creationProgress');
-                
-                // Check if table ID exists
-                if (!window.createdTableId) {
-                    showAlert('Önce tablo yapısını oluşturmanız gerekiyor. Lütfen 1. adımı tamamlayın.', 'warning');
-                    return;
-                }
+                 async function insertData() {
+             try {
+                 const insertDataBtn = document.getElementById('insertDataBtn');
+                 const stage2Status = document.getElementById('stage2Status');
+                 const creationProgress = document.getElementById('creationProgress');
+                 
+                 // Check if table ID exists (for new tables) or if we're inserting into existing table
+                 if (!window.createdTableId && !window.tableExists) {
+                     showAlert('Önce tablo yapısını oluşturmanız gerekiyor. Lütfen 1. adımı tamamlayın.', 'warning');
+                     return;
+                 }
                 
                 insertDataBtn.disabled = true;
                 stage2Status.textContent = 'Yükleniyor...';
@@ -958,31 +1150,57 @@
                 stage2Status.style.color = '#856404';
                 creationProgress.style.display = 'block';
 
-                // Prepare data
-                const formData = new FormData();
-                formData.append('ExcelFile', excelData.file);
-                formData.append('TableId', window.createdTableId); // Use the table ID from stage 1
-                
-                // Add database connection ID (force empty to use default connection)
-                const databaseConnectionId = document.getElementById('databaseConnection').value;
-                formData.append('DatabaseConnectionId', databaseConnectionId || '');
-                
-                // Debug: Log form data
-                console.log('Form data being sent:');
-                console.log('TableId:', window.createdTableId);
-                console.log('ExcelFile:', excelData.file);
-                console.log('DatabaseConnectionId:', databaseConnectionId);
+                                 // Prepare data
+                 const formData = new FormData();
+                 formData.append('ExcelFile', excelData.file);
+                 
+                 // If inserting into existing table, use create-table-structure endpoint
+                 // If inserting into new table, use insert-data endpoint
+                 let endpoint = '/api/home/insert-data';
+                 
+                 if (window.tableExists) {
+                     // Inserting into existing table - use create-table-structure endpoint
+                     endpoint = '/api/home/create-table-structure';
+                     
+                     // Add description if available
+                     const description = document.getElementById('tableDescription')?.value;
+                     if (description && description.trim() !== '') {
+                         formData.append('Description', description);
+                     }
+                 } else {
+                     // Inserting into new table - use insert-data endpoint
+                     formData.append('TableId', window.createdTableId);
+                     
+                     // Add description if available
+                     const description = document.getElementById('tableDescription')?.value;
+                     if (description && description.trim() !== '') {
+                         formData.append('Description', description);
+                     }
+                 }
+                 
+                 // Add database connection ID only if it's not empty
+                 const databaseConnectionId = document.getElementById('databaseConnection').value;
+                 if (databaseConnectionId && databaseConnectionId.trim() !== '') {
+                     formData.append('DatabaseConnectionId', databaseConnectionId);
+                 }
+                 
+                 // Debug: Log form data
+                 console.log('Form data being sent:');
+                 console.log('Endpoint:', endpoint);
+                 console.log('TableExists:', window.tableExists);
+                 console.log('ExcelFile:', excelData.file);
+                 console.log('DatabaseConnectionId:', databaseConnectionId);
 
-                // Update progress
-                updateProgress(25, 'Dosya yükleniyor...');
+                 // Update progress
+                 updateProgress(25, 'Dosya yükleniyor...');
 
-                const response = await fetch('/api/home/insert-data', {
-                    method: 'POST',
-                    body: formData,
-                    headers: {
-                        'Authorization': `Bearer ${getToken()}`
-                    }
-                });
+                 const response = await fetch(endpoint, {
+                     method: 'POST',
+                     body: formData,
+                     headers: {
+                         'Authorization': `Bearer ${getToken()}`
+                     }
+                 });
 
                 updateProgress(50, 'Veriler işleniyor...');
 

@@ -29,8 +29,80 @@ namespace ExcelUploader.Services
             {
                 // Generate table name
                 var tableName = GenerateTableName(file.FileName);
+                _logger.LogInformation("Generated table name: {TableName} from file: {FileName}", tableName, file.FileName);
                 
-                // Check if table already exists
+                // First, check if the exact table name already exists in the database
+                var exactTableExists = await CheckExactTableExistsAsync(tableName, databaseConnectionId);
+                _logger.LogInformation("Exact table exists check result: {ExactTableExists} for table: {TableName}", exactTableExists, tableName);
+                
+                if (exactTableExists)
+                {
+                    // Table already exists in database, find the actual table name and insert data directly
+                    var actualTableName = await FindExistingTableNameAsync(tableName, databaseConnectionId);
+                    if (actualTableName == null)
+                    {
+                        throw new InvalidOperationException($"Table '{tableName}' not found in database");
+                    }
+                    
+                    var insertedRows = await InsertDataIntoExistingTableAsync(file, actualTableName, databaseConnectionId);
+                    
+                    // Create or get DynamicTable record for tracking
+                    var trackingTableId = await GetTableIdByNameAsync(tableName);
+                    DynamicTable trackingTable;
+                    
+                    if (trackingTableId.HasValue)
+                    {
+                        // Get existing DynamicTable record
+                        trackingTable = await GetTableByIdAsync(trackingTableId.Value);
+                        if (trackingTable == null)
+                        {
+                            throw new InvalidOperationException("Mevcut tablo bulunamadı");
+                        }
+                        trackingTable.RowCount = insertedRows;
+                        await _context.SaveChangesAsync();
+                    }
+                    else
+                    {
+                        // Create new DynamicTable record for tracking
+                        var (headers, dataTypes, sampleData) = await AnalyzeExcelFileAsync(file);
+                        trackingTable = new DynamicTable
+                        {
+                            TableName = tableName,
+                            FileName = file.FileName,
+                            UploadedBy = uploadedBy,
+                            Description = description ?? string.Empty,
+                            RowCount = insertedRows,
+                            ColumnCount = headers.Count,
+                            UploadDate = DateTime.UtcNow,
+                            IsProcessed = true,
+                            ProcessedDate = DateTime.UtcNow
+                        };
+                        
+                        // Create table columns for tracking
+                        for (int i = 0; i < headers.Count; i++)
+                        {
+                            var column = new TableColumn
+                            {
+                                ColumnName = SanitizeColumnName(headers[i]),
+                                DisplayName = headers[i],
+                                DataType = dataTypes[i],
+                                ColumnOrder = i + 1,
+                                MaxLength = dataTypes[i] == "nvarchar" ? 1000 : null,
+                                IsRequired = false,
+                                IsUnique = false
+                            };
+                            trackingTable.Columns.Add(column);
+                        }
+                        
+                        _context.DynamicTables.Add(trackingTable);
+                        await _context.SaveChangesAsync();
+                    }
+                    
+                    _logger.LogInformation("Data inserted into existing table: {TableName}, {InsertedRows} rows", tableName, insertedRows);
+                    return trackingTable;
+                }
+                
+                // Check if table exists in our tracking system
                 var tableExists = await TableExistsAsync(tableName, databaseConnectionId);
                 var existingTableId = await GetTableIdByNameAsync(tableName);
                 
@@ -38,7 +110,7 @@ namespace ExcelUploader.Services
                 
                 if (tableExists && existingTableId.HasValue)
                 {
-                    // Table exists, get existing table
+                    // Table exists in tracking system, get existing table
                     dynamicTable = await GetTableByIdAsync(existingTableId.Value);
                     if (dynamicTable == null)
                     {
@@ -59,54 +131,65 @@ namespace ExcelUploader.Services
                 }
                 else
                 {
-                    // Read Excel headers and determine data types
-                    var (headers, dataTypes, sampleData) = await AnalyzeExcelFileAsync(file);
-                    
-                    // Create DynamicTable entity
+                // Read Excel headers and determine data types
+                var (headers, dataTypes, sampleData) = await AnalyzeExcelFileAsync(file);
+                
+                // Create DynamicTable entity
                     dynamicTable = new DynamicTable
-                    {
-                        TableName = tableName,
-                        FileName = file.FileName,
-                        UploadedBy = uploadedBy,
+                {
+                    TableName = tableName,
+                    FileName = file.FileName,
+                    UploadedBy = uploadedBy,
                         Description = description ?? string.Empty,
-                        RowCount = sampleData.Count,
-                        ColumnCount = headers.Count,
-                        UploadDate = DateTime.UtcNow
+                    RowCount = sampleData.Count,
+                    ColumnCount = headers.Count,
+                    UploadDate = DateTime.UtcNow
+                };
+
+                // Create table columns
+                for (int i = 0; i < headers.Count; i++)
+                {
+                    var column = new TableColumn
+                    {
+                        ColumnName = SanitizeColumnName(headers[i]),
+                        DisplayName = headers[i],
+                        DataType = dataTypes[i],
+                        ColumnOrder = i + 1,
+                        MaxLength = dataTypes[i] == "nvarchar" ? 1000 : null,
+                        IsRequired = false,
+                        IsUnique = false
                     };
+                    
+                    dynamicTable.Columns.Add(column);
+                }
 
-                    // Create table columns
-                    for (int i = 0; i < headers.Count; i++)
+                // Save to database
+                _context.DynamicTables.Add(dynamicTable);
+                await _context.SaveChangesAsync();
+
+                    // Create SQL table (or find existing table with similar name)
+                var sqlTableCreated = await CreateSqlTableAsync(dynamicTable, databaseConnectionId);
+                if (!sqlTableCreated)
+                {
+                    throw new InvalidOperationException("SQL table creation failed");
+                }
+
+                    // Check if we found an existing table with similar name
+                    if (await TableExistsAsync(dynamicTable.TableName, databaseConnectionId))
                     {
-                        var column = new TableColumn
-                        {
-                            ColumnName = SanitizeColumnName(headers[i]),
-                            DisplayName = headers[i],
-                            DataType = dataTypes[i],
-                            ColumnOrder = i + 1,
-                            MaxLength = dataTypes[i] == "nvarchar" ? 1000 : null,
-                            IsRequired = false,
-                            IsUnique = false
-                        };
-                        
-                        dynamicTable.Columns.Add(column);
+                        // Insert data into existing table
+                        var insertedRows = await InsertDataIntoExistingTableAsync(file, dynamicTable.TableName, databaseConnectionId);
+                        dynamicTable.RowCount = insertedRows;
+                        _logger.LogInformation("Data inserted into existing table with similar name: {TableName}, {InsertedRows} rows", dynamicTable.TableName, insertedRows);
                     }
-
-                    // Save to database
-                    _context.DynamicTables.Add(dynamicTable);
-                    await _context.SaveChangesAsync();
-
-                    // Create SQL table
-                    var sqlTableCreated = await CreateSqlTableAsync(dynamicTable, databaseConnectionId);
-                    if (!sqlTableCreated)
+                    else
                     {
-                        throw new InvalidOperationException("SQL table creation failed");
-                    }
-
-                    // Insert data
-                    var dataInserted = await InsertDataAsync(dynamicTable, sampleData, databaseConnectionId);
-                    if (!dataInserted)
-                    {
-                        throw new InvalidOperationException("Data insertion failed");
+                        // Insert data into newly created table
+                        var dataInserted = await InsertDataAsync(dynamicTable, sampleData, databaseConnectionId);
+                if (!dataInserted)
+                {
+                    throw new InvalidOperationException("Data insertion failed");
+                        }
                     }
 
                     _logger.LogInformation("New table created and data inserted: {TableName}", dynamicTable.TableName);
@@ -154,51 +237,71 @@ namespace ExcelUploader.Services
                 }
                 else
                 {
-                    // Read Excel headers and determine data types
-                    var (headers, dataTypes, sampleData) = await AnalyzeExcelFileAsync(file);
-                    
-                    // Create DynamicTable entity
+                // Read Excel headers and determine data types
+                var (headers, dataTypes, sampleData) = await AnalyzeExcelFileAsync(file);
+                
+                // Create DynamicTable entity
                     dynamicTable = new DynamicTable
-                    {
-                        TableName = tableName,
-                        FileName = file.FileName,
-                        UploadedBy = uploadedBy,
+                {
+                    TableName = tableName,
+                    FileName = file.FileName,
+                    UploadedBy = uploadedBy,
                         Description = description ?? string.Empty,
-                        RowCount = sampleData.Count,
-                        ColumnCount = headers.Count,
-                        UploadDate = DateTime.UtcNow,
-                        IsProcessed = false // Not processed yet
+                    RowCount = sampleData.Count,
+                    ColumnCount = headers.Count,
+                    UploadDate = DateTime.UtcNow,
+                    IsProcessed = false // Not processed yet
+                };
+
+                // Create table columns
+                for (int i = 0; i < headers.Count; i++)
+                {
+                    var column = new TableColumn
+                    {
+                        ColumnName = SanitizeColumnName(headers[i]),
+                        DisplayName = headers[i],
+                        DataType = dataTypes[i],
+                        ColumnOrder = i + 1,
+                        MaxLength = dataTypes[i] == "nvarchar" ? 1000 : null,
+                        IsRequired = false,
+                        IsUnique = false
                     };
+                    
+                    dynamicTable.Columns.Add(column);
+                }
 
-                    // Create table columns
-                    for (int i = 0; i < headers.Count; i++)
+                // Save to database
+                _context.DynamicTables.Add(dynamicTable);
+                await _context.SaveChangesAsync();
+
+                // Create SQL table structure only
+                var sqlTableCreated = await CreateSqlTableAsync(dynamicTable, databaseConnectionId);
+                if (!sqlTableCreated)
+                {
+                    throw new InvalidOperationException("SQL table creation failed");
+                }
+
+                    // Check if CreateSqlTableAsync found an existing table and updated the table name
+                    if (dynamicTable.TableName != tableName)
                     {
-                        var column = new TableColumn
-                        {
-                            ColumnName = SanitizeColumnName(headers[i]),
-                            DisplayName = headers[i],
-                            DataType = dataTypes[i],
-                            ColumnOrder = i + 1,
-                            MaxLength = dataTypes[i] == "nvarchar" ? 1000 : null,
-                            IsRequired = false,
-                            IsUnique = false
-                        };
+                        // An existing table was found, we need to check if we already have a tracking record
+                        var existingTrackingTable = await _context.DynamicTables
+                            .FirstOrDefaultAsync(t => t.TableName == dynamicTable.TableName);
                         
-                        dynamicTable.Columns.Add(column);
+                        if (existingTrackingTable != null)
+                        {
+                            // Use the existing tracking record
+                            _logger.LogInformation("Using existing tracking record for table: {TableName}", dynamicTable.TableName);
+                            return existingTrackingTable;
+                        }
+                        else
+                        {
+                            // Update our tracking record to use the existing table name
+                            _logger.LogInformation("Updated tracking record to use existing table: {TableName}", dynamicTable.TableName);
+                        }
                     }
 
-                    // Save to database
-                    _context.DynamicTables.Add(dynamicTable);
-                    await _context.SaveChangesAsync();
-
-                    // Create SQL table structure only
-                    var sqlTableCreated = await CreateSqlTableAsync(dynamicTable, databaseConnectionId);
-                    if (!sqlTableCreated)
-                    {
-                        throw new InvalidOperationException("SQL table creation failed");
-                    }
-
-                    _logger.LogInformation("Table structure created successfully: {TableName}", dynamicTable.TableName);
+                _logger.LogInformation("Table structure created successfully: {TableName}", dynamicTable.TableName);
                 }
                 
                 return dynamicTable;
@@ -218,6 +321,152 @@ namespace ExcelUploader.Services
             baseName = System.Text.RegularExpressions.Regex.Replace(baseName, @"_\d{8}_\d{4}$", "");
             baseName = System.Text.RegularExpressions.Regex.Replace(baseName, @"_\d{8}$", "");
             return baseName;
+        }
+
+        // Helper method to find the actual existing table name
+        public async Task<string?> FindExistingTableNameAsync(string tableName, int? databaseConnectionId = null)
+        {
+            try
+            {
+                string connectionString;
+                
+                if (databaseConnectionId.HasValue)
+                {
+                    // Use specific database connection
+                    var dbConnection = await _context.DatabaseConnections.FindAsync(databaseConnectionId.Value);
+                    if (dbConnection == null)
+                        throw new ArgumentException($"Database connection with ID {databaseConnectionId.Value} not found");
+                    
+                    connectionString = $"Server={dbConnection.ServerName},{dbConnection.Port};Database={dbConnection.DatabaseName};User Id={dbConnection.Username};Password={dbConnection.Password};TrustServerCertificate=true;";
+                }
+                else
+                {
+                    // Use default connection
+                    connectionString = _configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Default connection string not found");
+                }
+
+                using var connection = new SqlConnection(connectionString);
+                await connection.OpenAsync();
+
+                // Check for both the exact table name and with Excel_ prefix
+                var sql = @"
+                    SELECT TABLE_NAME 
+                    FROM INFORMATION_SCHEMA.TABLES 
+                    WHERE TABLE_NAME = @TableName OR TABLE_NAME = @TableNameWithPrefix";
+
+                using var command = new SqlCommand(sql, connection);
+                command.Parameters.AddWithValue("@TableName", tableName);
+                command.Parameters.AddWithValue("@TableNameWithPrefix", $"Excel_{tableName}");
+
+                using var reader = await command.ExecuteReaderAsync();
+                if (await reader.ReadAsync())
+                {
+                    return reader.GetString(0);
+                }
+
+                return null;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error finding existing table name: {TableName}", tableName);
+                return null;
+            }
+        }
+
+        // Helper method to check if exact table exists in database
+        public async Task<bool> CheckExactTableExistsAsync(string tableName, int? databaseConnectionId = null)
+        {
+            try
+            {
+                string connectionString;
+                
+                if (databaseConnectionId.HasValue)
+                {
+                    // Use specific database connection
+                    var dbConnection = await _context.DatabaseConnections.FindAsync(databaseConnectionId.Value);
+                    if (dbConnection == null)
+                        throw new ArgumentException($"Database connection with ID {databaseConnectionId.Value} not found");
+                    
+                    connectionString = $"Server={dbConnection.ServerName},{dbConnection.Port};Database={dbConnection.DatabaseName};User Id={dbConnection.Username};Password={dbConnection.Password};TrustServerCertificate=true;";
+                }
+                else
+                {
+                    // Use default connection
+                    connectionString = _configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Default connection string not found");
+                }
+
+                using var connection = new SqlConnection(connectionString);
+                await connection.OpenAsync();
+
+                // First, let's check what tables exist with similar names for debugging
+                var debugSql = @"
+                    SELECT TABLE_NAME 
+                    FROM INFORMATION_SCHEMA.TABLES 
+                    WHERE TABLE_NAME LIKE @TableNamePattern
+                    ORDER BY TABLE_NAME";
+
+                using var debugCommand = new SqlCommand(debugSql, connection);
+                debugCommand.Parameters.AddWithValue("@TableNamePattern", $"%{tableName}%");
+                
+                var existingTables = new List<string>();
+                using var debugReader = await debugCommand.ExecuteReaderAsync();
+                while (await debugReader.ReadAsync())
+                {
+                    existingTables.Add(debugReader.GetString(0));
+                }
+                
+                _logger.LogInformation("Found tables with similar names to '{TableName}': {ExistingTables}", tableName, string.Join(", ", existingTables));
+
+                // Check for both the exact table name and with Excel_ prefix
+                var sql = @"
+                    SELECT COUNT(*) 
+                    FROM INFORMATION_SCHEMA.TABLES 
+                    WHERE TABLE_NAME = @TableName OR TABLE_NAME = @TableNameWithPrefix";
+
+                using var command = new SqlCommand(sql, connection);
+                command.Parameters.AddWithValue("@TableName", tableName);
+                command.Parameters.AddWithValue("@TableNameWithPrefix", $"Excel_{tableName}");
+
+                var count = await command.ExecuteScalarAsync();
+                var exists = Convert.ToInt32(count) > 0;
+                
+                _logger.LogInformation("Table '{TableName}' exists check result: {Exists}", tableName, exists);
+                return exists;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error checking if exact table exists: {TableName}", tableName);
+                return false;
+            }
+        }
+
+        // Helper method to find existing table with similar name
+        private async Task<string?> FindExistingTableWithSimilarNameAsync(SqlConnection connection, string baseTableName)
+        {
+            try
+            {
+                var sql = @"
+                    SELECT TABLE_NAME 
+                    FROM INFORMATION_SCHEMA.TABLES 
+                    WHERE TABLE_NAME LIKE @BaseTableName + '%'
+                    ORDER BY TABLE_NAME";
+
+                using var command = new SqlCommand(sql, connection);
+                command.Parameters.AddWithValue("@BaseTableName", baseTableName);
+
+                using var reader = await command.ExecuteReaderAsync();
+                if (await reader.ReadAsync())
+                {
+                    return reader.GetString(0);
+                }
+
+                return null;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error finding existing table with similar name: {BaseTableName}", baseTableName);
+                return null;
+            }
         }
 
         // Check if table exists in database
@@ -310,6 +559,33 @@ namespace ExcelUploader.Services
                 using var connection = new SqlConnection(connectionString);
                 await connection.OpenAsync();
 
+                // First check if exact table name already exists
+                var exactTableExists = await CheckExactTableExistsAsync(dynamicTable.TableName, databaseConnectionId);
+                if (exactTableExists)
+                {
+                    // Find the actual existing table name
+                    var actualTableName = await FindExistingTableNameAsync(dynamicTable.TableName, databaseConnectionId);
+                    if (actualTableName != null)
+                    {
+                        // Update the dynamic table to use the actual existing table name
+                        dynamicTable.TableName = actualTableName;
+                        _logger.LogInformation("Exact table name already exists: {ActualTableName}, will use for data insertion", actualTableName);
+                        return true; // Return true to indicate "table is ready for data insertion"
+                    }
+                }
+
+                // Check if a table with similar name already exists
+                var baseTableName = GetBaseTableName(dynamicTable.TableName);
+                var existingTableName = await FindExistingTableWithSimilarNameAsync(connection, baseTableName);
+                
+                if (!string.IsNullOrEmpty(existingTableName))
+                {
+                    // Table with similar name exists, update the dynamic table to use existing table name
+                    dynamicTable.TableName = existingTableName;
+                    _logger.LogInformation("Found existing table with similar name: {ExistingTableName}, will use for data insertion", existingTableName);
+                    return true; // Return true to indicate "table is ready for data insertion"
+                }
+
                 // Build CREATE TABLE SQL
                 var createTableSql = BuildCreateTableSql(dynamicTable);
                 
@@ -348,7 +624,24 @@ namespace ExcelUploader.Services
 
         private string GetSqlDataType(string dataType, int? maxLength)
         {
-            return dataType.ToLower() switch
+            // Handle full data type strings from DetermineDataType
+            var lowerDataType = dataType.ToLower();
+            
+            if (lowerDataType.StartsWith("nvarchar(") || lowerDataType.StartsWith("varchar("))
+                return dataType; // Return as-is
+            if (lowerDataType.StartsWith("decimal("))
+                return dataType; // Return as-is
+            if (lowerDataType == "datetime2" || lowerDataType == "datetime")
+                return "DATETIME2";
+            if (lowerDataType == "int" || lowerDataType == "bigint")
+                return "INT";
+            if (lowerDataType == "bit")
+                return "BIT";
+            if (lowerDataType == "uniqueidentifier")
+                return "UNIQUEIDENTIFIER";
+            
+            // Handle simple type names
+            return lowerDataType switch
             {
                 "string" => maxLength.HasValue ? $"NVARCHAR({maxLength.Value})" : "NVARCHAR(MAX)",
                 "int" => "INT",
@@ -764,7 +1057,7 @@ namespace ExcelUploader.Services
             }
         }
 
-        private async Task<(List<string> headers, List<string> dataTypes, List<Dictionary<string, object>> sampleData)> AnalyzeExcelFileAsync(IFormFile file)
+        public async Task<(List<string> headers, List<string> dataTypes, List<Dictionary<string, object>> sampleData)> AnalyzeExcelFileAsync(IFormFile file)
         {
             var headers = new List<string>();
             var dataTypes = new List<string>();
@@ -899,20 +1192,20 @@ namespace ExcelUploader.Services
         {
             var baseName = Path.GetFileNameWithoutExtension(fileName);
             var sanitizedName = SanitizeTableName(baseName);
-            return $"Excel_{sanitizedName}";
+            return sanitizedName; // Remove Excel_ prefix to match existing table names
         }
 
         private string SanitizeTableName(string name)
         {
-            // Remove invalid characters and replace with underscores
-            var sanitized = System.Text.RegularExpressions.Regex.Replace(name, @"[^a-zA-Z0-9_]", "_");
-            // Ensure it starts with a letter
-            if (char.IsDigit(sanitized[0]))
-                sanitized = "Tbl_" + sanitized;
+            // Keep the original name as much as possible, only replace spaces with underscores
+            var sanitized = name.Replace(" ", "_");
+            // Ensure it starts with a letter or underscore (SQL Server requirement)
+            if (sanitized.Length > 0 && char.IsDigit(sanitized[0]))
+                sanitized = "_" + sanitized;
             return sanitized;
         }
 
-        private string SanitizeColumnName(string name)
+        public string SanitizeColumnName(string name)
         {
             // Remove invalid characters and replace with underscores
             var sanitized = System.Text.RegularExpressions.Regex.Replace(name, @"[^a-zA-Z0-9_]", "_");
@@ -1054,6 +1347,246 @@ namespace ExcelUploader.Services
             }
         }
 
+        // New method to read all data from Excel file
+        public async Task<List<Dictionary<string, object>>> ReadAllExcelDataAsync(IFormFile file)
+        {
+            var allData = new List<Dictionary<string, object>>();
 
+            if (file.FileName.EndsWith(".xlsx"))
+            {
+                await ReadAllXlsxDataAsync(file, allData);
+            }
+            else if (file.FileName.EndsWith(".xls"))
+            {
+                await ReadAllXlsDataAsync(file, allData);
+            }
+
+            return allData;
+        }
+
+        private async Task ReadAllXlsxDataAsync(IFormFile file, List<Dictionary<string, object>> allData)
+        {
+            using var stream = file.OpenReadStream();
+            using var package = new ExcelPackage(stream);
+            var worksheet = package.Workbook.Worksheets.FirstOrDefault() ?? package.Workbook.Worksheets[0];
+
+            if (worksheet == null) return;
+
+            var rowCount = worksheet.Dimension?.Rows ?? 0;
+            var colCount = worksheet.Dimension?.Columns ?? 0;
+
+            if (rowCount < 2) return; // Need at least header + 1 data row
+
+            // Read headers (first row)
+            var headers = new List<string>();
+            for (int col = 1; col <= colCount; col++)
+            {
+                var headerValue = GetCellValue(worksheet, 1, col);
+                headers.Add(headerValue ?? $"Column{col}");
+            }
+
+            // Read all data rows (starting from row 2)
+            for (int row = 2; row <= rowCount; row++)
+            {
+                var rowData = new Dictionary<string, object>();
+                for (int col = 1; col <= colCount; col++)
+                {
+                    var cellValue = worksheet.Cells[row, col].Value;
+                    rowData[headers[col - 1]] = cellValue;
+                }
+                allData.Add(rowData);
+            }
+        }
+
+        private async Task ReadAllXlsDataAsync(IFormFile file, List<Dictionary<string, object>> allData)
+        {
+            using var stream = file.OpenReadStream();
+            IWorkbook workbook;
+            
+            if (file.FileName.EndsWith(".xlsx"))
+                workbook = new XSSFWorkbook(stream);
+            else
+                workbook = new HSSFWorkbook(stream);
+
+            var sheet = workbook.GetSheetAt(0);
+            var rowCount = sheet.LastRowNum;
+
+            if (rowCount < 1) return; // Need at least header + 1 data row
+
+            // Read headers (first row)
+            var headers = new List<string>();
+            var headerRow = sheet.GetRow(0);
+            if (headerRow != null)
+            {
+                for (int col = 0; col < headerRow.LastCellNum; col++)
+                {
+                    var cell = headerRow.GetCell(col);
+                    var headerValue = GetNpoiCellValue(cell);
+                    headers.Add(headerValue ?? $"Column{col + 1}");
+                }
+            }
+
+            // Read all data rows (starting from row 1)
+            for (int row = 1; row <= rowCount; row++)
+            {
+                var sheetRow = sheet.GetRow(row);
+                if (sheetRow == null) continue;
+
+                var rowData = new Dictionary<string, object>();
+                for (int col = 0; col < headers.Count; col++)
+                {
+                    var cell = sheetRow.GetCell(col);
+                    var cellValue = GetNpoiCellValue(cell);
+                    rowData[headers[col]] = cellValue;
+                }
+                allData.Add(rowData);
+            }
+        }
+
+        // New method to insert data into existing table by name
+        public async Task<int> InsertDataIntoExistingTableAsync(IFormFile file, string existingTableName, int? databaseConnectionId = null)
+        {
+            try
+            {
+                string connectionString;
+                
+                if (databaseConnectionId.HasValue)
+                {
+                    // Use specific database connection
+                    var dbConnection = await _context.DatabaseConnections.FindAsync(databaseConnectionId.Value);
+                    if (dbConnection == null)
+                        throw new ArgumentException($"Database connection with ID {databaseConnectionId.Value} not found");
+                    
+                    connectionString = $"Server={dbConnection.ServerName},{dbConnection.Port};Database={dbConnection.DatabaseName};User Id={dbConnection.Username};Password={dbConnection.Password};TrustServerCertificate=true;";
+                }
+                else
+                {
+                    // Use default connection
+                    connectionString = _configuration.GetConnectionString("DefaultConnection");
+                }
+                
+                using var connection = new SqlConnection(connectionString);
+                await connection.OpenAsync();
+
+                // Read Excel data - use all data instead of just sample data
+                var (headers, dataTypes, _) = await AnalyzeExcelFileAsync(file);
+                var allData = await ReadAllExcelDataAsync(file);
+
+                // Get existing table structure from database
+                var existingColumns = await GetTableColumnsAsync(connection, existingTableName);
+                if (!existingColumns.Any())
+                {
+                    throw new InvalidOperationException($"Table '{existingTableName}' not found or has no columns");
+                }
+
+                _logger.LogInformation("Found {ColumnCount} columns in existing table '{TableName}': {Columns}", 
+                    existingColumns.Count, existingTableName, string.Join(", ", existingColumns));
+                _logger.LogInformation("Excel file has {HeaderCount} headers: {Headers}", 
+                    headers.Count, string.Join(", ", headers));
+                _logger.LogInformation("Excel file has {DataRowCount} data rows", allData.Count);
+
+                // Find matching columns between Excel headers and table columns
+                var matchingColumns = new List<(string tableColumn, string excelHeader, int excelIndex)>();
+                
+                for (int i = 0; i < headers.Count; i++)
+                {
+                    var header = headers[i];
+                    // Try to find exact match first
+                    var matchingColumn = existingColumns.FirstOrDefault(c => 
+                        string.Equals(c, header, StringComparison.OrdinalIgnoreCase));
+                    
+                    if (matchingColumn != null)
+                    {
+                        matchingColumns.Add((matchingColumn, header, i));
+                    }
+                }
+
+                if (!matchingColumns.Any())
+                {
+                    throw new InvalidOperationException($"No matching columns found between Excel headers and table '{existingTableName}' columns");
+                }
+
+                _logger.LogInformation("Found {MatchingColumnCount} matching columns: {MatchingColumns}", 
+                    matchingColumns.Count, string.Join(", ", matchingColumns.Select(mc => $"{mc.excelHeader}->{mc.tableColumn}")));
+
+                // Build INSERT statement for matching columns only
+                var columnNames = string.Join(", ", matchingColumns.Select(mc => $"[{mc.tableColumn}]"));
+                var parameterNames = string.Join(", ", matchingColumns.Select(mc => $"@{mc.tableColumn}"));
+
+                var insertSql = $"INSERT INTO [{existingTableName}] ({columnNames}) VALUES ({parameterNames})";
+
+                using var command = new SqlCommand(insertSql, connection);
+                
+                // Add parameters for matching columns
+                foreach (var matchingColumn in matchingColumns)
+                {
+                    command.Parameters.AddWithValue($"@{matchingColumn.tableColumn}", DBNull.Value);
+                }
+
+                // Insert data rows
+                var insertedRows = 0;
+                foreach (var row in allData)
+                {
+                    foreach (var matchingColumn in matchingColumns)
+                    {
+                        var headerName = matchingColumn.excelHeader;
+                        var columnName = matchingColumn.tableColumn;
+                        var excelIndex = matchingColumn.excelIndex;
+                        
+                        if (row.ContainsKey(headerName))
+                        {
+                            var value = row[headerName];
+                            if (value == null || string.IsNullOrEmpty(value.ToString()))
+                            {
+                                command.Parameters[$"@{columnName}"].Value = DBNull.Value;
+                            }
+                            else
+                            {
+                                command.Parameters[$"@{columnName}"].Value = ConvertValue(value.ToString() ?? "", dataTypes[excelIndex]);
+                            }
+                        }
+                        else
+                        {
+                            command.Parameters[$"@{columnName}"].Value = DBNull.Value;
+                        }
+                    }
+                    
+                    await command.ExecuteNonQueryAsync();
+                    insertedRows++;
+                }
+
+                _logger.LogInformation("Data inserted successfully into existing table: {TableName}, {InsertedRows} rows, {MatchingColumns} matching columns", 
+                    existingTableName, insertedRows, matchingColumns.Count);
+                return insertedRows;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error inserting data into existing table: {TableName}. Error: {ErrorMessage}", existingTableName, ex.Message);
+                throw;
+            }
+        }
+
+        // Helper method to get table columns from database
+        private async Task<List<string>> GetTableColumnsAsync(SqlConnection connection, string tableName)
+        {
+            var columns = new List<string>();
+            
+            var sql = @"
+                SELECT COLUMN_NAME 
+                FROM INFORMATION_SCHEMA.COLUMNS 
+                WHERE TABLE_NAME = @TableName 
+                ORDER BY ORDINAL_POSITION";
+
+            using var command = new SqlCommand(sql, connection);
+            command.Parameters.AddWithValue("@TableName", tableName);
+
+            using var reader = await command.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                columns.Add(reader.GetString(0));
+            }
+
+            return columns;
+        }
     }
 }
