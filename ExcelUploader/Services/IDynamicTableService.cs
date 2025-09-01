@@ -23,7 +23,8 @@ namespace ExcelUploader.Services
         Task<byte[]> ExportTableDataAsync(string tableName, string format = "xlsx");
         Task<bool> ExecuteSqlQueryAsync(string sql, Dictionary<string, object>? parameters = null);
         Task<DataTable> ExecuteSqlQueryWithResultAsync(string sql, Dictionary<string, object>? parameters = null);
-        Task<bool> TestDatabaseConnectionAsync();
-        Task<Dictionary<string, string>> GetDatabaseInfoAsync();
+
+        Task<bool> TableExistsAsync(string tableName, int? databaseConnectionId = null);
+        Task<int?> GetTableIdByNameAsync(string tableName);
     }
 }

@@ -57,7 +57,7 @@ namespace ExcelUploader.Controllers
                     _logger.LogInformation("User logged in: {Email}", model.Email);
                     
                     // Generate JWT token
-                    var token = _jwtService.GenerateToken(user!);
+                    var token = _jwtService.GenerateToken(user ?? throw new InvalidOperationException("User not found"));
                     
                     // Log successful login with LoginLogService
                     if (user != null)
@@ -67,7 +67,7 @@ namespace ExcelUploader.Controllers
                             $"{user.FirstName} {user.LastName}", 
                             user.Email!, 
                             ipAddress, 
-                            userAgent, 
+                            userAgent ?? string.Empty, 
                             true);
                     }
                     
@@ -92,7 +92,7 @@ namespace ExcelUploader.Controllers
                             $"{user.FirstName} {user.LastName}", 
                             user.Email!, 
                             ipAddress, 
-                            userAgent, 
+                            userAgent ?? string.Empty, 
                             false, 
                             "Geçersiz şifre");
                     }
@@ -104,7 +104,7 @@ namespace ExcelUploader.Controllers
                             "Bilinmeyen Kullanıcı", 
                             model.Email, 
                             ipAddress, 
-                            userAgent, 
+                            userAgent ?? string.Empty, 
                             false, 
                             "Kullanıcı bulunamadı");
                     }

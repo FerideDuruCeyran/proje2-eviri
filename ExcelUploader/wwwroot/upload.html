@@ -672,26 +672,28 @@
             selectedColumns[index].type = type;
         }
 
-        // Setup table naming
-        function setupTableNaming() {
-            // Generate default table name
-            const fileName = excelData.file.name.replace(/\.[^/.]+$/, "");
-            const defaultName = fileName.toLowerCase()
-                .replace(/[^a-z0-9]/g, '_')
-                .replace(/_+/g, '_')
-                .replace(/^_|_$/g, '');
-            
-            document.getElementById('tableName').value = defaultName;
-            updateSchemaPreview();
-            
-            // Add event listener for table name changes
-            document.getElementById('tableName').addEventListener('input', function() {
-                updateSchemaPreview();
-            });
-            
-            // Load database connections
-            loadDatabaseConnections();
-        }
+                 // Setup table naming
+         function setupTableNaming() {
+             // Generate default table name
+             const fileName = excelData.file.name.replace(/\.[^/.]+$/, "");
+             const defaultName = fileName.toLowerCase()
+                 .replace(/[^a-z0-9]/g, '_')
+                 .replace(/_+/g, '_')
+                 .replace(/^_|_$/g, '');
+             
+             document.getElementById('tableName').value = defaultName;
+             updateSchemaPreview();
+             
+             // Add event listener for table name changes
+             document.getElementById('tableName').addEventListener('input', function() {
+                 updateSchemaPreview();
+                 // Reset table exists status when user changes table name
+                 window.tableExists = false;
+             });
+             
+             // Load database connections
+             loadDatabaseConnections();
+         }
 
         // Get authentication token
         function getToken() {
@@ -866,16 +868,26 @@
                     // Show SQL output
                     showSqlOutput(result);
                     
-                    setTimeout(() => {
-                        showAlert(`Tablo yapısı başarıyla oluşturuldu: ${result.tableName}`, 'success');
-                        stage1Status.textContent = '✓ Tamamlandı!';
-                        stage1Status.style.background = '#d4edda';
-                        stage1Status.style.color = '#155724';
-                        stage2Section.style.display = 'block';
-                        viewTableBtn.style.display = 'inline-block';
-                        createStructureBtn.disabled = false;
-                        window.createdTableId = result.tableId; // Store table ID for stage 2
-                    }, 1000);
+                                         setTimeout(() => {
+                         const message = result.tableExists ? 
+                             `Mevcut tablo bulundu: ${result.tableName}` : 
+                             `Tablo yapısı başarıyla oluşturuldu: ${result.tableName}`;
+                         
+                         showAlert(message, 'success');
+                         stage1Status.textContent = result.tableExists ? '✓ Mevcut Tablo Bulundu!' : '✓ Tamamlandı!';
+                         stage1Status.style.background = '#d4edda';
+                         stage1Status.style.color = '#155724';
+                         stage2Section.style.display = 'block';
+                         viewTableBtn.style.display = 'inline-block';
+                         createStructureBtn.disabled = false;
+                         window.createdTableId = result.tableId; // Store table ID for stage 2
+                         window.tableExists = result.tableExists; // Store table exists status
+                         
+                         // Update button text if table exists
+                         if (result.tableExists) {
+                             document.getElementById('insertDataBtn').innerHTML = '<i class="fas fa-plus"></i> Verileri Ekle';
+                         }
+                     }, 1000);
                 } else {
                     const error = await response.json();
                     showAlert(error.error || 'Tablo yapısı oluşturulurken hata oluştu', 'danger');
@@ -983,13 +995,17 @@
                     // Show data insertion summary
                     showDataInsertionSummary(result);
                     
-                    setTimeout(() => {
-                        showAlert(`Veriler başarıyla yüklendi! ${result.insertedRows || 0} satır eklendi.`, 'success');
-                        stage2Status.textContent = '✓ Tamamlandı!';
-                        stage2Status.style.background = '#d4edda';
-                        stage2Status.style.color = '#155724';
-                        insertDataBtn.disabled = false;
-                    }, 1000);
+                                         setTimeout(() => {
+                         const message = window.tableExists ? 
+                             `Veriler başarıyla eklendi! ${result.insertedRows || 0} satır eklendi.` : 
+                             `Veriler başarıyla yüklendi! ${result.insertedRows || 0} satır eklendi.`;
+                         
+                         showAlert(message, 'success');
+                         stage2Status.textContent = '✓ Tamamlandı!';
+                         stage2Status.style.background = '#d4edda';
+                         stage2Status.style.color = '#155724';
+                         insertDataBtn.disabled = false;
+                     }, 1000);
                 } else {
                     const error = await response.json();
                     let errorMessage = 'Veriler yüklenirken hata oluştu';

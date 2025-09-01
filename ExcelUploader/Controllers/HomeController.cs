@@ -6,6 +6,7 @@ using ExcelUploader.Data;
 using System.Security.Claims;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Data.SqlClient;
+using System.Text.RegularExpressions;
 
 namespace ExcelUploader.Controllers
 {
@@ -186,12 +187,47 @@ namespace ExcelUploader.Controllers
                 // Process Excel file and create dynamic table
                 var userName = User.FindFirstValue(ClaimTypes.Name) ?? User.Identity?.Name ?? "Unknown";
                 
-                // Create dynamic table from Excel file
-                var dynamicTable = await _dynamicTableService.CreateTableFromExcelAsync(
-                    model.ExcelFile, 
-                    userName, 
-                    model.DatabaseConnectionId, 
-                    model.Description);
+                // Generate table name from file name
+                var tableName = GenerateTableNameFromFileName(model.ExcelFile.FileName);
+                
+                // Check if table already exists in database
+                var tableExists = await _dynamicTableService.TableExistsAsync(tableName, model.DatabaseConnectionId);
+                var existingTableId = await _dynamicTableService.GetTableIdByNameAsync(tableName);
+                
+                DynamicTable dynamicTable;
+                string action;
+                int insertedRows = 0;
+                
+                if (tableExists && existingTableId.HasValue)
+                {
+                    // Table exists, insert data into existing table
+                    dynamicTable = await _dynamicTableService.GetTableByIdAsync(existingTableId.Value);
+                    if (dynamicTable == null)
+                    {
+                        return BadRequest(new { error = "Mevcut tablo bulunamadı" });
+                    }
+                    
+                    // Insert data into existing table
+                    var success = await _dynamicTableService.InsertDataIntoTableAsync(existingTableId.Value, model.ExcelFile, model.DatabaseConnectionId);
+                    if (!success)
+                    {
+                        return BadRequest(new { error = "Veriler mevcut tabloya eklenemedi" });
+                    }
+                    
+                    action = "data_inserted_into_existing";
+                    insertedRows = dynamicTable.RowCount; // This will be updated after insertion
+                }
+                else
+                {
+                    // Create new table and insert data
+                    dynamicTable = await _dynamicTableService.CreateTableFromExcelAsync(
+                        model.ExcelFile, 
+                        userName, 
+                        model.DatabaseConnectionId, 
+                        model.Description ?? string.Empty);
+                    action = "new_table_created";
+                    insertedRows = dynamicTable?.RowCount ?? 0;
+                }
 
                 if (dynamicTable == null)
                 {
@@ -199,10 +235,12 @@ namespace ExcelUploader.Controllers
                 }
 
                 return Ok(new { 
-                    message = $"Excel dosyası başarıyla yüklendi", 
+                    message = tableExists ? $"Veriler mevcut tabloya başarıyla eklendi: {tableName}" : $"Excel dosyası başarıyla yüklendi: {tableName}", 
                     tableName = dynamicTable.TableName,
-                    rowCount = dynamicTable.RowCount,
-                    tableId = dynamicTable.Id
+                    rowCount = insertedRows,
+                    tableId = dynamicTable.Id,
+                    action = action,
+                    tableExists = tableExists
                 });
             }
             catch (Exception ex)
@@ -239,12 +277,36 @@ namespace ExcelUploader.Controllers
                 // Process Excel file and create table structure only
                 var userName = User.FindFirstValue(ClaimTypes.Name) ?? User.Identity?.Name ?? "Unknown";
                 
-                // Create table structure from Excel file
-                var dynamicTable = await _dynamicTableService.CreateTableStructureAsync(
-                    model.ExcelFile, 
-                    userName, 
-                    model.DatabaseConnectionId, 
-                    model.Description);
+                // Generate table name from file name
+                var tableName = GenerateTableNameFromFileName(model.ExcelFile.FileName);
+                
+                // Check if table already exists in database
+                var tableExists = await _dynamicTableService.TableExistsAsync(tableName, model.DatabaseConnectionId);
+                var existingTableId = await _dynamicTableService.GetTableIdByNameAsync(tableName);
+                
+                DynamicTable dynamicTable;
+                string action;
+                
+                if (tableExists && existingTableId.HasValue)
+                {
+                    // Table exists, use existing table
+                    dynamicTable = await _dynamicTableService.GetTableByIdAsync(existingTableId.Value);
+                    if (dynamicTable == null)
+                    {
+                        return BadRequest(new { error = "Mevcut tablo bulunamadı" });
+                    }
+                    action = "existing_table_found";
+                }
+                else
+                {
+                    // Create new table structure
+                    dynamicTable = await _dynamicTableService.CreateTableStructureAsync(
+                        model.ExcelFile, 
+                        userName, 
+                        model.DatabaseConnectionId, 
+                        model.Description ?? string.Empty);
+                    action = "structure_created";
+                }
 
                 if (dynamicTable == null)
                 {
@@ -252,11 +314,12 @@ namespace ExcelUploader.Controllers
                 }
 
                 return Ok(new { 
-                    message = $"Tablo yapısı başarıyla oluşturuldu", 
+                    message = tableExists ? $"Mevcut tablo bulundu: {tableName}" : $"Tablo yapısı başarıyla oluşturuldu: {tableName}", 
                     tableName = dynamicTable.TableName,
                     tableId = dynamicTable.Id,
                     columnCount = dynamicTable.ColumnCount,
-                    stage = "structure_created"
+                    stage = action,
+                    tableExists = tableExists
                 });
             }
             catch (Exception ex)
@@ -265,6 +328,37 @@ namespace ExcelUploader.Controllers
                 return StatusCode(500, new { error = "Tablo yapısı oluşturulurken hata oluştu" });
             }
         }
+
+        // Helper method to generate table name from file name
+        private string GenerateTableNameFromFileName(string fileName)
+        {
+            var nameWithoutExtension = Path.GetFileNameWithoutExtension(fileName);
+            var tableName = nameWithoutExtension.ToLower()
+                .Replace(" ", "_")
+                .Replace("-", "_")
+                .Replace(".", "_")
+                .Replace("ç", "c")
+                .Replace("ğ", "g")
+                .Replace("ı", "i")
+                .Replace("ö", "o")
+                .Replace("ş", "s")
+                .Replace("ü", "u")
+                .Replace("Ç", "C")
+                .Replace("Ğ", "G")
+                .Replace("İ", "I")
+                .Replace("Ö", "O")
+                .Replace("Ş", "S")
+                .Replace("Ü", "U");
+            
+            // Remove timestamp patterns from the table name
+            tableName = Regex.Replace(tableName, @"_\d{8}_\d{6}$", "");
+            tableName = Regex.Replace(tableName, @"_\d{8}_\d{4}$", "");
+            tableName = Regex.Replace(tableName, @"_\d{8}$", "");
+            
+            return tableName;
+        }
+
+
 
         // New endpoint for two-stage process: Stage 2 - Insert data into existing table
         [HttpPost]
@@ -408,82 +502,7 @@ namespace ExcelUploader.Controllers
             }
         }
 
-        [HttpGet]
-        [Route("diagnose")]
-        [Authorize]
-        public async Task<IActionResult> Diagnose(string tableName = null)
-        {
-            try
-            {
-                var diagnostics = new
-                {
-                    timestamp = DateTime.UtcNow,
-                    databaseConnection = "Checking...",
-                    tableExists = tableName != null ? "Checking..." : "No table specified",
-                    availableTables = new List<string>(),
-                    errors = new List<string>()
-                };
 
-                // Check database connection
-                try
-                {
-                    var connectionString = _configuration.GetConnectionString("DefaultConnection");
-                    using var connection = new Microsoft.Data.SqlClient.SqlConnection(connectionString);
-                    await connection.OpenAsync();
-                    diagnostics = diagnostics with { databaseConnection = "Connected successfully" };
-                }
-                catch (Exception ex)
-                {
-                    diagnostics = diagnostics with { databaseConnection = $"Connection failed: {ex.Message}" };
-                    diagnostics.errors.Add($"Database connection error: {ex.Message}");
-                }
-
-                // Check if table exists
-                if (!string.IsNullOrEmpty(tableName))
-                {
-                    try
-                    {
-                        var connectionString = _configuration.GetConnectionString("DefaultConnection");
-                        using var connection = new Microsoft.Data.SqlClient.SqlConnection(connectionString);
-                        await connection.OpenAsync();
-
-                        var sql = $@"
-                            SELECT COUNT(*) 
-                            FROM INFORMATION_SCHEMA.TABLES 
-                            WHERE TABLE_NAME = @TableName";
-                        
-                        using var command = new Microsoft.Data.SqlClient.SqlCommand(sql, connection);
-                        command.Parameters.AddWithValue("@TableName", tableName);
-                        
-                        var tableExists = await command.ExecuteScalarAsync();
-                        diagnostics = diagnostics with { tableExists = tableExists.ToString() == "1" ? "Yes" : "No" };
-                    }
-                    catch (Exception ex)
-                    {
-                        diagnostics = diagnostics with { tableExists = $"Error checking: {ex.Message}" };
-                        diagnostics.errors.Add($"Table check error: {ex.Message}");
-                    }
-                }
-
-                // Get available tables
-                try
-                {
-                    var tables = await _dynamicTableService.GetAllTablesAsync();
-                    diagnostics = diagnostics with { availableTables = tables.Select(t => t.TableName).ToList() };
-                }
-                catch (Exception ex)
-                {
-                    diagnostics.errors.Add($"Error getting available tables: {ex.Message}");
-                }
-
-                return Ok(diagnostics);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error in diagnostics");
-                return StatusCode(500, new { error = "Diagnostics failed", details = ex.Message });
-            }
-        }
 
         [HttpGet]
         [Route("data")]
@@ -544,84 +563,9 @@ namespace ExcelUploader.Controllers
             }
         }
 
-        [HttpGet]
-        [Route("sql-test")]
-        [AllowAnonymous]
-        public async Task<IActionResult> SqlTest()
-        {
-            try
-            {
-                // Test SQL Server connection
-                var canConnect = await _context.Database.CanConnectAsync();
-                
-                if (canConnect)
-                {
-                    // Get database info
-                    var connectionString = _context.Database.GetConnectionString();
-                    var databaseName = _context.Database.GetDbConnection().Database;
-                    var serverVersion = _context.Database.GetDbConnection().ServerVersion;
-                    
-                    return Ok(new { 
-                        status = "Connected",
-                        message = "SQL Server bağlantısı başarılı",
-                        database = databaseName,
-                        serverVersion = serverVersion,
-                        timestamp = DateTime.UtcNow
-                    });
-                }
-                else
-                {
-                    return StatusCode(500, new { 
-                        status = "Failed",
-                        message = "SQL Server bağlantısı başarısız",
-                        timestamp = DateTime.UtcNow
-                    });
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "SQL connection test failed");
-                return StatusCode(500, new { 
-                    status = "Error",
-                    message = "SQL Server bağlantı testi sırasında hata oluştu",
-                    error = ex.Message,
-                    timestamp = DateTime.UtcNow
-                });
-            }
-        }
 
-        [HttpGet]
-        [Route("database-info")]
-        [Authorize]
-        public async Task<IActionResult> DatabaseInfo()
-        {
-            try
-            {
-                // Get database statistics
-                var tableCount = await _context.Database.SqlQueryRaw<int>("SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE'").FirstOrDefaultAsync();
-                var totalSize = await _context.Database.SqlQueryRaw<decimal>("SELECT SUM(size * 8.0 / 1024) FROM sys.database_files").FirstOrDefaultAsync();
-                
-                // Get recent tables
-                var recentTables = await _context.DynamicTables
-                    .OrderByDescending(t => t.UploadDate)
-                    .Take(10)
-                    .Select(t => new { t.TableName, t.FileName, t.UploadDate, t.RowCount })
-                    .ToListAsync();
 
-                return Ok(new
-                {
-                    tableCount,
-                    totalSizeMB = Math.Round(totalSize, 2),
-                    recentTables,
-                    lastUpdate = DateTime.UtcNow
-                });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error getting database info");
-                return StatusCode(500, new { error = "Veritabanı bilgileri alınırken hata oluştu" });
-            }
-        }
+
 
         [HttpGet]
         [Route("health")]
@@ -636,29 +580,7 @@ namespace ExcelUploader.Controllers
             });
         }
 
-        // Test database connection endpoint
-        [HttpGet]
-        [Route("test-database")]
-        [Authorize]
-        public async Task<IActionResult> TestDatabase()
-        {
-            try
-            {
-                var isConnected = await _dynamicTableService.TestDatabaseConnectionAsync();
-                var dbInfo = await _dynamicTableService.GetDatabaseInfoAsync();
-                
-                return Ok(new { 
-                    isConnected = isConnected,
-                    databaseInfo = dbInfo,
-                    message = isConnected ? "Database connection successful" : "Database connection failed"
-                });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error testing database connection");
-                return StatusCode(500, new { error = "Database connection test failed", details = ex.Message });
-            }
-        }
+
 
         // Delete table endpoint
         [HttpDelete]
@@ -685,52 +607,6 @@ namespace ExcelUploader.Controllers
             }
         }
 
-        // Connection info endpoint for diagnostics
-        [HttpGet]
-        [Route("connection-info")]
-        [Authorize]
-        public IActionResult ConnectionInfo()
-        {
-            try
-            {
-                var connectionString = _configuration.GetConnectionString("DefaultConnection");
-                
-                // Parse connection string to extract components
-                var builder = new SqlConnectionStringBuilder(connectionString);
-                
-                return Ok(new
-                {
-                    defaultConnectionString = connectionString,
-                    databaseName = builder.InitialCatalog,
-                    server = builder.DataSource,
-                    user = builder.UserID,
-                    integratedSecurity = builder.IntegratedSecurity
-                });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error getting connection info");
-                return StatusCode(500, new { error = "Connection info retrieval failed", details = ex.Message });
-            }
-        }
 
-        // Reset connection endpoint
-        [HttpPost]
-        [Route("reset-connection")]
-        [Authorize]
-        public IActionResult ResetConnection()
-        {
-            try
-            {
-                // This endpoint can be used to reset connection settings if needed
-                // For now, just return success
-                return Ok(new { message = "Connection settings reset successfully" });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error resetting connection");
-                return StatusCode(500, new { error = "Connection reset failed", details = ex.Message });
-            }
-        }
     }
 }

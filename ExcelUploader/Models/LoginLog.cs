@@ -8,19 +8,19 @@ namespace ExcelUploader.Models
         public int Id { get; set; }
         
         [Required]
-        public string UserId { get; set; }
+        public string UserId { get; set; } = string.Empty;
         
         [Required]
-        public string UserName { get; set; }
+        public string UserName { get; set; } = string.Empty;
         
         [Required]
-        public string Email { get; set; }
+        public string Email { get; set; } = string.Empty;
         
         public DateTime LoginTime { get; set; }
         
-        public string IpAddress { get; set; }
+        public string IpAddress { get; set; } = string.Empty;
         
-        public string UserAgent { get; set; }
+        public string UserAgent { get; set; } = string.Empty;
         
         public bool IsSuccess { get; set; }
         
@@ -31,6 +31,6 @@ namespace ExcelUploader.Models
         public DateTime? LogoutTime { get; set; }
         
         // Navigation property
-        public virtual ApplicationUser User { get; set; }
+        public virtual ApplicationUser? User { get; set; }
     }
 }

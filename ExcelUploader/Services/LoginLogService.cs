@@ -34,7 +34,7 @@ namespace ExcelUploader.Services
             return loginLog;
         }
 
-        public async Task<LoginLog> LogLogoutAsync(string userId, string sessionId)
+        public async Task<LoginLog?> LogLogoutAsync(string userId, string sessionId)
         {
             var loginLog = await _context.LoginLogs
                 .FirstOrDefaultAsync(l => l.UserId == userId && l.SessionId == sessionId && l.LogoutTime == null);

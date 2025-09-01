@@ -245,7 +245,7 @@ namespace ExcelUploader.Services
             }
         }
 
-        private async Task<List<ExcelData>> ProcessXlsxFileAsync(IFormFile file, string uploadedBy)
+        private Task<List<ExcelData>> ProcessXlsxFileAsync(IFormFile file, string uploadedBy)
         {
             var data = new List<ExcelData>();
             
@@ -318,10 +318,10 @@ namespace ExcelUploader.Services
                 }
             }
 
-            return data;
+            return Task.FromResult(data);
         }
 
-        private async Task<List<ExcelData>> ProcessXlsFileAsync(IFormFile file, string uploadedBy)
+        private Task<List<ExcelData>> ProcessXlsFileAsync(IFormFile file, string uploadedBy)
         {
             var data = new List<ExcelData>();
             
@@ -398,7 +398,7 @@ namespace ExcelUploader.Services
                 }
             }
 
-            return data;
+            return Task.FromResult(data);
         }
 
         private string? GetCellValue(ExcelWorksheet worksheet, int row, int col)
