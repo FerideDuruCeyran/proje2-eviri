@@ -443,6 +443,97 @@ namespace ExcelUploader.Controllers
             }
         }
 
+        // Test database connection endpoint
+        [HttpGet]
+        [Route("test-connection")]
+        [Authorize]
+        public async Task<IActionResult> TestConnection()
+        {
+            try
+            {
+                var connectionString = _configuration.GetConnectionString("DefaultConnection");
+                if (string.IsNullOrEmpty(connectionString))
+                {
+                    return BadRequest(new { error = "Default connection string not found" });
+                }
+
+                using var connection = new SqlConnection(connectionString);
+                await connection.OpenAsync();
+
+                // Get server and database info
+                var server = connection.DataSource;
+                var database = connection.Database;
+
+                return Ok(new { 
+                    server = server, 
+                    database = database, 
+                    status = "Connected successfully" 
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error testing database connection");
+                return StatusCode(500, new { error = $"Database connection failed: {ex.Message}" });
+            }
+        }
+
+        // Get table columns endpoint
+        [HttpGet]
+        [Route("get-table-columns")]
+        [Authorize]
+        public async Task<IActionResult> GetTableColumns([FromQuery] string tableName)
+        {
+            if (string.IsNullOrEmpty(tableName))
+            {
+                return BadRequest(new { error = "Table name is required" });
+            }
+
+            try
+            {
+                var connectionString = _configuration.GetConnectionString("DefaultConnection");
+                if (string.IsNullOrEmpty(connectionString))
+                {
+                    return BadRequest(new { error = "Default connection string not found" });
+                }
+
+                using var connection = new SqlConnection(connectionString);
+                await connection.OpenAsync();
+
+                var sql = @"
+                    SELECT 
+                        COLUMN_NAME as name,
+                        DATA_TYPE as type,
+                        IS_NULLABLE as isNullable,
+                        CHARACTER_MAXIMUM_LENGTH as maxLength
+                    FROM INFORMATION_SCHEMA.COLUMNS 
+                    WHERE TABLE_NAME = @TableName 
+                    ORDER BY ORDINAL_POSITION";
+
+                using var command = new SqlCommand(sql, connection);
+                command.Parameters.AddWithValue("@TableName", tableName);
+
+                var columns = new List<object>();
+                using var reader = await command.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    columns.Add(new
+                    {
+                        name = reader.GetString(0), // COLUMN_NAME
+                        type = reader.GetString(1), // DATA_TYPE
+                        isNullable = reader.GetString(2), // IS_NULLABLE
+                        maxLength = reader.IsDBNull(3) ? (int?)null : reader.GetInt32(3) // CHARACTER_MAXIMUM_LENGTH
+                    });
+                }
+
+                return Ok(new { columns = columns });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting table columns for table: {TableName}", tableName);
+                return StatusCode(500, new { error = $"Error getting table columns: {ex.Message}" });
+            }
+        }
+
         // Helper method to generate table name from file name
         private string GenerateTableNameFromFileName(string fileName)
         {

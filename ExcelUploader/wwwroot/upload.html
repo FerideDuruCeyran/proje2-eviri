@@ -917,7 +917,7 @@
              const stage1Section = document.getElementById('stage1Section');
              const stage2Section = document.getElementById('stage2Section');
 
-             summaryDetails.innerHTML = `
+             let summaryHtml = `
                  <div class="summary-item">
                      <strong>Tablo Adı:</strong> ${tableName}
                  </div>
@@ -934,6 +934,25 @@
                      <strong>Dosya:</strong> ${excelData.file.name}
                  </div>
              `;
+             
+             // Add table existence status
+             if (window.tableExists) {
+                 summaryHtml += `
+                     <div class="summary-item" style="color: #856404; background-color: #fff3cd; padding: 10px; border-radius: 5px; margin-top: 10px;">
+                         <i class="fas fa-info-circle"></i>
+                         <strong>Durum:</strong> "${tableName}" tablosu zaten mevcut. Veriler mevcut tabloya eklenecek.
+                     </div>
+                 `;
+             } else {
+                 summaryHtml += `
+                     <div class="summary-item" style="color: #155724; background-color: #d4edda; padding: 10px; border-radius: 5px; margin-top: 10px;">
+                         <i class="fas fa-plus-circle"></i>
+                         <strong>Durum:</strong> Yeni tablo oluşturulacak ve veriler yüklenecek.
+                     </div>
+                 `;
+             }
+             
+             summaryDetails.innerHTML = summaryHtml;
 
              // Check if table exists and adjust UI accordingly
              if (window.tableExists) {
@@ -1154,21 +1173,27 @@
                  const formData = new FormData();
                  formData.append('ExcelFile', excelData.file);
                  
-                 // If inserting into existing table, use create-table-structure endpoint
-                 // If inserting into new table, use insert-data endpoint
-                 let endpoint = '/api/home/insert-data';
+                 // Determine the correct endpoint based on table existence
+                 let endpoint;
                  
                  if (window.tableExists) {
-                     // Inserting into existing table - use create-table-structure endpoint
+                     // Table already exists - only upload data to existing table
                      endpoint = '/api/home/create-table-structure';
+                     
+                     // Add table name for existing table
+                     const tableName = document.getElementById('tableName').value;
+                     formData.append('TableName', tableName);
                      
                      // Add description if available
                      const description = document.getElementById('tableDescription')?.value;
                      if (description && description.trim() !== '') {
                          formData.append('Description', description);
                      }
+                     
+                     console.log('Table exists - will only upload data to existing table');
                  } else {
-                     // Inserting into new table - use insert-data endpoint
+                     // Table doesn't exist - use insert-data endpoint for new table
+                     endpoint = '/api/home/insert-data';
                      formData.append('TableId', window.createdTableId);
                      
                      // Add description if available
@@ -1176,6 +1201,8 @@
                      if (description && description.trim() !== '') {
                          formData.append('Description', description);
                      }
+                     
+                     console.log('Table does not exist - will create new table and upload data');
                  }
                  
                  // Add database connection ID only if it's not empty

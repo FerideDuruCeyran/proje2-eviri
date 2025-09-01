@@ -523,8 +523,9 @@ namespace ExcelUploader.Services
                 // Get base table name without timestamp
                 var baseTableName = GetBaseTableName(tableName);
                 
-                var table = await _context.DynamicTables
-                    .FirstOrDefaultAsync(t => GetBaseTableName(t.TableName) == baseTableName);
+                // Get all tables and filter in memory to avoid EF translation issues
+                var allTables = await _context.DynamicTables.ToListAsync();
+                var table = allTables.FirstOrDefault(t => GetBaseTableName(t.TableName) == baseTableName);
                 
                 return table?.Id;
             }
@@ -1443,7 +1444,7 @@ namespace ExcelUploader.Services
             }
         }
 
-        // New method to insert data into existing table by name
+        // New method to insert data into existing table by name with auto-column management
         public async Task<int> InsertDataIntoExistingTableAsync(IFormFile file, string existingTableName, int? databaseConnectionId = null)
         {
             try
@@ -1485,13 +1486,14 @@ namespace ExcelUploader.Services
                     headers.Count, string.Join(", ", headers));
                 _logger.LogInformation("Excel file has {DataRowCount} data rows", allData.Count);
 
-                // Find matching columns between Excel headers and table columns
+                // Find matching columns and missing columns
                 var matchingColumns = new List<(string tableColumn, string excelHeader, int excelIndex)>();
+                var missingColumns = new List<(string excelHeader, string dataType, int excelIndex)>();
                 
                 for (int i = 0; i < headers.Count; i++)
                 {
                     var header = headers[i];
-                    // Try to find exact match first
+                    // Try to find exact match first (case-insensitive)
                     var matchingColumn = existingColumns.FirstOrDefault(c => 
                         string.Equals(c, header, StringComparison.OrdinalIgnoreCase));
                     
@@ -1499,34 +1501,93 @@ namespace ExcelUploader.Services
                     {
                         matchingColumns.Add((matchingColumn, header, i));
                     }
+                    else
+                    {
+                        // Column doesn't exist in table - will be added
+                        missingColumns.Add((header, dataTypes[i], i));
+                    }
                 }
 
-                if (!matchingColumns.Any())
+                // Auto-add missing columns to the existing table
+                if (missingColumns.Any())
+                {
+                    _logger.LogInformation("Adding {MissingColumnCount} missing columns to table '{TableName}': {MissingColumns}", 
+                        missingColumns.Count, existingTableName, string.Join(", ", missingColumns.Select(mc => mc.excelHeader)));
+                    
+                    foreach (var missingColumn in missingColumns)
+                    {
+                        var baseColumnName = SanitizeColumnName(missingColumn.excelHeader);
+                        var columnName = baseColumnName;
+                        var counter = 1;
+                        
+                        // Check if column name already exists and generate unique name
+                        while (existingColumns.Any(c => string.Equals(c, columnName, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            columnName = $"{baseColumnName}_{counter}";
+                            counter++;
+                        }
+                        
+                        var sqlDataType = GetSqlDataType(missingColumn.dataType, null);
+                        
+                        var alterSql = $"ALTER TABLE [{existingTableName}] ADD [{columnName}] {sqlDataType}";
+                        using var alterCommand = new SqlCommand(alterSql, connection);
+                        await alterCommand.ExecuteNonQueryAsync();
+                        
+                        _logger.LogInformation("Added column '{ColumnName}' with type '{DataType}' to table '{TableName}'", 
+                            columnName, sqlDataType, existingTableName);
+                        
+                        // Add the new column to existing columns list
+                        existingColumns.Add(columnName);
+                    }
+                }
+
+                // Now all Excel columns should have matching table columns
+                if (!matchingColumns.Any() && !missingColumns.Any())
                 {
                     throw new InvalidOperationException($"No matching columns found between Excel headers and table '{existingTableName}' columns");
                 }
 
-                _logger.LogInformation("Found {MatchingColumnCount} matching columns: {MatchingColumns}", 
-                    matchingColumns.Count, string.Join(", ", matchingColumns.Select(mc => $"{mc.excelHeader}->{mc.tableColumn}")));
-
-                // Build INSERT statement for matching columns only
-                var columnNames = string.Join(", ", matchingColumns.Select(mc => $"[{mc.tableColumn}]"));
-                var parameterNames = string.Join(", ", matchingColumns.Select(mc => $"@{mc.tableColumn}"));
+                // Build INSERT statement for ALL columns (matching + newly added)
+                var allColumns = new List<string>();
+                
+                // Add matching columns
+                allColumns.AddRange(matchingColumns.Select(mc => mc.tableColumn));
+                
+                // Add newly added columns with their actual names
+                foreach (var missingColumn in missingColumns)
+                {
+                    var baseColumnName = SanitizeColumnName(missingColumn.excelHeader);
+                    var columnName = baseColumnName;
+                    var counter = 1;
+                    
+                    // Find the actual column name that was created
+                    while (!existingColumns.Any(c => string.Equals(c, columnName, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        columnName = $"{baseColumnName}_{counter}";
+                        counter++;
+                    }
+                    
+                    allColumns.Add(columnName);
+                }
+                
+                var columnNames = string.Join(", ", allColumns.Select(c => $"[{c}]"));
+                var parameterNames = string.Join(", ", allColumns.Select(c => $"@{c}"));
 
                 var insertSql = $"INSERT INTO [{existingTableName}] ({columnNames}) VALUES ({parameterNames})";
 
                 using var command = new SqlCommand(insertSql, connection);
                 
-                // Add parameters for matching columns
-                foreach (var matchingColumn in matchingColumns)
+                // Add parameters for all columns
+                foreach (var column in allColumns)
                 {
-                    command.Parameters.AddWithValue($"@{matchingColumn.tableColumn}", DBNull.Value);
+                    command.Parameters.AddWithValue($"@{column}", DBNull.Value);
                 }
 
                 // Insert data rows
                 var insertedRows = 0;
                 foreach (var row in allData)
                 {
+                    // Set values for matching columns
                     foreach (var matchingColumn in matchingColumns)
                     {
                         var headerName = matchingColumn.excelHeader;
@@ -1551,12 +1612,47 @@ namespace ExcelUploader.Services
                         }
                     }
                     
+                    // Set values for newly added columns
+                    foreach (var missingColumn in missingColumns)
+                    {
+                        var headerName = missingColumn.excelHeader;
+                        var baseColumnName = SanitizeColumnName(missingColumn.excelHeader);
+                        var columnName = baseColumnName;
+                        var counter = 1;
+                        
+                        // Find the actual column name that was created
+                        while (!existingColumns.Any(c => string.Equals(c, columnName, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            columnName = $"{baseColumnName}_{counter}";
+                            counter++;
+                        }
+                        
+                        var excelIndex = missingColumn.excelIndex;
+                        
+                        if (row.ContainsKey(headerName))
+                        {
+                            var value = row[headerName];
+                            if (value == null || string.IsNullOrEmpty(value.ToString()))
+                            {
+                                command.Parameters[$"@{columnName}"].Value = DBNull.Value;
+                            }
+                            else
+                            {
+                                command.Parameters[$"@{columnName}"].Value = ConvertValue(value.ToString() ?? "", dataTypes[excelIndex]);
+                            }
+                        }
+                        else
+                        {
+                            command.Parameters[$"@{columnName}"].Value = DBNull.Value;
+                        }
+                    }
+                    
                     await command.ExecuteNonQueryAsync();
                     insertedRows++;
                 }
 
-                _logger.LogInformation("Data inserted successfully into existing table: {TableName}, {InsertedRows} rows, {MatchingColumns} matching columns", 
-                    existingTableName, insertedRows, matchingColumns.Count);
+                _logger.LogInformation("Data inserted successfully into existing table: {TableName}, {InsertedRows} rows, {MatchingColumns} matching columns, {MissingColumns} added columns", 
+                    existingTableName, insertedRows, matchingColumns.Count, missingColumns.Count);
                 return insertedRows;
             }
             catch (Exception ex)
