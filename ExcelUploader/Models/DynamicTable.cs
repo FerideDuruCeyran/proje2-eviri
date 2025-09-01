@@ -48,6 +48,7 @@ namespace ExcelUploader.Models
         
         [Required]
         [Display(Name = "Sütun Adı")]
+        [MaxLength(128)]
         public string ColumnName { get; set; } = string.Empty;
         
         [Display(Name = "Görünen Ad")]

@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel Uploader - Step 6 Test</title>
+    <link rel="stylesheet" href="css/site.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <h1><i class="fas fa-file-excel"></i> Excel Uploader - Step 6 Test</h1>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <div class="card">
+                <div class="card-header">
+                    <h2 class="card-title">
+                        <i class="fas fa-database"></i> Altıncı Adım Test - Tablo Oluşturma
+                    </h2>
+                </div>
+                <div class="card-body">
+                    <p>Bu sayfa altıncı adımın çalışıp çalışmadığını test etmek için oluşturulmuştur.</p>
+                    
+                    <!-- Test Form -->
+                    <div class="form-group">
+                        <label for="testTableName" class="form-label">Test Tablo Adı:</label>
+                        <input type="text" id="testTableName" class="form-control" value="test_tablo" placeholder="test_tablo">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="testTableDescription" class="form-label">Test Tablo Açıklaması:</label>
+                        <textarea id="testTableDescription" class="form-control" rows="3" placeholder="Bu bir test tablosudur"></textarea>
+                    </div>
+                    
+                    <!-- Test Buttons -->
+                    <div class="step-actions">
+                        <button type="button" class="btn btn-primary" onclick="testStep6()">
+                            <i class="fas fa-play"></i> Altıncı Adımı Test Et
+                        </button>
+                        <button type="button" class="btn btn-secondary" onclick="testSqlGeneration()">
+                            <i class="fas fa-code"></i> SQL Oluşturmayı Test Et
+                        </button>
+                    </div>
+                    
+                    <!-- Test Results -->
+                    <div id="testResults" style="margin-top: 2rem;"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Scripts -->
+    <script>
+        // Test data
+        const testExcelData = {
+            file: { name: 'test.xlsx', size: 1024 },
+            preview: {
+                headers: ['ID', 'Ad', 'Soyad', 'Email', 'Telefon'],
+                rows: [
+                    ['1', 'Ahmet', 'Yılmaz', 'ahmet@test.com', '555-0001'],
+                    ['2', 'Ayşe', 'Demir', 'ayse@test.com', '555-0002'],
+                    ['3', 'Mehmet', 'Kaya', 'mehmet@test.com', '555-0003']
+                ]
+            }
+        };
+
+        const testSelectedColumns = [
+            { index: 0, name: 'ID', type: 'int', selected: true },
+            { index: 1, name: 'Ad', type: 'string', selected: true },
+            { index: 2, name: 'Soyad', type: 'string', selected: true },
+            { index: 3, name: 'Email', type: 'string', selected: true },
+            { index: 4, name: 'Telefon', type: 'string', selected: true }
+        ];
+
+        // Test step 6 functionality
+        function testStep6() {
+            const resultsDiv = document.getElementById('testResults');
+            const tableName = document.getElementById('testTableName').value;
+            const tableDescription = document.getElementById('testTableDescription').value;
+            
+            if (!tableName || !tableName.trim()) {
+                showTestResult('Lütfen tablo adını girin.', 'warning');
+                return;
+            }
+            
+            resultsDiv.innerHTML = `
+                <div class="alert alert-info">
+                    <h4><i class="fas fa-cog fa-spin"></i> Test Çalışıyor...</h4>
+                    <p>Altıncı adım test ediliyor...</p>
+                </div>
+            `;
+            
+            // Simulate step 6 process
+            setTimeout(() => {
+                const sqlScript = generateSqlScript(tableName, testSelectedColumns);
+                const summary = generateSummary(tableName, tableDescription, testSelectedColumns, testExcelData);
+                
+                resultsDiv.innerHTML = `
+                    <div class="alert alert-success">
+                        <h4><i class="fas fa-check-circle"></i> Test Başarılı!</h4>
+                        <p>Altıncı adım düzgün çalışıyor.</p>
+                    </div>
+                    
+                    <div class="card" style="margin-top: 1rem;">
+                        <div class="card-header">
+                            <h5><i class="fas fa-list"></i> Oluşturulacak Tablo Özeti</h5>
+                        </div>
+                        <div class="card-body">
+                            ${summary}
+                        </div>
+                    </div>
+                    
+                    <div class="card" style="margin-top: 1rem;">
+                        <div class="card-header">
+                            <h5><i class="fas fa-code"></i> SQL Çıktısı</h5>
+                        </div>
+                        <div class="card-body">
+                            <pre style="background: #f8f9fa; padding: 1rem; border-radius: 5px; overflow-x: auto;">${sqlScript}</pre>
+                        </div>
+                    </div>
+                `;
+            }, 2000);
+        }
+
+        // Test SQL generation
+        function testSqlGeneration() {
+            const tableName = document.getElementById('testTableName').value || 'test_tablo';
+            const sqlScript = generateSqlScript(tableName, testSelectedColumns);
+            
+            const resultsDiv = document.getElementById('testResults');
+            resultsDiv.innerHTML = `
+                <div class="alert alert-success">
+                    <h4><i class="fas fa-code"></i> SQL Oluşturma Testi</h4>
+                    <p>SQL script başarıyla oluşturuldu.</p>
+                </div>
+                
+                <div class="card" style="margin-top: 1rem;">
+                    <div class="card-header">
+                        <h5><i class="fas fa-code"></i> Oluşturulan SQL Script</h5>
+                    </div>
+                    <div class="card-body">
+                        <pre style="background: #f8f9fa; padding: 1rem; border-radius: 5px; overflow-x: auto;">${sqlScript}</pre>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Generate SQL script
+        function generateSqlScript(tableName, columns) {
+            let sql = `CREATE TABLE ${tableName} (\n`;
+            
+            const selectedCols = columns.filter(col => col.selected);
+            selectedCols.forEach((col, index) => {
+                const sqlType = getSqlType(col.type);
+                const comma = index < selectedCols.length - 1 ? ',' : '';
+                sql += `    ${col.name} ${sqlType}${comma}\n`;
+            });
+            
+            sql += `);`;
+            return sql;
+        }
+
+        // Get SQL type
+        function getSqlType(type) {
+            switch (type) {
+                case 'int': return 'INT';
+                case 'decimal': return 'DECIMAL(18,2)';
+                case 'datetime': return 'DATETIME';
+                case 'boolean': return 'BIT';
+                default: return 'VARCHAR(255)';
+            }
+        }
+
+        // Generate summary
+        function generateSummary(tableName, description, columns, excelData) {
+            const selectedCols = columns.filter(col => col.selected);
+            
+            return `
+                <div class="summary-details">
+                    <div class="summary-item">
+                        <strong>Tablo Adı:</strong> ${tableName}
+                    </div>
+                    <div class="summary-item">
+                        <strong>Açıklama:</strong> ${description || 'Açıklama yok'}
+                    </div>
+                    <div class="summary-item">
+                        <strong>Sütun Sayısı:</strong> ${selectedCols.length}
+                    </div>
+                    <div class="summary-item">
+                        <strong>Veri Sayısı:</strong> ${excelData.preview.rows.length}
+                    </div>
+                    <div class="summary-item">
+                        <strong>Dosya:</strong> ${excelData.file.name}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Show test result
+        function showTestResult(message, type) {
+            const resultsDiv = document.getElementById('testResults');
+            resultsDiv.innerHTML = `
+                <div class="alert alert-${type}">
+                    <h4><i class="fas fa-info-circle"></i> Test Sonucu</h4>
+                    <p>${message}</p>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>

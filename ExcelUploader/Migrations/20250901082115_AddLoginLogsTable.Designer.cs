@@ -4,6 +4,7 @@ using ExcelUploader.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace ExcelUploader.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250901082115_AddLoginLogsTable")]
+    partial class AddLoginLogsTable
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -188,7 +191,7 @@ namespace ExcelUploader.Migrations
                     b.HasIndex("Name")
                         .IsUnique();
 
-                    b.ToTable("DatabaseConnections", (string)null);
+                    b.ToTable("DatabaseConnections");
                 });
 
             modelBuilder.Entity("ExcelUploader.Models.DynamicTable", b =>
@@ -241,7 +244,7 @@ namespace ExcelUploader.Migrations
 
                     b.HasIndex("UploadDate");
 
-                    b.ToTable("DynamicTables", (string)null);
+                    b.ToTable("DynamicTables");
                 });
 
             modelBuilder.Entity("ExcelUploader.Models.ExcelData", b =>
@@ -498,7 +501,7 @@ namespace ExcelUploader.Migrations
 
                     b.HasIndex("UploadDate");
 
-                    b.ToTable("ExcelData", (string)null);
+                    b.ToTable("ExcelData");
                 });
 
             modelBuilder.Entity("ExcelUploader.Models.LoginLog", b =>
@@ -561,7 +564,7 @@ namespace ExcelUploader.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("LoginLogs", (string)null);
+                    b.ToTable("LoginLogs");
                 });
 
             modelBuilder.Entity("ExcelUploader.Models.TableColumn", b =>
@@ -606,7 +609,7 @@ namespace ExcelUploader.Migrations
 
                     b.HasIndex("DynamicTableId", "ColumnOrder");
 
-                    b.ToTable("TableColumns", (string)null);
+                    b.ToTable("TableColumns");
                 });
 
             modelBuilder.Entity("ExcelUploader.Models.TableData", b =>
@@ -637,7 +640,7 @@ namespace ExcelUploader.Migrations
 
                     b.HasIndex("DynamicTableId", "RowNumber");
 
-                    b.ToTable("TableData", (string)null);
+                    b.ToTable("TableData");
                 });
 
             modelBuilder.Entity("ExcelUploader.Models.UserLoginLog", b =>
@@ -698,7 +701,7 @@ namespace ExcelUploader.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("UserLoginLogs", (string)null);
+                    b.ToTable("UserLoginLogs");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>

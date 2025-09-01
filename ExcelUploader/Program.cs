@@ -85,7 +85,7 @@ if (!app.Environment.IsDevelopment())
 
 // Remove HTTPS redirection for development
 // app.UseHttpsRedirection();
-// app.UseStaticFiles(); // Remove this since we don't have wwwroot
+app.UseStaticFiles(); // Enable static files for wwwroot
 app.UseRouting();
 
 // Use CORS
@@ -95,8 +95,19 @@ app.UseCors("AllowAll");
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Map API root endpoint
-app.MapGet("/", () => Results.Redirect("/api/home"));
+// Map API root endpoint to redirect to index.html
+app.MapGet("/", () => Results.Redirect("/index.html"));
+
+// Map HTML pages
+app.MapGet("/login", () => Results.File("login.html", "text/html"));
+app.MapGet("/register", () => Results.File("register.html", "text/html"));
+app.MapGet("/home", () => Results.File("home.html", "text/html"));
+app.MapGet("/upload", () => Results.File("upload.html", "text/html"));
+app.MapGet("/data", () => Results.File("data.html", "text/html"));
+app.MapGet("/tables", () => Results.File("tables.html", "text/html"));
+app.MapGet("/connections", () => Results.File("connections.html", "text/html"));
+app.MapGet("/login-logs", () => Results.File("login-logs.html", "text/html"));
+app.MapGet("/profile", () => Results.File("profile.html", "text/html"));
 
 // Map controllers
 app.MapControllers();

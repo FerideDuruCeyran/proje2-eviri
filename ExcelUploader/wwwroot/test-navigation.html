@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel Uploader - Navigation Test</title>
+    <link rel="stylesheet" href="css/site.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <h1><i class="fas fa-file-excel"></i> Excel Uploader - Navigation Test</h1>
+        </div>
+    </header>
+
+    <!-- Navigation -->
+    <nav class="nav">
+        <div class="container">
+            <ul class="nav-list">
+                <li class="nav-item">
+                    <a href="/" class="nav-link" data-page="home">
+                        <i class="fas fa-home"></i> Ana Sayfa
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="/upload" class="nav-link" data-page="upload">
+                        <i class="fas fa-upload"></i> Excel Yükle
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="/data" class="nav-link" data-page="data">
+                        <i class="fas fa-database"></i> Veri Görüntüle
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="/tables" class="nav-link" data-page="tables">
+                        <i class="fas fa-table"></i> Dinamik Tablolar
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="/connections" class="nav-link" data-page="connections">
+                        <i class="fas fa-plug"></i> Bağlantılar
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="/login-logs" class="nav-link" data-page="login-logs">
+                        <i class="fas fa-history"></i> Giriş Logları
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <h2>Navigation Test Page</h2>
+            <p>Bu sayfa navigasyon ve tab geçişlerini test etmek için oluşturulmuştur.</p>
+
+            <!-- Tab Navigation Test -->
+            <div class="tab-navigation">
+                <button class="tab-link active" data-tab="tab1">Tab 1</button>
+                <button class="tab-link" data-tab="tab2">Tab 2</button>
+                <button class="tab-link" data-tab="tab3">Tab 3</button>
+            </div>
+
+            <!-- Tab Content -->
+            <div class="tab-content active" id="tab1">
+                <h3>Tab 1 İçeriği</h3>
+                <p>Bu birinci tab'ın içeriğidir. Diğer tab'lara tıklayarak içerik değişimini görebilirsiniz.</p>
+            </div>
+
+            <div class="tab-content" id="tab2">
+                <h3>Tab 2 İçeriği</h3>
+                <p>Bu ikinci tab'ın içeriğidir. Tab geçişleri düzgün çalışıyor mu kontrol edin.</p>
+            </div>
+
+            <div class="tab-content" id="tab3">
+                <h3>Tab 3 İçeriği</h3>
+                <p>Bu üçüncü tab'ın içeriğidir. Tüm tab'lar arasında geçiş yapabilmelisiniz.</p>
+            </div>
+
+            <!-- Step Navigation Test -->
+            <h3 style="margin-top: 3rem;">Step Navigation Test</h3>
+            <div class="step-navigation">
+                <button class="step-link active" data-step="step1">Adım 1</button>
+                <button class="step-link" data-step="step2">Adım 2</button>
+                <button class="step-link" data-step="step3">Adım 3</button>
+            </div>
+
+            <!-- Step Content -->
+            <div class="step-content active" id="step1">
+                <h4>Adım 1 İçeriği</h4>
+                <p>Bu birinci adımın içeriğidir.</p>
+            </div>
+
+            <div class="step-content" id="step2">
+                <h4>Adım 2 İçeriği</h4>
+                <p>Bu ikinci adımın içeriğidir.</p>
+            </div>
+
+            <div class="step-content" id="step3">
+                <h4>Adım 3 İçeriği</h4>
+                <p>Bu üçüncü adımın içeriğidir.</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Scripts -->
+    <script src="js/site.js"></script>
+    <script>
+        // Test navigation functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Navigation test page loaded');
+            
+            // Test tab navigation
+            const tabLinks = document.querySelectorAll('.tab-link');
+            const tabContents = document.querySelectorAll('.tab-content');
+            
+            tabLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    
+                    // Remove active class from all tabs
+                    tabLinks.forEach(tab => tab.classList.remove('active'));
+                    tabContents.forEach(content => content.classList.remove('active'));
+                    
+                    // Add active class to clicked tab
+                    this.classList.add('active');
+                    
+                    // Show corresponding content
+                    const targetId = this.getAttribute('data-tab');
+                    const targetContent = document.getElementById(targetId);
+                    if (targetContent) {
+                        targetContent.classList.add('active');
+                        console.log('Switched to tab:', targetId);
+                    }
+                });
+            });
+            
+            // Test step navigation
+            const stepLinks = document.querySelectorAll('.step-link');
+            const stepContents = document.querySelectorAll('.step-content');
+            
+            stepLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    
+                    // Remove active class from all steps
+                    stepLinks.forEach(step => step.classList.remove('active'));
+                    stepContents.forEach(content => content.classList.remove('active'));
+                    
+                    // Add active class to clicked step
+                    this.classList.add('active');
+                    
+                    // Show corresponding content
+                    const targetId = this.getAttribute('data-step');
+                    const targetContent = document.getElementById(targetId);
+                    if (targetContent) {
+                        targetContent.classList.add('active');
+                        console.log('Switched to step:', targetId);
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>

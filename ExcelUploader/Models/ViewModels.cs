@@ -107,6 +107,9 @@ namespace ExcelUploader.Models
         [Required(ErrorMessage = "Tablo ID gereklidir")]
         [Display(Name = "Tablo ID")]
         public int TableId { get; set; }
+        
+        [Display(Name = "Veritabanı Bağlantısı")]
+        public int? DatabaseConnectionId { get; set; }
     }
 
     public class DataRequest

@@ -121,8 +121,8 @@ namespace ExcelUploader.Controllers
             }
         }
 
-        [HttpPost("{id}/test")]
-        public async Task<ActionResult> TestConnection(int id)
+        [HttpPost("{id}/test-connection")]
+        public async Task<ActionResult> TestConnectionById(int id)
         {
             try
             {
@@ -255,6 +255,102 @@ namespace ExcelUploader.Controllers
             {
                 _logger.LogError(ex, "Sorgu sonuçları alınırken hata oluştu: {Id}, Database: {Database}", id, databaseName);
                 return StatusCode(500, "Sorgu sonuçları alınırken hata oluştu");
+            }
+        }
+
+
+
+        // Test all connections endpoint
+        [HttpPost("test-all")]
+        public async Task<ActionResult> TestAllConnections()
+        {
+            try
+            {
+                var connections = await _portService.GetAllConnectionsAsync();
+                var results = new List<object>();
+
+                foreach (var connection in connections)
+                {
+                    try
+                    {
+                        var success = await _portService.TestConnectionAsync(connection);
+                        results.Add(new { name = connection.Name, success = success, error = success ? null : "Connection failed" });
+                    }
+                    catch (Exception ex)
+                    {
+                        results.Add(new { name = connection.Name, success = false, error = ex.Message });
+                    }
+                }
+
+                return Ok(results);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error testing all connections");
+                return StatusCode(500, new { error = ex.Message });
+            }
+        }
+
+        // Clear inactive connections endpoint
+        [HttpDelete("clear-inactive")]
+        public async Task<ActionResult> ClearInactiveConnections()
+        {
+            try
+            {
+                var connections = await _portService.GetAllConnectionsAsync();
+                var inactiveConnections = connections.Where(c => !c.IsActive).ToList();
+                var deletedCount = 0;
+
+                foreach (var connection in inactiveConnections)
+                {
+                    try
+                    {
+                        await _portService.DeleteConnectionAsync(connection.Id);
+                        deletedCount++;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error deleting inactive connection: {Id}", connection.Id);
+                    }
+                }
+
+                return Ok(new { deletedCount = deletedCount, message = $"Deleted {deletedCount} inactive connections" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error clearing inactive connections");
+                return StatusCode(500, new { error = ex.Message });
+            }
+        }
+
+        // Clear all connections endpoint
+        [HttpDelete("clear-all")]
+        public async Task<ActionResult> ClearAllConnections()
+        {
+            try
+            {
+                var connections = await _portService.GetAllConnectionsAsync();
+                var deletedCount = 0;
+
+                foreach (var connection in connections)
+                {
+                    try
+                    {
+                        await _portService.DeleteConnectionAsync(connection.Id);
+                        deletedCount++;
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error deleting connection: {Id}", connection.Id);
+                    }
+                }
+
+                return Ok(new { deletedCount = deletedCount, message = $"Deleted {deletedCount} connections" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error clearing all connections");
+                return StatusCode(500, new { error = ex.Message });
             }
         }
     }

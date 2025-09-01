@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Application Status - Excel Uploader</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .status-card {
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .status-success {
+            color: #28a745;
+        }
+        .status-error {
+            color: #dc3545;
+        }
+        .status-warning {
+            color: #ffc107;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <h1>Application Status Check</h1>
+        <p class="text-muted">Checking if the Excel Uploader application is running properly</p>
+        
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card status-card">
+                    <div class="card-header">
+                        <h5>Application Health</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="healthStatus">
+                            <p>Checking application health...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="card status-card">
+                    <div class="card-header">
+                        <h5>Database Connection</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="dbStatus">
+                            <p>Checking database connection...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card status-card">
+                    <div class="card-header">
+                        <h5>Quick Actions</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-3">
+                                <a href="/test-api.html" class="btn btn-primary btn-sm w-100">Test API</a>
+                            </div>
+                            <div class="col-md-3">
+                                <a href="/check-tables.html" class="btn btn-info btn-sm w-100">Check Tables</a>
+                            </div>
+                            <div class="col-md-3">
+                                <a href="/diagnose.html" class="btn btn-warning btn-sm w-100">Diagnose</a>
+                            </div>
+                            <div class="col-md-3">
+                                <a href="/upload.html" class="btn btn-success btn-sm w-100">Upload</a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = window.location.origin;
+        
+        async function checkHealth() {
+            const healthDiv = document.getElementById('healthStatus');
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/home/health`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    healthDiv.innerHTML = `
+                        <div class="status-success">
+                            <h6>✅ Application is Running</h6>
+                            <p><strong>Status:</strong> ${data.status}</p>
+                            <p><strong>Version:</strong> ${data.version}</p>
+                            <p><strong>Environment:</strong> ${data.environment}</p>
+                            <p><strong>Timestamp:</strong> ${new Date(data.timestamp).toLocaleString()}</p>
+                        </div>
+                    `;
+                } else {
+                    healthDiv.innerHTML = `
+                        <div class="status-error">
+                            <h6>❌ Application Error</h6>
+                            <p>Status: ${response.status} ${response.statusText}</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                healthDiv.innerHTML = `
+                    <div class="status-error">
+                        <h6>❌ Connection Failed</h6>
+                        <p>Error: ${error.message}</p>
+                        <p>Make sure the application is running on ${API_BASE}</p>
+                    </div>
+                `;
+            }
+        }
+        
+        async function checkDatabase() {
+            const dbDiv = document.getElementById('dbStatus');
+            
+            try {
+                const response = await fetch(`${API_BASE}/api/home/sql-test`);
+                const data = await response.json();
+                
+                if (response.ok && data.status === 'Connected') {
+                    dbDiv.innerHTML = `
+                        <div class="status-success">
+                            <h6>✅ Database Connected</h6>
+                            <p><strong>Database:</strong> ${data.database}</p>
+                            <p><strong>Server Version:</strong> ${data.serverVersion}</p>
+                            <p><strong>Message:</strong> ${data.message}</p>
+                        </div>
+                    `;
+                } else {
+                    dbDiv.innerHTML = `
+                        <div class="status-error">
+                            <h6>❌ Database Error</h6>
+                            <p>Status: ${data.status}</p>
+                            <p>Message: ${data.message}</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                dbDiv.innerHTML = `
+                    <div class="status-error">
+                        <h6>❌ Database Test Failed</h6>
+                        <p>Error: ${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+        
+        // Run checks on page load
+        window.addEventListener('load', function() {
+            checkHealth();
+            checkDatabase();
+        });
+    </script>
+</body>
+</html>

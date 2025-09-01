@@ -20,13 +20,13 @@
         <div class="container">
             <ul class="nav-list">
                 <li class="nav-item">
-                    <a href="/" class="nav-link">
+                    <a href="/home" class="nav-link">
                         <i class="fas fa-home"></i> Ana Sayfa
                     </a>
                 </li>
                 <li class="nav-item auth-only">
                     <a href="/upload" class="nav-link">
-                        <i class="fas fa-upload"></i> Dosya Yükle
+                        <i class="fas fa-upload"></i> Excel Yükle
                     </a>
                 </li>
                 <li class="nav-item auth-only">
@@ -40,8 +40,13 @@
                     </a>
                 </li>
                 <li class="nav-item auth-only">
+                    <a href="/connections" class="nav-link">
+                        <i class="fas fa-plug"></i> Bağlantılar
+                    </a>
+                </li>
+                <li class="nav-item auth-only">
                     <a href="/login-logs" class="nav-link">
-                        <i class="fas fa-sign-in-alt"></i> Giriş Günlükleri
+                        <i class="fas fa-history"></i> Giriş Logları
                     </a>
                 </li>
                 <li class="nav-item unauth-only">
@@ -60,7 +65,7 @@
                     </a>
                 </li>
                 <li class="nav-item auth-only">
-                    <a href="/logout" class="nav-link">
+                    <a href="#" class="nav-link" onclick="logout()">
                         <i class="fas fa-sign-out-alt"></i> Çıkış Yap
                     </a>
                 </li>
@@ -149,7 +154,7 @@
         // Load tables
         async function loadTables() {
             try {
-                const response = await fetch('/api/dynamic-tables', {
+                const response = await fetch('/api/home/data', {
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('authToken')}`
                     }
@@ -189,7 +194,7 @@
                             <i class="fas fa-table"></i> ${table.tableName}
                         </h4>
                         <div style="display: flex; gap: 0.5rem;">
-                            <button class="btn btn-sm btn-secondary" onclick="viewTable(${table.id})">
+                            <button class="btn btn-sm btn-secondary" onclick="viewTable('${table.tableName}')">
                                 <i class="fas fa-eye"></i> Görüntüle
                             </button>
                             <button class="btn btn-sm btn-primary" onclick="editTable(${table.id})">
@@ -207,7 +212,7 @@
                     
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem;">
                         <div style="text-align: center;">
-                            <div style="font-size: 1.5rem; font-weight: bold; color: #667eea;">${table.recordCount || 0}</div>
+                            <div style="font-size: 1.5rem; font-weight: bold; color: #667eea;">${table.rowCount || 0}</div>
                             <div style="font-size: 0.9rem; color: #666;">Kayıt</div>
                         </div>
                         <div style="text-align: center;">
@@ -215,8 +220,8 @@
                             <div style="font-size: 0.9rem; color: #666;">Sütun</div>
                         </div>
                         <div style="text-align: center;">
-                            <div style="font-size: 1.5rem; font-weight: bold; color: #ffc107;">${table.lastModified ? formatDate(table.lastModified) : 'N/A'}</div>
-                            <div style="font-size: 0.9rem; color: #666;">Son Güncelleme</div>
+                            <div style="font-size: 1.5rem; font-weight: bold; color: #ffc107;">${table.uploadDate ? formatDate(table.uploadDate) : 'N/A'}</div>
+                            <div style="font-size: 0.9rem; color: #666;">Oluşturulma Tarihi</div>
                         </div>
                     </div>
                 </div>
@@ -228,37 +233,27 @@
             const tableName = document.getElementById('tableName').value;
             const description = document.getElementById('tableDescription').value;
 
-            try {
-                const response = await fetch('/api/dynamic-tables', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-                    },
-                    body: JSON.stringify({
-                        tableName,
-                        description
-                    })
-                });
-
-                if (response.ok) {
-                    showMessage('Tablo başarıyla oluşturuldu', 'success');
-                    document.getElementById('createTableForm').reset();
-                    loadTables();
-                } else {
-                    const error = await response.json();
-                    showMessage(error.message || 'Tablo oluşturulurken hata oluştu', 'error');
-                }
-            } catch (error) {
-                console.error('Create table error:', error);
-                showMessage('Tablo oluşturulurken hata oluştu', 'error');
+            if (!tableName.trim()) {
+                showMessage('Lütfen tablo adı girin', 'error');
+                return;
             }
+
+            // Redirect to upload page with table name and description
+            const params = new URLSearchParams({
+                tableName: tableName,
+                description: description
+            });
+            window.location.href = `/upload.html?${params.toString()}`;
         }
 
         // View table
-        function viewTable(id) {
-            // For now, redirect to data page to view table data
-            window.location.href = `/data?tableId=${id}`;
+        function viewTable(tableName) {
+            // Open view-table endpoint in a new tab
+            const token = localStorage.getItem('authToken');
+            if (token) {
+                const url = `/api/home/view-table?tableName=${encodeURIComponent(tableName)}`;
+                window.open(url, '_blank');
+            }
         }
 
         // Edit table
@@ -271,7 +266,7 @@
         async function deleteTable(id) {
             if (confirm('Bu tabloyu silmek istediğinizden emin misiniz? Bu işlem geri alınamaz!')) {
                 try {
-                    const response = await fetch(`/api/dynamic-tables/${id}`, {
+                    const response = await fetch(`/api/home/delete-table/${id}`, {
                         method: 'DELETE',
                         headers: {
                             'Authorization': `Bearer ${localStorage.getItem('authToken')}`

@@ -20,13 +20,13 @@
         <div class="container">
             <ul class="nav-list">
                 <li class="nav-item">
-                    <a href="/" class="nav-link">
+                    <a href="/home" class="nav-link">
                         <i class="fas fa-home"></i> Ana Sayfa
                     </a>
                 </li>
                 <li class="nav-item auth-only">
                     <a href="/upload" class="nav-link">
-                        <i class="fas fa-upload"></i> Dosya Yükle
+                        <i class="fas fa-upload"></i> Excel Yükle
                     </a>
                 </li>
                 <li class="nav-item auth-only">
@@ -37,6 +37,16 @@
                 <li class="nav-item auth-only">
                     <a href="/tables" class="nav-link">
                         <i class="fas fa-table"></i> Dinamik Tablolar
+                    </a>
+                </li>
+                <li class="nav-item auth-only">
+                    <a href="/connections" class="nav-link">
+                        <i class="fas fa-plug"></i> Bağlantılar
+                    </a>
+                </li>
+                <li class="nav-item auth-only">
+                    <a href="/login-logs" class="nav-link">
+                        <i class="fas fa-history"></i> Giriş Logları
                     </a>
                 </li>
                 <li class="nav-item unauth-only">
@@ -55,7 +65,7 @@
                     </a>
                 </li>
                 <li class="nav-item auth-only">
-                    <a href="/logout" class="nav-link">
+                    <a href="#" class="nav-link" onclick="logout()">
                         <i class="fas fa-sign-out-alt"></i> Çıkış Yap
                     </a>
                 </li>

@@ -20,13 +20,13 @@
         <div class="container">
             <ul class="nav-list">
                 <li class="nav-item">
-                    <a href="/" class="nav-link">
+                    <a href="/home" class="nav-link">
                         <i class="fas fa-home"></i> Ana Sayfa
                     </a>
                 </li>
                 <li class="nav-item auth-only">
                     <a href="/upload" class="nav-link active">
-                        <i class="fas fa-upload"></i> Dosya Yükle
+                        <i class="fas fa-upload"></i> Excel Yükle
                     </a>
                 </li>
                 <li class="nav-item auth-only">
@@ -37,6 +37,16 @@
                 <li class="nav-item auth-only">
                     <a href="/tables" class="nav-link">
                         <i class="fas fa-table"></i> Dinamik Tablolar
+                    </a>
+                </li>
+                <li class="nav-item auth-only">
+                    <a href="/connections" class="nav-link">
+                        <i class="fas fa-plug"></i> Bağlantılar
+                    </a>
+                </li>
+                <li class="nav-item auth-only">
+                    <a href="/login-logs" class="nav-link">
+                        <i class="fas fa-history"></i> Giriş Logları
                     </a>
                 </li>
                 <li class="nav-item unauth-only">
@@ -55,7 +65,7 @@
                     </a>
                 </li>
                 <li class="nav-item auth-only">
-                    <a href="/logout" class="nav-link">
+                    <a href="#" class="nav-link" onclick="logout()">
                         <i class="fas fa-sign-out-alt"></i> Çıkış Yap
                     </a>
                 </li>
@@ -68,27 +78,27 @@
         <div class="container">
             <!-- Progress Steps -->
             <div class="progress-steps">
-                <div class="step active" data-step="1">
+                <div class="step active" data-step="1" onclick="goToStep(1)">
                     <div class="step-number">1</div>
                     <div class="step-title">Giriş</div>
                 </div>
-                <div class="step" data-step="2">
+                <div class="step" data-step="2" onclick="goToStep(2)">
                     <div class="step-number">2</div>
                     <div class="step-title">Dosya Yükleme</div>
                 </div>
-                <div class="step" data-step="3">
+                <div class="step" data-step="3" onclick="goToStep(3)">
                     <div class="step-number">3</div>
                     <div class="step-title">Veri Görselleştirme</div>
                 </div>
-                <div class="step" data-step="4">
+                <div class="step" data-step="4" onclick="goToStep(4)">
                     <div class="step-number">4</div>
                     <div class="step-title">Veri Seçimi</div>
                 </div>
-                <div class="step" data-step="5">
+                <div class="step" data-step="5" onclick="goToStep(5)">
                     <div class="step-number">5</div>
                     <div class="step-title">Tablo Adı</div>
                 </div>
-                <div class="step" data-step="6">
+                <div class="step" data-step="6" onclick="goToStep(6)">
                     <div class="step-number">6</div>
                     <div class="step-title">Oluştur</div>
                 </div>
@@ -555,7 +565,7 @@
                     method: 'POST',
                     body: formData,
                     headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                        'Authorization': `Bearer ${getToken()}`
                     }
                 });
 
@@ -674,8 +684,18 @@
             document.getElementById('tableName').value = defaultName;
             updateSchemaPreview();
             
+            // Add event listener for table name changes
+            document.getElementById('tableName').addEventListener('input', function() {
+                updateSchemaPreview();
+            });
+            
             // Load database connections
             loadDatabaseConnections();
+        }
+
+        // Get authentication token
+        function getToken() {
+            return localStorage.getItem('authToken');
         }
 
         // Load database connections
@@ -784,34 +804,54 @@
                 const viewTableBtn = document.getElementById('viewTableBtn');
                 const creationProgress = document.getElementById('creationProgress');
                 
-                                 createStructureBtn.disabled = true;
-                 stage1Status.textContent = 'Oluşturuluyor...';
-                 stage1Status.style.background = '#fff3cd';
-                 stage1Status.style.color = '#856404';
-                 stage2Section.style.display = 'none';
-                 viewTableBtn.style.display = 'none';
-                 creationProgress.style.display = 'block';
+                createStructureBtn.disabled = true;
+                stage1Status.textContent = 'Oluşturuluyor...';
+                stage1Status.style.background = '#fff3cd';
+                stage1Status.style.color = '#856404';
+                stage2Section.style.display = 'none';
+                viewTableBtn.style.display = 'none';
+                creationProgress.style.display = 'block';
+
+                // Get table name and description
+                const tableName = document.getElementById('tableName').value;
+                const tableDescription = document.getElementById('tableDescription').value;
+                
+                if (!tableName || !tableName.trim()) {
+                    showAlert('Lütfen tablo adını girin.', 'warning');
+                    createStructureBtn.disabled = false;
+                    stage1Status.textContent = '✗ Hata!';
+                    stage1Status.style.background = '#f8d7da';
+                    stage1Status.style.color = '#721c24';
+                    creationProgress.style.display = 'none';
+                    return;
+                }
 
                 // Prepare data
                 const formData = new FormData();
                 formData.append('ExcelFile', excelData.file);
-                                 // Table name is already included in the form data
-                formData.append('Description', document.getElementById('tableDescription').value);
+                formData.append('TableName', tableName);
+                formData.append('Description', tableDescription);
                 
-                // Add database connection ID if selected
+                // Add database connection ID (force empty to use default connection)
                 const databaseConnectionId = document.getElementById('databaseConnection').value;
-                if (databaseConnectionId) {
-                    formData.append('DatabaseConnectionId', databaseConnectionId);
-                }
+                formData.append('DatabaseConnectionId', databaseConnectionId || '');
+
+                // Add selected columns data
+                const selectedColumnsData = selectedColumns.filter(col => col.selected).map(col => ({
+                    name: col.name,
+                    type: col.type,
+                    index: col.index
+                }));
+                formData.append('SelectedColumns', JSON.stringify(selectedColumnsData));
 
                 // Update progress
                 updateProgress(25, 'Dosya yükleniyor...');
 
-                                 const response = await fetch('/api/home/create-table-structure', {
+                const response = await fetch('/api/home/create-table-structure', {
                     method: 'POST',
                     body: formData,
                     headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                        'Authorization': `Bearer ${getToken()}`
                     }
                 });
 
@@ -823,34 +863,69 @@
                     
                     updateProgress(100, 'Tamamlandı!');
                     
-                                         setTimeout(() => {
-                         showAlert(`Tablo yapısı başarıyla oluşturuldu: ${result.tableName}`, 'success');
-                         stage1Status.textContent = '✓ Tamamlandı!';
-                         stage1Status.style.background = '#d4edda';
-                         stage1Status.style.color = '#155724';
-                         stage2Section.style.display = 'block';
-                         viewTableBtn.style.display = 'inline-block';
-                         createStructureBtn.disabled = false;
-                         window.createdTableId = result.tableId; // Store table ID for stage 2
-                     }, 1000);
-                                 } else {
-                     const error = await response.json();
-                     showAlert(error.error || 'Tablo yapısı oluşturulurken hata oluştu', 'danger');
-                     createStructureBtn.disabled = false;
-                     stage1Status.textContent = '✗ Hata!';
-                     stage1Status.style.background = '#f8d7da';
-                     stage1Status.style.color = '#721c24';
-                     creationProgress.style.display = 'none';
-                 }
-                         } catch (error) {
-                 console.error('Error creating table structure:', error);
-                 showAlert('Tablo yapısı oluşturulurken hata oluştu', 'danger');
-                 createStructureBtn.disabled = false;
-                 stage1Status.textContent = '✗ Hata!';
-                 stage1Status.style.background = '#f8d7da';
-                 stage1Status.style.color = '#721c24';
-                 creationProgress.style.display = 'none';
-             }
+                    // Show SQL output
+                    showSqlOutput(result);
+                    
+                    setTimeout(() => {
+                        showAlert(`Tablo yapısı başarıyla oluşturuldu: ${result.tableName}`, 'success');
+                        stage1Status.textContent = '✓ Tamamlandı!';
+                        stage1Status.style.background = '#d4edda';
+                        stage1Status.style.color = '#155724';
+                        stage2Section.style.display = 'block';
+                        viewTableBtn.style.display = 'inline-block';
+                        createStructureBtn.disabled = false;
+                        window.createdTableId = result.tableId; // Store table ID for stage 2
+                    }, 1000);
+                } else {
+                    const error = await response.json();
+                    showAlert(error.error || 'Tablo yapısı oluşturulurken hata oluştu', 'danger');
+                    createStructureBtn.disabled = false;
+                    stage1Status.textContent = '✗ Hata!';
+                    stage1Status.style.background = '#f8d7da';
+                    stage1Status.style.color = '#721c24';
+                    creationProgress.style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Error creating table structure:', error);
+                showAlert('Tablo yapısı oluşturulurken hata oluştu', 'danger');
+                createStructureBtn.disabled = false;
+                stage1Status.textContent = '✗ Hata!';
+                stage1Status.style.background = '#f8d7da';
+                stage1Status.style.color = '#721c24';
+                creationProgress.style.display = 'none';
+            }
+        }
+
+        // Show SQL output
+        function showSqlOutput(result) {
+            const stage1Status = document.getElementById('stage1Status');
+            
+            // Create SQL output display
+            let sqlOutput = `
+                <div style="margin-top: 1rem; padding: 1rem; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 5px;">
+                    <h6 style="margin-bottom: 0.5rem; color: #495057;"><i class="fas fa-code"></i> SQL Çıktısı:</h6>
+                    <pre style="background: #fff; padding: 1rem; border-radius: 3px; font-size: 0.9rem; overflow-x: auto; margin: 0;">`;
+            
+            if (result.sqlScript) {
+                sqlOutput += result.sqlScript;
+            } else {
+                // Generate SQL script from selected columns
+                const tableName = document.getElementById('tableName').value;
+                sqlOutput += `CREATE TABLE ${tableName} (\n`;
+                
+                const selectedCols = selectedColumns.filter(col => col.selected);
+                selectedCols.forEach((col, index) => {
+                    const sqlType = getSqlType(col.type);
+                    const comma = index < selectedCols.length - 1 ? ',' : '';
+                    sqlOutput += `    ${col.name} ${sqlType}${comma}\n`;
+                });
+                
+                sqlOutput += `);`;
+            }
+            
+            sqlOutput += `</pre></div>`;
+            
+            stage1Status.innerHTML = '✓ Tamamlandı!' + sqlOutput;
         }
 
         async function insertData() {
@@ -859,16 +934,32 @@
                 const stage2Status = document.getElementById('stage2Status');
                 const creationProgress = document.getElementById('creationProgress');
                 
-                                 insertDataBtn.disabled = true;
-                 stage2Status.textContent = 'Yükleniyor...';
-                 stage2Status.style.background = '#fff3cd';
-                 stage2Status.style.color = '#856404';
-                 creationProgress.style.display = 'block';
+                // Check if table ID exists
+                if (!window.createdTableId) {
+                    showAlert('Önce tablo yapısını oluşturmanız gerekiyor. Lütfen 1. adımı tamamlayın.', 'warning');
+                    return;
+                }
+                
+                insertDataBtn.disabled = true;
+                stage2Status.textContent = 'Yükleniyor...';
+                stage2Status.style.background = '#fff3cd';
+                stage2Status.style.color = '#856404';
+                creationProgress.style.display = 'block';
 
-                                 // Prepare data
-                 const formData = new FormData();
-                 formData.append('ExcelFile', excelData.file);
-                 formData.append('TableId', window.createdTableId); // Use the table ID from stage 1
+                // Prepare data
+                const formData = new FormData();
+                formData.append('ExcelFile', excelData.file);
+                formData.append('TableId', window.createdTableId); // Use the table ID from stage 1
+                
+                // Add database connection ID (force empty to use default connection)
+                const databaseConnectionId = document.getElementById('databaseConnection').value;
+                formData.append('DatabaseConnectionId', databaseConnectionId || '');
+                
+                // Debug: Log form data
+                console.log('Form data being sent:');
+                console.log('TableId:', window.createdTableId);
+                console.log('ExcelFile:', excelData.file);
+                console.log('DatabaseConnectionId:', databaseConnectionId);
 
                 // Update progress
                 updateProgress(25, 'Dosya yükleniyor...');
@@ -877,7 +968,7 @@
                     method: 'POST',
                     body: formData,
                     headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                        'Authorization': `Bearer ${getToken()}`
                     }
                 });
 
@@ -889,31 +980,62 @@
                     
                     updateProgress(100, 'Tamamlandı!');
                     
-                                         setTimeout(() => {
-                         showAlert(`Veriler başarıyla yüklendi!`, 'success');
-                         stage2Status.textContent = '✓ Tamamlandı!';
-                         stage2Status.style.background = '#d4edda';
-                         stage2Status.style.color = '#155724';
-                         insertDataBtn.disabled = false;
-                     }, 1000);
-                                 } else {
-                     const error = await response.json();
-                     showAlert(error.error || 'Veriler yüklenirken hata oluştu', 'danger');
-                     insertDataBtn.disabled = false;
-                     stage2Status.textContent = '✗ Hata!';
-                     stage2Status.style.background = '#f8d7da';
-                     stage2Status.style.color = '#721c24';
-                     creationProgress.style.display = 'none';
-                 }
-                         } catch (error) {
-                 console.error('Error inserting data:', error);
-                 showAlert('Veriler yüklenirken hata oluştu', 'danger');
-                 insertDataBtn.disabled = false;
-                 stage2Status.textContent = '✗ Hata!';
-                 stage2Status.style.background = '#f8d7da';
-                 stage2Status.style.color = '#721c24';
-                 creationProgress.style.display = 'none';
-             }
+                    // Show data insertion summary
+                    showDataInsertionSummary(result);
+                    
+                    setTimeout(() => {
+                        showAlert(`Veriler başarıyla yüklendi! ${result.insertedRows || 0} satır eklendi.`, 'success');
+                        stage2Status.textContent = '✓ Tamamlandı!';
+                        stage2Status.style.background = '#d4edda';
+                        stage2Status.style.color = '#155724';
+                        insertDataBtn.disabled = false;
+                    }, 1000);
+                } else {
+                    const error = await response.json();
+                    let errorMessage = 'Veriler yüklenirken hata oluştu';
+                    
+                    if (error.error) {
+                        errorMessage = error.error;
+                    } else if (error.errors) {
+                        // Handle validation errors
+                        const validationErrors = Object.values(error.errors).flat();
+                        errorMessage = validationErrors.join(', ');
+                    }
+                    
+                    showAlert(errorMessage, 'danger');
+                    insertDataBtn.disabled = false;
+                    stage2Status.textContent = '✗ Hata!';
+                    stage2Status.style.background = '#f8d7da';
+                    stage2Status.style.color = '#721c24';
+                    creationProgress.style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Error inserting data:', error);
+                showAlert('Veriler yüklenirken hata oluştu', 'danger');
+                insertDataBtn.disabled = false;
+                stage2Status.textContent = '✗ Hata!';
+                stage2Status.style.background = '#f8d7da';
+                stage2Status.style.color = '#721c24';
+                creationProgress.style.display = 'none';
+            }
+        }
+
+        // Show data insertion summary
+        function showDataInsertionSummary(result) {
+            const stage2Status = document.getElementById('stage2Status');
+            
+            let summary = `
+                <div style="margin-top: 1rem; padding: 1rem; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 5px;">
+                    <h6 style="margin-bottom: 0.5rem; color: #495057;"><i class="fas fa-database"></i> Veri Yükleme Özeti:</h6>
+                    <div style="background: #fff; padding: 1rem; border-radius: 3px; font-size: 0.9rem;">
+                        <p><strong>Tablo Adı:</strong> ${result.tableName || document.getElementById('tableName').value}</p>
+                        <p><strong>Eklenen Satır Sayısı:</strong> ${result.insertedRows || 0}</p>
+                        <p><strong>İşlem Durumu:</strong> <span style="color: #28a745;">✓ Başarılı</span></p>
+                        <p><strong>İşlem Tarihi:</strong> ${new Date().toLocaleString('tr-TR')}</p>
+                    </div>
+                </div>`;
+            
+            stage2Status.innerHTML = '✓ Tamamlandı!' + summary;
         }
 
         async function viewCreatedTable() {
@@ -927,18 +1049,23 @@
                     return;
                 }
 
-                if (!databaseConnectionId) {
-                    showAlert('Lütfen bir veritabanı bağlantısı seçin.', 'warning');
-                    return;
-                }
+                // Database connection is optional for viewing tables
+                // if (!databaseConnectionId) {
+                //     showAlert('Lütfen bir veritabanı bağlantısı seçin.', 'warning');
+                //     return;
+                // }
 
                 viewTableBtn.disabled = true;
                 showAlert(`${tableName} tablosunun verileri görüntüleniyor...`, 'info');
 
-                const response = await fetch(`/api/home/view-table?TableName=${tableName}&DatabaseConnectionId=${databaseConnectionId}`, {
+                const url = databaseConnectionId ? 
+                    `/api/home/view-table?tableName=${encodeURIComponent(tableName)}&databaseConnectionId=${databaseConnectionId}` :
+                    `/api/home/view-table?tableName=${encodeURIComponent(tableName)}`;
+                
+                const response = await fetch(url, {
                     method: 'GET',
                     headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                        'Authorization': `Bearer ${getToken()}`
                     }
                 });
 
@@ -963,6 +1090,128 @@
             document.getElementById('progressFill').style.width = percent + '%';
             document.getElementById('progressText').textContent = text;
         }
+
+        // Step Navigation Functions - Fixed
+        const totalSteps = 6;
+
+        function goToStep(stepNumber) {
+            // Validate step number
+            if (stepNumber < 1 || stepNumber > totalSteps) {
+                return;
+            }
+
+            // Check if we can go to this step (basic validation)
+            if (stepNumber > currentStep) {
+                if (!canProceedToStep(stepNumber)) {
+                    return;
+                }
+            }
+
+            // Update current step
+            currentStep = stepNumber;
+
+            // Update step indicators
+            updateStepIndicators();
+
+            // Show/hide step content
+            showStepContent(stepNumber);
+            
+            // Execute step-specific actions
+            executeStepActions(stepNumber);
+        }
+
+        function executeStepActions(stepNumber) {
+            switch (stepNumber) {
+                case 3:
+                    if (excelData && excelData.file) {
+                        loadExcelPreview();
+                    }
+                    break;
+                case 4:
+                    if (excelData && excelData.preview) {
+                        setupColumnSelection();
+                    }
+                    break;
+                case 5:
+                    if (excelData && excelData.preview) {
+                        setupTableNaming();
+                    }
+                    break;
+                case 6:
+                    if (excelData && excelData.preview) {
+                        showCreationSummary();
+                    }
+                    break;
+            }
+        }
+
+        function nextStep() {
+            if (currentStep < totalSteps) {
+                goToStep(currentStep + 1);
+            }
+        }
+
+        function previousStep() {
+            if (currentStep > 1) {
+                goToStep(currentStep - 1);
+            }
+        }
+
+        function updateStepIndicators() {
+            const steps = document.querySelectorAll('.step');
+            steps.forEach((step, index) => {
+                const stepNumber = index + 1;
+                if (stepNumber <= currentStep) {
+                    step.classList.add('active');
+                } else {
+                    step.classList.remove('active');
+                }
+            });
+        }
+
+        function showStepContent(stepNumber) {
+            // Hide all step content
+            const stepContents = document.querySelectorAll('.step-content');
+            stepContents.forEach(content => {
+                content.classList.remove('active');
+            });
+
+            // Show current step content
+            const currentContent = document.getElementById(`step${stepNumber}`);
+            if (currentContent) {
+                currentContent.classList.add('active');
+            }
+        }
+
+        function canProceedToStep(stepNumber) {
+            // Add validation logic for each step
+            switch (stepNumber) {
+                case 2:
+                    // Step 2: File upload - no validation needed
+                    return true;
+                case 3:
+                    // Step 3: Data preview - need file uploaded
+                    return excelData && excelData.file;
+                case 4:
+                    // Step 4: Column selection - need data preview
+                    return excelData && excelData.preview;
+                case 5:
+                    // Step 5: Table naming - need column selection
+                    return excelData && excelData.preview && selectedColumns.length > 0;
+                case 6:
+                    // Step 6: Create table - need all previous steps
+                    return excelData && excelData.preview && selectedColumns.length > 0;
+                default:
+                    return true;
+            }
+        }
+
+        // Initialize step navigation
+        document.addEventListener('DOMContentLoaded', function() {
+            currentStep = 1;
+            updateStepIndicators();
+            showStepContent(1);
+        });
 
         // Utility functions
         function formatFileSize(bytes) {

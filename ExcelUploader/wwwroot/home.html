@@ -40,6 +40,11 @@
                     </a>
                 </li>
                 <li class="nav-item auth-only">
+                    <a href="/connections" class="nav-link">
+                        <i class="fas fa-plug"></i> Bağlantılar
+                    </a>
+                </li>
+                <li class="nav-item auth-only">
                     <a href="/login-logs" class="nav-link">
                         <i class="fas fa-history"></i> Giriş Logları
                     </a>
@@ -395,7 +400,7 @@
             
             showAlert('Başarıyla çıkış yapıldı', 'success');
             setTimeout(() => {
-                window.location.href = '/login';
+                window.location.href = '/';
             }, 1000);
         }
     </script>

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.EntityFrameworkCore;
 using ExcelUploader.Models;
 using ExcelUploader.Data;
 using ExcelUploader.Services;
@@ -18,28 +19,34 @@ namespace ExcelUploader.Controllers
         private readonly ILogger<AccountController> _logger;
         private readonly IUserLoginLogService _userLoginLogService;
         private readonly ILoginLogService _loginLogService;
+        private readonly IJwtService _jwtService;
 
         public AccountController(
             UserManager<ApplicationUser> userManager, 
             SignInManager<ApplicationUser> signInManager, 
             ILogger<AccountController> logger,
             IUserLoginLogService userLoginLogService,
-            ILoginLogService loginLogService)
+            ILoginLogService loginLogService,
+            IJwtService jwtService)
         {
             _userManager = userManager;
             _signInManager = signInManager;
             _logger = logger;
             _userLoginLogService = userLoginLogService;
             _loginLogService = loginLogService;
+            _jwtService = jwtService;
         }
 
         [HttpPost("login")]
         [AllowAnonymous]
         public async Task<IActionResult> Login([FromBody] LoginViewModel model)
         {
+            _logger.LogInformation("Login attempt received for email: {Email}", model?.Email);
+            
             if (ModelState.IsValid)
             {
                 var user = await _userManager.FindByEmailAsync(model.Email);
+                _logger.LogInformation("User lookup result: {UserFound}", user != null);
                 var ipAddress = GetClientIpAddress();
                 var userAgent = GetUserAgent();
 
@@ -48,6 +55,9 @@ namespace ExcelUploader.Controllers
                 if (result.Succeeded)
                 {
                     _logger.LogInformation("User logged in: {Email}", model.Email);
+                    
+                    // Generate JWT token
+                    var token = _jwtService.GenerateToken(user!);
                     
                     // Log successful login with LoginLogService
                     if (user != null)
@@ -63,6 +73,7 @@ namespace ExcelUploader.Controllers
                     
                     return Ok(new { 
                         message = "Giriş başarılı", 
+                        token = token,
                         user = new { 
                             id = user?.Id, 
                             email = user?.Email, 
@@ -165,6 +176,26 @@ namespace ExcelUploader.Controllers
             return Unauthorized(new { message = "Bu sayfaya erişim yetkiniz yok" });
         }
 
+        [HttpGet("verify")]
+        [Authorize]
+        public async Task<IActionResult> Verify()
+        {
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return Unauthorized(new { message = "Geçersiz token" });
+            }
+
+            return Ok(new { 
+                id = user.Id, 
+                email = user.Email, 
+                firstName = user.FirstName, 
+                lastName = user.LastName,
+                createdAt = user.CreatedAt,
+                isActive = user.IsActive
+            });
+        }
+
         [HttpGet("profile")]
         [Authorize]
         public async Task<IActionResult> Profile()
@@ -185,6 +216,53 @@ namespace ExcelUploader.Controllers
                     isActive = user.IsActive
                 } 
             });
+        }
+
+        [HttpGet("stats")]
+        [Authorize]
+        public async Task<IActionResult> Stats()
+        {
+            var user = await _userManager.GetUserAsync(User);
+            if (user == null)
+            {
+                return NotFound(new { message = "Kullanıcı bulunamadı" });
+            }
+
+            // For now, return placeholder stats
+            // You can implement actual stats calculation here
+            return Ok(new { 
+                totalUploads = 0,
+                totalRecords = 0,
+                totalTables = 0,
+                lastLogin = user.CreatedAt
+            });
+        }
+
+        [HttpGet("test-users")]
+        [AllowAnonymous]
+        public async Task<IActionResult> TestUsers()
+        {
+            try
+            {
+                var users = await _userManager.Users.Take(10).ToListAsync();
+                var userList = users.Select(u => new { 
+                    id = u.Id, 
+                    email = u.Email, 
+                    firstName = u.FirstName, 
+                    lastName = u.LastName,
+                    isActive = u.IsActive
+                }).ToList();
+                
+                return Ok(new { 
+                    totalUsers = users.Count,
+                    users = userList
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting users");
+                return StatusCode(500, new { error = "Kullanıcılar alınırken hata oluştu" });
+            }
         }
 
         private string GetClientIpAddress()

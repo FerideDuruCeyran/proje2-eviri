@@ -230,11 +230,27 @@ namespace ExcelUploader.Services
             };
         }
 
-        public async Task<bool> InsertDataAsync(DynamicTable dynamicTable, List<Dictionary<string, object>> data)
+        public async Task<bool> InsertDataAsync(DynamicTable dynamicTable, List<Dictionary<string, object>> data, int? databaseConnectionId = null)
         {
             try
             {
-                var connectionString = _configuration.GetConnectionString("DefaultConnection");
+                string connectionString;
+                
+                if (databaseConnectionId.HasValue)
+                {
+                    // Use specific database connection
+                    var dbConnection = await _context.DatabaseConnections.FindAsync(databaseConnectionId.Value);
+                    if (dbConnection == null)
+                        throw new ArgumentException($"Database connection with ID {databaseConnectionId.Value} not found");
+                    
+                    connectionString = $"Server={dbConnection.ServerName},{dbConnection.Port};Database={dbConnection.DatabaseName};User Id={dbConnection.Username};Password={dbConnection.Password};TrustServerCertificate=true;";
+                }
+                else
+                {
+                    // Use default connection
+                    connectionString = _configuration.GetConnectionString("DefaultConnection");
+                }
+                
                 using var connection = new SqlConnection(connectionString);
                 await connection.OpenAsync();
 
@@ -307,13 +323,44 @@ namespace ExcelUploader.Services
             };
         }
 
-        public async Task<List<object>> GetTableDataAsync(string tableName, int page = 1, int pageSize = 50)
+        public async Task<List<object>> GetTableDataAsync(string tableName, int page = 1, int pageSize = 50, int? databaseConnectionId = null)
         {
             try
             {
-                var connectionString = _configuration.GetConnectionString("DefaultConnection");
+                string connectionString;
+                
+                if (databaseConnectionId.HasValue)
+                {
+                    // Use specific database connection
+                    var dbConnection = await _context.DatabaseConnections.FindAsync(databaseConnectionId.Value);
+                    if (dbConnection == null)
+                        throw new ArgumentException($"Database connection with ID {databaseConnectionId.Value} not found");
+                    
+                    connectionString = $"Server={dbConnection.ServerName},{dbConnection.Port};Database={dbConnection.DatabaseName};User Id={dbConnection.Username};Password={dbConnection.Password};TrustServerCertificate=true;";
+                }
+                else
+                {
+                    // Use default connection
+                    connectionString = _configuration.GetConnectionString("DefaultConnection");
+                }
+                
                 using var connection = new SqlConnection(connectionString);
                 await connection.OpenAsync();
+
+                // First check if table exists
+                var tableExistsSql = @"
+                    SELECT COUNT(*) 
+                    FROM INFORMATION_SCHEMA.TABLES 
+                    WHERE TABLE_NAME = @TableName";
+                
+                using var tableCheckCommand = new SqlCommand(tableExistsSql, connection);
+                tableCheckCommand.Parameters.AddWithValue("@TableName", tableName);
+                var tableExists = await tableCheckCommand.ExecuteScalarAsync();
+                
+                if (Convert.ToInt32(tableExists) == 0)
+                {
+                    throw new InvalidOperationException($"Table '{tableName}' does not exist in the database");
+                }
 
                 var offset = (page - 1) * pageSize;
                 var sql = $@"
@@ -740,9 +787,23 @@ namespace ExcelUploader.Services
         {
             // Remove invalid characters and replace with underscores
             var sanitized = System.Text.RegularExpressions.Regex.Replace(name, @"[^a-zA-Z0-9_]", "_");
+            
             // Ensure it starts with a letter
-            if (char.IsDigit(sanitized[0]))
+            if (sanitized.Length > 0 && char.IsDigit(sanitized[0]))
                 sanitized = "Col_" + sanitized;
+            
+            // Limit length to 128 characters (SQL Server column name limit)
+            if (sanitized.Length > 128)
+            {
+                sanitized = sanitized.Substring(0, 128);
+                // Ensure it doesn't end with underscore
+                sanitized = sanitized.TrimEnd('_');
+            }
+            
+            // If empty after sanitization, provide a default name
+            if (string.IsNullOrEmpty(sanitized))
+                sanitized = "Column_" + Guid.NewGuid().ToString("N").Substring(0, 8);
+                
             return sanitized;
         }
 
@@ -806,7 +867,7 @@ namespace ExcelUploader.Services
         }
 
         // New method for two-stage process: Stage 2 - Insert data into existing table
-        public async Task<bool> InsertDataIntoTableAsync(int tableId, IFormFile file)
+        public async Task<bool> InsertDataIntoTableAsync(int tableId, IFormFile file, int? databaseConnectionId = null)
         {
             try
             {
@@ -843,7 +904,7 @@ namespace ExcelUploader.Services
                 }
 
                 // Insert data
-                var dataInserted = await InsertDataAsync(dynamicTable, sampleData);
+                var dataInserted = await InsertDataAsync(dynamicTable, sampleData, databaseConnectionId);
                 if (!dataInserted)
                 {
                     throw new InvalidOperationException("Data insertion failed");

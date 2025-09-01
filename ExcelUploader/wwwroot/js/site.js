@@ -7,6 +7,7 @@ document.addEventListener('DOMContentLoaded', function() {
     initializeApp();
     setupEventListeners();
     checkAuthentication();
+    setupTabNavigation();
 });
 
 // Initialize application
@@ -19,6 +20,72 @@ function initializeApp() {
         isAuthenticated = true;
         loadUserProfile();
     }
+}
+
+// Setup tab navigation
+function setupTabNavigation() {
+    // Get current page path
+    const currentPath = window.location.pathname;
+    
+    // Remove all active classes from navigation
+    const allNavLinks = document.querySelectorAll('.nav-link');
+    allNavLinks.forEach(link => {
+        link.classList.remove('active');
+    });
+    
+    // Add active class to current page
+    const currentNavLink = document.querySelector(`.nav-link[href="${currentPath}"]`);
+    if (currentNavLink) {
+        currentNavLink.classList.add('active');
+    }
+    
+    // Handle tab content switching
+    const tabLinks = document.querySelectorAll('.tab-link');
+    const tabContents = document.querySelectorAll('.tab-content');
+    
+    tabLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            // Remove active class from all tabs
+            tabLinks.forEach(tab => tab.classList.remove('active'));
+            tabContents.forEach(content => content.classList.remove('active'));
+            
+            // Add active class to clicked tab
+            this.classList.add('active');
+            
+            // Show corresponding content
+            const targetId = this.getAttribute('data-tab');
+            const targetContent = document.getElementById(targetId);
+            if (targetContent) {
+                targetContent.classList.add('active');
+            }
+        });
+    });
+    
+    // Handle step navigation in upload page
+    const stepLinks = document.querySelectorAll('.step-link');
+    const stepContents = document.querySelectorAll('.step-content');
+    
+    stepLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            // Remove active class from all steps
+            stepLinks.forEach(step => step.classList.remove('active'));
+            stepContents.forEach(content => content.classList.remove('active'));
+            
+            // Add active class to clicked step
+            this.classList.add('active');
+            
+            // Show corresponding content
+            const targetId = this.getAttribute('data-step');
+            const targetContent = document.getElementById(targetId);
+            if (targetContent) {
+                targetContent.classList.add('active');
+            }
+        });
+    });
 }
 
 // Setup event listeners
@@ -136,11 +203,14 @@ async function handleFileUpload(file) {
 function setupNavigation() {
     const navLinks = document.querySelectorAll('.nav-item a');
     navLinks.forEach(link => {
-        link.addEventListener('click', function(e) {
-            e.preventDefault();
-            const href = this.getAttribute('href');
-            navigateTo(href);
-        });
+        // Only handle navigation links, not form buttons or other interactive elements
+        if (link.getAttribute('href') && !link.closest('form')) {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                const href = this.getAttribute('href');
+                navigateTo(href);
+            });
+        }
     });
 }
 
@@ -186,8 +256,10 @@ async function loadPageContent(path) {
 function setupForms() {
     // Login form
     const loginForm = document.getElementById('loginForm');
+    console.log('Login form found:', loginForm);
     if (loginForm) {
         loginForm.addEventListener('submit', handleLogin);
+        console.log('Login form event listener added');
     }
 
     // Register form
@@ -205,6 +277,7 @@ function setupForms() {
 
 // Handle login
 async function handleLogin(e) {
+    console.log('handleLogin called');
     e.preventDefault();
     
     const formData = new FormData(e.target);
@@ -240,7 +313,7 @@ async function handleLogin(e) {
             
             showAlert('Başarıyla giriş yapıldı!', 'success');
             setTimeout(() => {
-                window.location.href = '/upload';
+                window.location.href = '/home';
             }, 1000);
         } else {
             const error = await response.json();
@@ -479,12 +552,12 @@ async function loadUserProfile() {
 }
 
 // Update user interface
-function updateUserProfile() {
+function updateUserInterface() {
     if (currentUser) {
-        const userNameElement = document.getElementById('userName');
-        if (userNameElement) {
-            userNameElement.textContent = `${currentUser.firstName} ${currentUser.lastName}`;
-        }
+        const userNameElements = document.querySelectorAll('#userName');
+        userNameElements.forEach(el => {
+            el.textContent = `${currentUser.firstName} ${currentUser.lastName}`;
+        });
     }
 }
 
@@ -545,10 +618,10 @@ function updateNavigationForAuthenticated() {
     
     // Update user name if available
     if (currentUser) {
-        const userNameElement = document.getElementById('userName');
-        if (userNameElement) {
-            userNameElement.textContent = `${currentUser.firstName} ${currentUser.lastName}`;
-        }
+        const userNameElements = document.querySelectorAll('#userName');
+        userNameElements.forEach(el => {
+            el.textContent = `${currentUser.firstName} ${currentUser.lastName}`;
+        });
     }
 }
 
@@ -558,10 +631,10 @@ function updateNavigationForUnauthenticated() {
     document.body.classList.remove('authenticated');
     
     // Clear user name
-    const userNameElement = document.getElementById('userName');
-    if (userNameElement) {
-        userNameElement.textContent = 'Profil';
-    }
+    const userNameElements = document.querySelectorAll('#userName');
+    userNameElements.forEach(el => {
+        el.textContent = 'Profil';
+    });
 }
 
 // Logout
@@ -575,7 +648,7 @@ function logout() {
     
     showAlert('Başarıyla çıkış yapıldı', 'success');
     setTimeout(() => {
-        window.location.href = '/home';
+        window.location.href = '/login';
     }, 1000);
 }
 
@@ -811,16 +884,7 @@ async function loadUserProfile() {
     }
 }
 
-// Update user interface
-function updateUserInterface() {
-    if (isAuthenticated && currentUser) {
-        // Update user name
-        const userNameElements = document.querySelectorAll('#userName');
-        userNameElements.forEach(el => {
-            el.textContent = currentUser.firstName || 'Profil';
-        });
-    }
-}
+
 
 // Show message function for tables page
 function showMessage(message, type) {
