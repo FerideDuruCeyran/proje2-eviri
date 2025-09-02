@@ -1223,32 +1223,102 @@ namespace ExcelUploader.Services
 
         private string SanitizeTableName(string name)
         {
-            // Keep the original name as much as possible, only replace spaces with underscores
-            var sanitized = name.Replace(" ", "_");
-            // Ensure it starts with a letter or underscore (SQL Server requirement)
+            if (string.IsNullOrEmpty(name))
+                return "Table_" + Guid.NewGuid().ToString("N").Substring(0, 8);
+
+            // Türkçe karakterleri İngilizce karşılıklarına çevir
+            var turkishToEnglish = new Dictionary<char, char>
+            {
+                {'ç', 'c'}, {'Ç', 'C'},
+                {'ğ', 'g'}, {'Ğ', 'G'},
+                {'ı', 'i'}, {'I', 'I'},
+                {'ö', 'o'}, {'Ö', 'O'},
+                {'ş', 's'}, {'Ş', 'S'},
+                {'ü', 'u'}, {'Ü', 'U'},
+                {'İ', 'I'}, {'i', 'i'}
+            };
+
+            var sanitized = name;
+            
+            // Türkçe karakterleri değiştir
+            foreach (var kvp in turkishToEnglish)
+            {
+                sanitized = sanitized.Replace(kvp.Key, kvp.Value);
+            }
+
+            // Boşlukları alt çizgi ile değiştir
+            sanitized = sanitized.Replace(" ", "_");
+            
+            // Geçersiz karakterleri alt çizgi ile değiştir (sadece harf, rakam ve alt çizgi bırak)
+            sanitized = System.Text.RegularExpressions.Regex.Replace(sanitized, @"[^a-zA-Z0-9_]", "_");
+            
+            // Birden fazla alt çizgiyi tek alt çizgiye çevir
+            sanitized = System.Text.RegularExpressions.Regex.Replace(sanitized, @"_+", "_");
+            
+            // Başındaki ve sonundaki alt çizgileri kaldır
+            sanitized = sanitized.Trim('_');
+            
+            // İlk karakter rakam ise başına alt çizgi ekle (SQL Server requirement)
             if (sanitized.Length > 0 && char.IsDigit(sanitized[0]))
                 sanitized = "_" + sanitized;
+            
+            // Boşsa varsayılan isim ver
+            if (string.IsNullOrEmpty(sanitized))
+                sanitized = "Table_" + Guid.NewGuid().ToString("N").Substring(0, 8);
+                
             return sanitized;
         }
 
         public string SanitizeColumnName(string name)
         {
-            // Remove invalid characters and replace with underscores
-            var sanitized = System.Text.RegularExpressions.Regex.Replace(name, @"[^a-zA-Z0-9_]", "_");
+            if (string.IsNullOrEmpty(name))
+                return "Column_" + Guid.NewGuid().ToString("N").Substring(0, 8);
+
+            // Türkçe karakterleri İngilizce karşılıklarına çevir
+            var turkishToEnglish = new Dictionary<char, char>
+            {
+                {'ç', 'c'}, {'Ç', 'C'},
+                {'ğ', 'g'}, {'Ğ', 'G'},
+                {'ı', 'i'}, {'I', 'I'},
+                {'ö', 'o'}, {'Ö', 'O'},
+                {'ş', 's'}, {'Ş', 'S'},
+                {'ü', 'u'}, {'Ü', 'U'},
+                {'İ', 'I'}, {'i', 'i'}
+            };
+
+            var sanitized = name;
             
-            // Ensure it starts with a letter
+            // Türkçe karakterleri değiştir
+            foreach (var kvp in turkishToEnglish)
+            {
+                sanitized = sanitized.Replace(kvp.Key, kvp.Value);
+            }
+
+            // Boşlukları alt çizgi ile değiştir
+            sanitized = sanitized.Replace(" ", "_");
+            
+            // Geçersiz karakterleri alt çizgi ile değiştir (sadece harf, rakam ve alt çizgi bırak)
+            sanitized = System.Text.RegularExpressions.Regex.Replace(sanitized, @"[^a-zA-Z0-9_]", "_");
+            
+            // Birden fazla alt çizgiyi tek alt çizgiye çevir
+            sanitized = System.Text.RegularExpressions.Regex.Replace(sanitized, @"_+", "_");
+            
+            // Başındaki ve sonundaki alt çizgileri kaldır
+            sanitized = sanitized.Trim('_');
+            
+            // İlk karakter rakam ise başına "Col_" ekle
             if (sanitized.Length > 0 && char.IsDigit(sanitized[0]))
                 sanitized = "Col_" + sanitized;
             
-            // Limit length to 128 characters (SQL Server column name limit)
+            // 128 karakter sınırını kontrol et (SQL Server column name limit)
             if (sanitized.Length > 128)
             {
                 sanitized = sanitized.Substring(0, 128);
-                // Ensure it doesn't end with underscore
+                // Alt çizgi ile bitiyorsa kaldır
                 sanitized = sanitized.TrimEnd('_');
             }
             
-            // If empty after sanitization, provide a default name
+            // Boşsa varsayılan isim ver
             if (string.IsNullOrEmpty(sanitized))
                 sanitized = "Column_" + Guid.NewGuid().ToString("N").Substring(0, 8);
                 
@@ -1268,7 +1338,7 @@ namespace ExcelUploader.Services
             switch (cell.CellType)
             {
                 case CellType.String:
-                    return cell.StringCellValue;
+                    return cell.StringCellValue ?? string.Empty;
                 case CellType.Numeric:
                     if (DateUtil.IsCellDateFormatted(cell))
                         return cell.DateCellValue.ToString();
@@ -1276,7 +1346,27 @@ namespace ExcelUploader.Services
                 case CellType.Boolean:
                     return cell.BooleanCellValue.ToString();
                 case CellType.Formula:
-                    return cell.StringCellValue;
+                    // For formulas, try to get the calculated value
+                    try
+                    {
+                        switch (cell.CachedFormulaResultType)
+                        {
+                            case CellType.String:
+                                return cell.StringCellValue ?? string.Empty;
+                            case CellType.Numeric:
+                                if (DateUtil.IsCellDateFormatted(cell))
+                                    return cell.DateCellValue.ToString();
+                                return cell.NumericCellValue.ToString();
+                            case CellType.Boolean:
+                                return cell.BooleanCellValue.ToString();
+                            default:
+                                return cell.StringCellValue ?? string.Empty;
+                        }
+                    }
+                    catch
+                    {
+                        return cell.StringCellValue ?? string.Empty;
+                    }
                 default:
                     return string.Empty;
             }
@@ -1767,5 +1857,7 @@ namespace ExcelUploader.Services
 
             return columns;
         }
+
+
     }
 }
