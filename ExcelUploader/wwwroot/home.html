@@ -254,8 +254,8 @@
                 });
                 
                 if (activitiesResponse.ok) {
-                    const activities = await activitiesResponse.json();
-                    displayRecentActivities(activities);
+                    const response = await activitiesResponse.json();
+                    displayRecentActivities(response.activities || []);
                 }
 
                 // Load user profile for last login
@@ -278,6 +278,11 @@
         function displayRecentActivities(activities) {
             const activitiesList = document.getElementById('activitiesList');
             if (!activitiesList) return;
+
+            // Ensure activities is an array
+            if (!Array.isArray(activities)) {
+                activities = [];
+            }
 
             if (activities.length === 0) {
                 activitiesList.innerHTML = '<p class="no-data">Henüz aktivite bulunmuyor.</p>';

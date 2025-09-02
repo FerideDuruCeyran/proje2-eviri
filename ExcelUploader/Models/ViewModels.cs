@@ -187,5 +187,72 @@ namespace ExcelUploader.Models
         public int TotalPages { get; set; }
     }
 
+    public class TableComparisonViewModel
+    {
+        [Required(ErrorMessage = "Lütfen bir Excel dosyası seçin")]
+        [Display(Name = "Excel Dosyası")]
+        public IFormFile? ExcelFile { get; set; }
+        
+        [Required(ErrorMessage = "Tablo adı gereklidir")]
+        [Display(Name = "Tablo Adı")]
+        public string TableName { get; set; } = string.Empty;
+        
+        [Display(Name = "Veritabanı Bağlantısı")]
+        public int? DatabaseConnectionId { get; set; }
+    }
+
+    public class TableComparisonResult
+    {
+        public string TableName { get; set; } = string.Empty;
+        public List<string> ExcelHeaders { get; set; } = new();
+        public List<string> ExcelDataTypes { get; set; } = new();
+        public List<object> TableColumns { get; set; } = new();
+        public ComparisonSummary Comparison { get; set; } = new();
+        public ComparisonDetails Details { get; set; } = new();
+        public string Action { get; set; } = string.Empty;
+        public string Message { get; set; } = string.Empty;
+    }
+
+    public class ComparisonSummary
+    {
+        public int MatchingColumns { get; set; }
+        public int MissingColumns { get; set; }
+        public int ExtraColumns { get; set; }
+        public int Total { get; set; }
+    }
+
+    public class ComparisonDetails
+    {
+        public List<object> Matching { get; set; } = new();
+        public List<object> Missing { get; set; } = new();
+        public List<object> Extra { get; set; } = new();
+    }
+
+    public class ActivityViewModel
+    {
+        public string Type { get; set; } = string.Empty;
+        public string Title { get; set; } = string.Empty;
+        public DateTime Timestamp { get; set; }
+        public string TableName { get; set; } = string.Empty;
+        public int RowCount { get; set; }
+        public int ColumnCount { get; set; }
+        public bool IsProcessed { get; set; }
+    }
+
+    public class ActivityPaginationViewModel
+    {
+        public List<ActivityViewModel> Activities { get; set; } = new();
+        public PaginationInfo Pagination { get; set; } = new();
+    }
+
+    public class PaginationInfo
+    {
+        public int CurrentPage { get; set; }
+        public int PageSize { get; set; }
+        public int TotalCount { get; set; }
+        public int TotalPages { get; set; }
+        public bool HasNextPage { get; set; }
+        public bool HasPreviousPage { get; set; }
+    }
 
 }

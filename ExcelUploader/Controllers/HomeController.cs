@@ -71,28 +71,93 @@ namespace ExcelUploader.Controllers
         [HttpGet]
         [Route("recent-activities")]
         [Authorize]
-        public async Task<IActionResult> RecentActivities()
+        public async Task<IActionResult> RecentActivities(int page = 1, int pageSize = 10)
         {
             try
             {
                 var tables = await _dynamicTableService.GetAllTablesAsync();
+                var totalCount = tables.Count;
+                
                 var activities = tables
                     .OrderByDescending(t => t.UploadDate)
-                    .Take(10)
+                    .Skip((page - 1) * pageSize)
+                    .Take(pageSize)
                     .Select(t => new
                     {
                         type = "upload",
                         title = $"{t.FileName} dosyası yüklendi",
-                        timestamp = t.UploadDate
+                        timestamp = t.UploadDate,
+                        tableName = t.TableName,
+                        rowCount = t.RowCount,
+                        columnCount = t.ColumnCount,
+                        isProcessed = t.IsProcessed
                     })
                     .ToList();
 
-                return Ok(activities);
+                var totalPages = (int)Math.Ceiling((double)totalCount / pageSize);
+
+                return Ok(new
+                {
+                    activities = activities,
+                    pagination = new
+                    {
+                        currentPage = page,
+                        pageSize = pageSize,
+                        totalCount = totalCount,
+                        totalPages = totalPages,
+                        hasNextPage = page < totalPages,
+                        hasPreviousPage = page > 1
+                    }
+                });
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error loading recent activities");
                 return StatusCode(500, new { error = "Son aktiviteler yüklenirken hata oluştu" });
+            }
+        }
+
+        [HttpGet]
+        [Route("test-database")]
+        [Authorize]
+        public async Task<IActionResult> TestDatabase()
+        {
+            try
+            {
+                // Test database connection
+                var connectionString = _configuration.GetConnectionString("DefaultConnection");
+                using var connection = new SqlConnection(connectionString);
+                await connection.OpenAsync();
+
+                // Get database info
+                var databaseInfo = new
+                {
+                    Database = connection.Database,
+                    Server = connection.DataSource,
+                    State = connection.State.ToString()
+                };
+
+                return Ok(new
+                {
+                    isConnected = true,
+                    databaseInfo = databaseInfo,
+                    message = "Veritabanı bağlantısı başarılı"
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Database connection test failed");
+                return Ok(new
+                {
+                    isConnected = false,
+                    databaseInfo = new
+                    {
+                        Database = "Unknown",
+                        Server = "Unknown",
+                        State = "Disconnected"
+                    },
+                    message = "Veritabanı bağlantısı başarısız"
+                });
             }
         }
 
@@ -197,88 +262,111 @@ namespace ExcelUploader.Controllers
                     databaseConnectionId = null;
                 }
                 
-                // First, check if the exact table name already exists in the database
+                // Check if table exists in database (exact name or similar name)
                 var exactTableExists = await _dynamicTableService.CheckExactTableExistsAsync(tableName, databaseConnectionId);
+                var tableExistsInTracking = await _dynamicTableService.TableExistsAsync(tableName, databaseConnectionId);
+                var existingTableId = await _dynamicTableService.GetTableIdByNameAsync(tableName);
                 
                 DynamicTable dynamicTable;
                 string action;
                 int insertedRows = 0;
+                string actualTableName = tableName;
                 
                 if (exactTableExists)
                 {
-                    // Table already exists in database, insert data directly
-                    var actualTableName = await _dynamicTableService.FindExistingTableNameAsync(tableName, databaseConnectionId);
+                    // Table already exists in database, find actual table name and insert data
+                    actualTableName = await _dynamicTableService.FindExistingTableNameAsync(tableName, databaseConnectionId);
                     if (actualTableName == null)
                     {
                         return BadRequest(new { error = "Mevcut tablo bulunamadı" });
                     }
                     
-                    // Insert data into existing table
+                    // Insert data into existing table with auto-column management
                     insertedRows = await _dynamicTableService.InsertDataIntoExistingTableAsync(model.ExcelFile, actualTableName, databaseConnectionId);
                     
-                    // Create or get DynamicTable record for tracking
-                    var existingTableId = await _dynamicTableService.GetTableIdByNameAsync(tableName);
+                    // Update or create tracking record
                     if (existingTableId.HasValue)
                     {
+                        // Update existing tracking record
                         dynamicTable = await _dynamicTableService.GetTableByIdAsync(existingTableId.Value);
                         if (dynamicTable != null)
                         {
                             dynamicTable.RowCount = insertedRows;
+                            dynamicTable.IsProcessed = true;
+                            dynamicTable.ProcessedDate = DateTime.UtcNow;
                             await _context.SaveChangesAsync();
                         }
                     }
                     else
                     {
-                        // Create new tracking record
-                        dynamicTable = await _dynamicTableService.CreateTableStructureAsync(
-                            model.ExcelFile, 
-                            userName, 
-                            databaseConnectionId, 
-                            model.Description ?? string.Empty);
-                        dynamicTable.RowCount = insertedRows;
-                        dynamicTable.IsProcessed = true;
-                        dynamicTable.ProcessedDate = DateTime.UtcNow;
+                        // Create new tracking record for existing table
+                        var (headers, dataTypes, sampleData) = await _dynamicTableService.AnalyzeExcelFileAsync(model.ExcelFile);
+                        dynamicTable = new DynamicTable
+                        {
+                            TableName = actualTableName,
+                            FileName = model.ExcelFile.FileName,
+                            UploadedBy = userName,
+                            Description = model.Description ?? string.Empty,
+                            RowCount = insertedRows,
+                            ColumnCount = headers.Count,
+                            UploadDate = DateTime.UtcNow,
+                            IsProcessed = true,
+                            ProcessedDate = DateTime.UtcNow
+                        };
+                        
+                        // Create table columns for tracking
+                        for (int i = 0; i < headers.Count; i++)
+                        {
+                            var column = new TableColumn
+                            {
+                                ColumnName = _dynamicTableService.SanitizeColumnName(headers[i]),
+                                DisplayName = headers[i],
+                                DataType = dataTypes[i],
+                                ColumnOrder = i + 1,
+                                MaxLength = dataTypes[i] == "nvarchar" ? 1000 : null,
+                                IsRequired = false,
+                                IsUnique = false
+                            };
+                            dynamicTable.Columns.Add(column);
+                        }
+                        
+                        _context.DynamicTables.Add(dynamicTable);
                         await _context.SaveChangesAsync();
                     }
                     
                     action = "data_inserted_into_existing";
                 }
+                else if (tableExistsInTracking && existingTableId.HasValue)
+                {
+                    // Table exists in tracking system but not in database, create table and insert data
+                    dynamicTable = await _dynamicTableService.GetTableByIdAsync(existingTableId.Value);
+                    if (dynamicTable == null)
+                    {
+                        return BadRequest(new { error = "Mevcut tablo bulunamadı" });
+                    }
+                    
+                    // Create SQL table and insert data
+                    var success = await _dynamicTableService.InsertDataIntoTableAsync(existingTableId.Value, model.ExcelFile, databaseConnectionId);
+                    if (!success)
+                    {
+                        return BadRequest(new { error = "Veriler mevcut tabloya eklenemedi" });
+                    }
+                    
+                    action = "data_inserted_into_existing";
+                    insertedRows = dynamicTable.RowCount;
+                    actualTableName = dynamicTable.TableName;
+                }
                 else
                 {
-                    // Check if table exists in our tracking system
-                    var tableExists = await _dynamicTableService.TableExistsAsync(tableName, databaseConnectionId);
-                    var existingTableId = await _dynamicTableService.GetTableIdByNameAsync(tableName);
-                    
-                    if (tableExists && existingTableId.HasValue)
-                    {
-                        // Table exists in tracking system, insert data into existing table
-                        dynamicTable = await _dynamicTableService.GetTableByIdAsync(existingTableId.Value);
-                        if (dynamicTable == null)
-                        {
-                            return BadRequest(new { error = "Mevcut tablo bulunamadı" });
-                        }
-                        
-                        // Insert data into existing table
-                        var success = await _dynamicTableService.InsertDataIntoTableAsync(existingTableId.Value, model.ExcelFile, databaseConnectionId);
-                        if (!success)
-                        {
-                            return BadRequest(new { error = "Veriler mevcut tabloya eklenemedi" });
-                        }
-                        
-                        action = "data_inserted_into_existing";
-                        insertedRows = dynamicTable.RowCount;
-                    }
-                    else
-                    {
-                        // Create new table and insert data
-                        dynamicTable = await _dynamicTableService.CreateTableFromExcelAsync(
-                            model.ExcelFile, 
-                            userName, 
-                            databaseConnectionId, 
-                            model.Description ?? string.Empty);
-                        action = "new_table_created";
-                        insertedRows = dynamicTable?.RowCount ?? 0;
-                    }
+                    // Create new table and insert data
+                    dynamicTable = await _dynamicTableService.CreateTableFromExcelAsync(
+                        model.ExcelFile, 
+                        userName, 
+                        databaseConnectionId, 
+                        model.Description ?? string.Empty);
+                    action = "new_table_created";
+                    insertedRows = dynamicTable?.RowCount ?? 0;
+                    actualTableName = dynamicTable?.TableName ?? tableName;
                 }
 
                 if (dynamicTable == null)
@@ -287,18 +375,21 @@ namespace ExcelUploader.Controllers
                 }
 
                 return Ok(new { 
-                    message = action == "data_inserted_into_existing" ? $"Veriler mevcut tabloya başarıyla eklendi: {tableName}" : $"Excel dosyası başarıyla yüklendi: {tableName}", 
-                    tableName = dynamicTable.TableName,
+                    message = action == "data_inserted_into_existing" 
+                        ? $"Veriler mevcut tabloya başarıyla eklendi: {actualTableName}" 
+                        : $"Yeni tablo oluşturuldu ve veriler eklendi: {actualTableName}", 
+                    tableName = actualTableName,
                     rowCount = insertedRows,
                     tableId = dynamicTable.Id,
                     action = action,
-                    tableExists = action == "data_inserted_into_existing"
+                    tableExists = action == "data_inserted_into_existing",
+                    columnsAdded = action == "data_inserted_into_existing" ? "Eksik sütunlar otomatik eklendi" : "Yeni tablo oluşturuldu"
                 });
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error uploading Excel file");
-                return StatusCode(500, new { error = "Dosya yükleme sırasında hata oluştu" });
+                return StatusCode(500, new { error = "Dosya yükleme sırasında hata oluştu", details = ex.Message });
             }
         }
 
@@ -373,39 +464,55 @@ namespace ExcelUploader.Controllers
                     }
                     else
                     {
-                        // Create a new tracking record for the existing table WITHOUT calling CreateTableStructureAsync
-                        var (headers, dataTypes, sampleData) = await _dynamicTableService.AnalyzeExcelFileAsync(model.ExcelFile);
-                        dynamicTable = new DynamicTable
-                        {
-                            TableName = actualTableName,
-                            FileName = model.ExcelFile.FileName,
-                            UploadedBy = userName,
-                            Description = model.Description ?? string.Empty,
-                            RowCount = insertedRows,
-                            ColumnCount = headers.Count,
-                            UploadDate = DateTime.UtcNow,
-                            IsProcessed = true,
-                            ProcessedDate = DateTime.UtcNow
-                        };
+                        // Check if a tracking record already exists for this table name
+                        var existingTrackingTable = await _context.DynamicTables
+                            .FirstOrDefaultAsync(t => t.TableName == actualTableName);
                         
-                        // Create table columns for tracking only (not for database)
-                        for (int i = 0; i < headers.Count; i++)
+                        if (existingTrackingTable != null)
                         {
-                            var column = new TableColumn
-                            {
-                                ColumnName = _dynamicTableService.SanitizeColumnName(headers[i]),
-                                DisplayName = headers[i],
-                                DataType = dataTypes[i],
-                                ColumnOrder = i + 1,
-                                MaxLength = dataTypes[i] == "nvarchar" ? 1000 : null,
-                                IsRequired = false,
-                                IsUnique = false
-                            };
-                            dynamicTable.Columns.Add(column);
+                            // Use existing tracking record and update row count
+                            dynamicTable = existingTrackingTable;
+                            dynamicTable.RowCount = insertedRows;
+                            dynamicTable.IsProcessed = true;
+                            dynamicTable.ProcessedDate = DateTime.UtcNow;
+                            await _context.SaveChangesAsync();
                         }
-                        
-                        _context.DynamicTables.Add(dynamicTable);
-                        await _context.SaveChangesAsync();
+                        else
+                        {
+                            // Create a new tracking record for the existing table WITHOUT calling CreateTableStructureAsync
+                            var (headers, dataTypes, sampleData) = await _dynamicTableService.AnalyzeExcelFileAsync(model.ExcelFile);
+                            dynamicTable = new DynamicTable
+                            {
+                                TableName = actualTableName,
+                                FileName = model.ExcelFile.FileName,
+                                UploadedBy = userName,
+                                Description = model.Description ?? string.Empty,
+                                RowCount = insertedRows,
+                                ColumnCount = headers.Count,
+                                UploadDate = DateTime.UtcNow,
+                                IsProcessed = true,
+                                ProcessedDate = DateTime.UtcNow
+                            };
+                            
+                            // Create table columns for tracking only (not for database)
+                            for (int i = 0; i < headers.Count; i++)
+                            {
+                                var column = new TableColumn
+                                {
+                                    ColumnName = _dynamicTableService.SanitizeColumnName(headers[i]),
+                                    DisplayName = headers[i],
+                                    DataType = dataTypes[i],
+                                    ColumnOrder = i + 1,
+                                    MaxLength = dataTypes[i] == "nvarchar" ? 1000 : null,
+                                    IsRequired = false,
+                                    IsUnique = false
+                                };
+                                dynamicTable.Columns.Add(column);
+                            }
+                            
+                            _context.DynamicTables.Add(dynamicTable);
+                            await _context.SaveChangesAsync();
+                        }
                     }
                     action = "data_inserted_into_existing";
                 }
@@ -725,21 +832,72 @@ namespace ExcelUploader.Controllers
             {
                 if (tableId.HasValue)
                 {
+                    // Get specific table data
                     var table = await _dynamicTableService.GetTableByIdAsync(tableId.Value);
                     if (table == null)
                     {
                         return NotFound(new { error = "Tablo bulunamadı" });
                     }
-                    return Ok(table);
+
+                    // Get actual data from the SQL table
+                    var tableData = await _dynamicTableService.GetTableDataAsync(table.TableName, 1, 1000, null);
+                    
+                    return Ok(new
+                    {
+                        table = table,
+                        data = tableData,
+                        totalRows = tableData.Count
+                    });
                 }
 
+                // Get all tables with their data
                 var tables = await _dynamicTableService.GetAllTablesAsync();
-                return Ok(tables);
+                var allData = new List<object>();
+
+                foreach (var table in tables)
+                {
+                    try
+                    {
+                        // Get actual data from each SQL table
+                        var tableData = await _dynamicTableService.GetTableDataAsync(table.TableName, 1, 100, null);
+                        
+                        allData.Add(new
+                        {
+                            tableId = table.Id,
+                            tableName = table.TableName,
+                            fileName = table.FileName,
+                            uploadDate = table.UploadDate,
+                            rowCount = table.RowCount,
+                            columnCount = table.ColumnCount,
+                            isProcessed = table.IsProcessed,
+                            data = tableData
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Error loading data for table: {TableName}", table.TableName);
+                        // Continue with other tables even if one fails
+                        allData.Add(new
+                        {
+                            tableId = table.Id,
+                            tableName = table.TableName,
+                            fileName = table.FileName,
+                            uploadDate = table.UploadDate,
+                            rowCount = table.RowCount,
+                            columnCount = table.ColumnCount,
+                            isProcessed = table.IsProcessed,
+                            data = new List<object>(),
+                            error = "Veri yüklenemedi"
+                        });
+                    }
+                }
+
+                return Ok(allData);
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error loading data");
-                return StatusCode(500, new { error = "Veri yüklenirken hata oluştu" });
+                return StatusCode(500, new { error = "Veri yüklenirken hata oluştu", details = ex.Message });
             }
         }
 
@@ -804,6 +962,144 @@ namespace ExcelUploader.Controllers
                 _logger.LogError(ex, "Error checking if table exists: {TableName}", tableName);
                 return StatusCode(500, new { error = "Tablo kontrolü sırasında hata oluştu" });
             }
+        }
+
+        [HttpPost]
+        [Route("compare-table-structure")]
+        [Authorize]
+        public async Task<IActionResult> CompareTableStructure([FromForm] IFormFile file, string tableName, int? databaseConnectionId = null)
+        {
+            try
+            {
+                if (file == null)
+                {
+                    return BadRequest(new { error = "Lütfen bir Excel dosyası seçin" });
+                }
+
+                if (string.IsNullOrEmpty(tableName))
+                {
+                    return BadRequest(new { error = "Tablo adı gereklidir" });
+                }
+
+                // Validate file
+                if (!await _excelService.ValidateExcelFileAsync(file))
+                {
+                    return BadRequest(new { error = "Geçersiz dosya formatı veya boyut" });
+                }
+
+                // Read Excel structure
+                var (excelHeaders, excelDataTypes, _) = await _dynamicTableService.AnalyzeExcelFileAsync(file);
+                
+                // Get table structure from database
+                var connectionString = databaseConnectionId.HasValue 
+                    ? await GetConnectionStringAsync(databaseConnectionId.Value)
+                    : _configuration.GetConnectionString("DefaultConnection");
+                
+                using var connection = new Microsoft.Data.SqlClient.SqlConnection(connectionString);
+                await connection.OpenAsync();
+
+                var sql = @"
+                    SELECT 
+                        COLUMN_NAME as name,
+                        DATA_TYPE as type,
+                        IS_NULLABLE as isNullable,
+                        CHARACTER_MAXIMUM_LENGTH as maxLength
+                    FROM INFORMATION_SCHEMA.COLUMNS 
+                    WHERE TABLE_NAME = @TableName 
+                    ORDER BY ORDINAL_POSITION";
+
+                using var command = new Microsoft.Data.SqlClient.SqlCommand(sql, connection);
+                command.Parameters.AddWithValue("@TableName", tableName);
+
+                var tableColumns = new List<object>();
+                using var reader = await command.ExecuteReaderAsync();
+                while (await reader.ReadAsync())
+                {
+                    tableColumns.Add(new
+                    {
+                        name = reader.GetString(0),
+                        type = reader.GetString(1),
+                        isNullable = reader.GetString(2),
+                        maxLength = reader.IsDBNull(3) ? (int?)null : reader.GetInt32(3)
+                    });
+                }
+
+                // Compare structures
+                var matchingColumns = new List<object>();
+                var missingColumns = new List<object>();
+                var extraColumns = new List<object>();
+
+                // Check Excel headers against table columns
+                foreach (var header in excelHeaders)
+                {
+                    var sanitizedHeader = _dynamicTableService.SanitizeColumnName(header);
+                    var found = tableColumns.Any(tc => 
+                        string.Equals(tc.GetType().GetProperty("name")?.GetValue(tc)?.ToString(), header, StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(tc.GetType().GetProperty("name")?.GetValue(tc)?.ToString(), sanitizedHeader, StringComparison.OrdinalIgnoreCase));
+                    
+                    if (found)
+                    {
+                        matchingColumns.Add(new { excelHeader = header, status = "matched" });
+                    }
+                    else
+                    {
+                        missingColumns.Add(new { excelHeader = header, status = "missing", suggestedName = sanitizedHeader });
+                    }
+                }
+
+                // Check table columns against Excel headers
+                foreach (var tableColumn in tableColumns)
+                {
+                    var columnName = tableColumn.GetType().GetProperty("name")?.GetValue(tableColumn)?.ToString();
+                    var found = excelHeaders.Any(h => 
+                        string.Equals(h, columnName, StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(_dynamicTableService.SanitizeColumnName(h), columnName, StringComparison.OrdinalIgnoreCase));
+                    
+                    if (!found)
+                    {
+                        extraColumns.Add(new { tableColumn = columnName, status = "extra" });
+                    }
+                }
+
+                return Ok(new
+                {
+                    tableName = tableName,
+                    excelHeaders = excelHeaders,
+                    excelDataTypes = excelDataTypes,
+                    tableColumns = tableColumns,
+                    comparison = new
+                    {
+                        matchingColumns = matchingColumns.Count,
+                        missingColumns = missingColumns.Count,
+                        extraColumns = extraColumns.Count,
+                        total = excelHeaders.Count
+                    },
+                    details = new
+                    {
+                        matching = matchingColumns,
+                        missing = missingColumns,
+                        extra = extraColumns
+                    },
+                    action = missingColumns.Count > 0 ? "update_required" : "no_update_needed",
+                    message = missingColumns.Count > 0 
+                        ? $"{missingColumns.Count} sütun eksik, otomatik güncelleme yapılacak" 
+                        : "Tablo yapısı uyumlu, güncelleme gerekmiyor"
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error comparing table structure: {TableName}", tableName);
+                return StatusCode(500, new { error = "Tablo yapısı karşılaştırılırken hata oluştu", details = ex.Message });
+            }
+        }
+
+        private async Task<string> GetConnectionStringAsync(int databaseConnectionId)
+        {
+            var dbConnection = await _context.DatabaseConnections.FindAsync(databaseConnectionId);
+            if (dbConnection == null)
+                throw new ArgumentException($"Database connection with ID {databaseConnectionId} not found");
+            
+            return $"Server={dbConnection.ServerName},{dbConnection.Port};Database={dbConnection.DatabaseName};User Id={dbConnection.Username};Password={dbConnection.Password};TrustServerCertificate=true;";
         }
 
         [HttpGet]
