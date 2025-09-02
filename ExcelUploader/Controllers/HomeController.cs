@@ -842,15 +842,11 @@ namespace ExcelUploader.Controllers
                     // Get actual data from the SQL table
                     var tableData = await _dynamicTableService.GetTableDataAsync(table.TableName, 1, 1000, null);
                     
-                    return Ok(new
-                    {
-                        table = table,
-                        data = tableData,
-                        totalRows = tableData.Count
-                    });
+                    // Return just the data array for the frontend
+                    return Ok(tableData);
                 }
 
-                // Get all tables with their data
+                // Get all tables and combine their data
                 var tables = await _dynamicTableService.GetAllTablesAsync();
                 var allData = new List<object>();
 
@@ -861,34 +857,21 @@ namespace ExcelUploader.Controllers
                         // Get actual data from each SQL table
                         var tableData = await _dynamicTableService.GetTableDataAsync(table.TableName, 1, 100, null);
                         
-                        allData.Add(new
+                        // Add table info to each row
+                        foreach (var row in tableData)
                         {
-                            tableId = table.Id,
-                            tableName = table.TableName,
-                            fileName = table.FileName,
-                            uploadDate = table.UploadDate,
-                            rowCount = table.RowCount,
-                            columnCount = table.ColumnCount,
-                            isProcessed = table.IsProcessed,
-                            data = tableData
-                        });
+                            var rowDict = row as Dictionary<string, object> ?? new Dictionary<string, object>();
+                            rowDict["_TableName"] = table.TableName;
+                            rowDict["_FileName"] = table.FileName;
+                            rowDict["_UploadDate"] = table.UploadDate;
+                            rowDict["_TableId"] = table.Id;
+                            allData.Add(rowDict);
+                        }
                     }
                     catch (Exception ex)
                     {
                         _logger.LogWarning(ex, "Error loading data for table: {TableName}", table.TableName);
                         // Continue with other tables even if one fails
-                        allData.Add(new
-                        {
-                            tableId = table.Id,
-                            tableName = table.TableName,
-                            fileName = table.FileName,
-                            uploadDate = table.UploadDate,
-                            rowCount = table.RowCount,
-                            columnCount = table.ColumnCount,
-                            isProcessed = table.IsProcessed,
-                            data = new List<object>(),
-                            error = "Veri yüklenemedi"
-                        });
                     }
                 }
 
