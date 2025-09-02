@@ -118,23 +118,36 @@ namespace ExcelUploader.Services
             var rowCount = worksheet.Dimension?.Rows ?? 0;
             var colCount = worksheet.Dimension?.Columns ?? 0;
 
+            _logger.LogInformation($"Excel file analysis: {file.FileName}, Sheet: {worksheet.Name}, Initial Rows: {rowCount}, Columns: {colCount}");
+
+            // If Dimension is null or shows 0, try to find data by scanning
             if (rowCount == 0 || colCount == 0)
             {
-                // Return empty result for empty sheets
-                return new ExcelAnalysisResult
+                // Scan for actual data
+                var actualData = ScanForData(worksheet);
+                rowCount = actualData.rowCount;
+                colCount = actualData.colCount;
+                
+                _logger.LogInformation($"After scanning: Rows: {rowCount}, Columns: {colCount}");
+                
+                if (rowCount == 0 || colCount == 0)
                 {
-                    FileName = file.FileName,
-                    TotalRows = 0,
-                    TotalColumns = 0,
-                    Headers = new List<string>(),
-                    ExcelColumnHeaders = new List<string>(),
-                    DataTypes = new List<string>(),
-                    DataTypeAnalysis = new List<ColumnDataTypeAnalysis>(),
-                    SampleData = new List<Dictionary<string, object>>(),
-                    AnalysisDate = DateTime.UtcNow,
-                    SheetName = worksheet.Name,
-                    SheetIndex = sheetIndex
-                };
+                    // Return empty result for empty sheets
+                    return new ExcelAnalysisResult
+                    {
+                        FileName = file.FileName,
+                        TotalRows = 0,
+                        TotalColumns = 0,
+                        Headers = new List<string>(),
+                        ExcelColumnHeaders = new List<string>(),
+                        DataTypes = new List<string>(),
+                        DataTypeAnalysis = new List<ColumnDataTypeAnalysis>(),
+                        SampleData = new List<Dictionary<string, object>>(),
+                        AnalysisDate = DateTime.UtcNow,
+                        SheetName = worksheet.Name,
+                        SheetIndex = sheetIndex
+                    };
+                }
             }
 
             // Excel sütun başlıklarını oluştur (A, B, C, D, ...)
@@ -147,6 +160,8 @@ namespace ExcelUploader.Services
                 var headerValue = GetCellValue(worksheet, 1, col);
                 actualHeaders.Add(string.IsNullOrEmpty(headerValue) ? columnHeaders[col - 1] : headerValue);
             }
+
+            _logger.LogInformation($"Headers found: {string.Join(", ", actualHeaders)}");
 
             // İlk 10 satırı oku ve veri tiplerini analiz et
             var sampleData = new List<Dictionary<string, object>>();
@@ -164,6 +179,8 @@ namespace ExcelUploader.Services
                 }
                 sampleData.Add(rowData);
             }
+
+            _logger.LogInformation($"Sample data rows collected: {sampleData.Count}");
 
             // Her sütun için veri tipi analizi yap
             for (int col = 0; col < actualHeaders.Count; col++)
@@ -211,25 +228,37 @@ namespace ExcelUploader.Services
 
             var rowCount = sheet.LastRowNum + 1; // LastRowNum is 0-based
             var headerRow = sheet.GetRow(0);
-            var colCount = headerRow?.LastCellNum ?? 0;
+            int colCount = headerRow?.LastCellNum ?? 0;
 
+            _logger.LogInformation($"Excel file analysis (.xls): {file.FileName}, Sheet: {sheet.SheetName}, Initial Rows: {rowCount}, Columns: {colCount}");
+
+            // If no data detected, try to scan for actual data
             if (rowCount == 0 || colCount == 0)
             {
-                // Return empty result for empty sheets
-                return new ExcelAnalysisResult
+                var actualData = ScanForDataXls(sheet);
+                rowCount = actualData.rowCount;
+                colCount = actualData.colCount;
+                
+                _logger.LogInformation($"After scanning (.xls): Rows: {rowCount}, Columns: {colCount}");
+                
+                if (rowCount == 0 || colCount == 0)
                 {
-                    FileName = file.FileName,
-                    TotalRows = 0,
-                    TotalColumns = 0,
-                    Headers = new List<string>(),
-                    ExcelColumnHeaders = new List<string>(),
-                    DataTypes = new List<string>(),
-                    DataTypeAnalysis = new List<ColumnDataTypeAnalysis>(),
-                    SampleData = new List<Dictionary<string, object>>(),
-                    AnalysisDate = DateTime.UtcNow,
-                    SheetName = sheet.SheetName,
-                    SheetIndex = sheetIndex
-                };
+                    // Return empty result for empty sheets
+                    return new ExcelAnalysisResult
+                    {
+                        FileName = file.FileName,
+                        TotalRows = 0,
+                        TotalColumns = 0,
+                        Headers = new List<string>(),
+                        ExcelColumnHeaders = new List<string>(),
+                        DataTypes = new List<string>(),
+                        DataTypeAnalysis = new List<ColumnDataTypeAnalysis>(),
+                        SampleData = new List<Dictionary<string, object>>(),
+                        AnalysisDate = DateTime.UtcNow,
+                        SheetName = sheet.SheetName,
+                        SheetIndex = sheetIndex
+                    };
+                }
             }
 
             // Excel sütun başlıklarını oluştur (A, B, C, D, ...)
@@ -246,6 +275,8 @@ namespace ExcelUploader.Services
                     actualHeaders.Add(string.IsNullOrEmpty(headerValue) ? columnHeaders[col] : headerValue);
                 }
             }
+
+            _logger.LogInformation($"Headers found (.xls): {string.Join(", ", actualHeaders)}");
 
             // İlk 10 satırı oku ve veri tiplerini analiz et
             var sampleData = new List<Dictionary<string, object>>();
@@ -268,6 +299,8 @@ namespace ExcelUploader.Services
                 sampleData.Add(rowData);
             }
 
+            _logger.LogInformation($"Sample data rows collected (.xls): {sampleData.Count}");
+
             // Her sütun için veri tipi analizi yap
             for (int col = 0; col < actualHeaders.Count; col++)
             {
@@ -280,7 +313,7 @@ namespace ExcelUploader.Services
             var result = new ExcelAnalysisResult
             {
                 FileName = file.FileName,
-                TotalRows = rowCount - 1, // Exclude header
+                TotalRows = rowCount - 1, // Header satırını çıkar
                 TotalColumns = colCount,
                 Headers = actualHeaders,
                 ExcelColumnHeaders = columnHeaders,
@@ -292,7 +325,7 @@ namespace ExcelUploader.Services
                 SheetIndex = sheetIndex
             };
 
-            _logger.LogInformation($"Excel dosyası analiz edildi: {file.FileName}, Sayfa: {sheet.SheetName}, {result.TotalRows} satır, {result.TotalColumns} sütun");
+            _logger.LogInformation($"Excel dosyası analiz edildi (.xls): {file.FileName}, Sayfa: {sheet.SheetName}, {result.TotalRows} satır, {result.TotalColumns} sütun");
             return result;
         }
 
@@ -494,10 +527,14 @@ namespace ExcelUploader.Services
             try
             {
                 var cell = worksheet.Cells[row, col];
-                return cell?.Value?.ToString()?.Trim();
+                if (cell?.Value == null) return null;
+                
+                var value = cell.Value.ToString();
+                return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogWarning(ex, $"Error reading cell at row {row}, col {col}");
                 return null;
             }
         }
@@ -575,6 +612,81 @@ namespace ExcelUploader.Services
                 default:
                     return string.Empty;
             }
+        }
+
+        private (int rowCount, int colCount) ScanForData(ExcelWorksheet worksheet)
+        {
+            // Scan from bottom up to find the last row with data
+            int lastRow = 0;
+            int lastCol = 0;
+            
+            // Scan up to 1000 rows and 100 columns
+            for (int row = 1; row <= 1000; row++)
+            {
+                bool rowHasData = false;
+                for (int col = 1; col <= 100; col++)
+                {
+                    try
+                    {
+                        var cell = worksheet.Cells[row, col];
+                        if (cell?.Value != null && !string.IsNullOrWhiteSpace(cell.Value.ToString()))
+                        {
+                            rowHasData = true;
+                            lastCol = Math.Max(lastCol, col);
+                        }
+                    }
+                    catch
+                    {
+                        // Cell doesn't exist, continue
+                    }
+                }
+                if (rowHasData)
+                {
+                    lastRow = row;
+                }
+                else if (row > 10 && lastRow > 0)
+                {
+                    // If we've found data and then hit empty rows, we can stop
+                    break;
+                }
+            }
+            
+            return (lastRow, lastCol);
+        }
+
+        private (int rowCount, int colCount) ScanForDataXls(ISheet sheet)
+        {
+            int lastRow = 0;
+            int lastCol = 0;
+            
+            // Scan up to 1000 rows and 100 columns
+            for (int row = 0; row <= 1000; row++)
+            {
+                var sheetRow = sheet.GetRow(row);
+                if (sheetRow == null) continue;
+                
+                bool rowHasData = false;
+                for (int col = 0; col < 100; col++)
+                {
+                    var cell = sheetRow.GetCell(col);
+                    if (cell != null && !string.IsNullOrWhiteSpace(cell.ToString()))
+                    {
+                        rowHasData = true;
+                        lastCol = Math.Max(lastCol, (int)(col + 1));
+                    }
+                }
+                if (rowHasData)
+                {
+                    lastRow = row + 1; // Convert to 1-based
+                }
+                else if (row > 10 && lastRow > 0)
+                {
+                    // If we've found data and then hit empty rows, we can stop
+                    break;
+                }
+            }
+            
+            return (lastRow, lastCol);
         }
     }
 

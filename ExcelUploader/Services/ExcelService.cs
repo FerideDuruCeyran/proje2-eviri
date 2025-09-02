@@ -122,22 +122,34 @@ namespace ExcelUploader.Services
 
                 var rowCount = sheet.LastRowNum + 1; // LastRowNum is 0-based
                 var headerRow = sheet.GetRow(0);
-                var colCount = headerRow?.LastCellNum ?? 0;
+                int colCount = headerRow?.LastCellNum ?? 0;
 
+                _logger.LogInformation($"Excel preview (.xls): {file.FileName}, Sheet: {sheet.SheetName}, Initial Rows: {rowCount}, Columns: {colCount}");
+
+                // If no data detected, try to scan for actual data
                 if (rowCount == 0 || colCount == 0)
                 {
-                    // Return empty result for empty sheets
-                    var emptyResult = new
+                    var actualData = ScanForDataXls(sheet);
+                    rowCount = actualData.rowCount;
+                    colCount = actualData.colCount;
+                    
+                    _logger.LogInformation($"After scanning (.xls): Rows: {rowCount}, Columns: {colCount}");
+                    
+                    if (rowCount == 0 || colCount == 0)
                     {
-                        headers = new List<string>(),
-                        rows = new List<List<string>>(),
-                        dataTypes = new List<string>(),
-                        totalRows = 0,
-                        totalColumns = 0,
-                        sheetName = sheet.SheetName,
-                        sheetIndex = sheetIndex
-                    };
-                    return Task.FromResult<object>(emptyResult);
+                        // Return empty result for empty sheets
+                        var emptyResult = new
+                        {
+                            headers = new List<string>(),
+                            rows = new List<List<string>>(),
+                            dataTypes = new List<string>(),
+                            totalRows = 0,
+                            totalColumns = 0,
+                            sheetName = sheet.SheetName,
+                            sheetIndex = sheetIndex
+                        };
+                        return Task.FromResult<object>(emptyResult);
+                    }
                 }
 
                 // Get headers (first row)
@@ -151,6 +163,8 @@ namespace ExcelUploader.Services
                         headers.Add(string.IsNullOrEmpty(headerValue) ? $"Sütun_{col + 1}" : headerValue);
                     }
                 }
+
+                _logger.LogInformation($"Headers found (.xls): {string.Join(", ", headers)}");
 
                 // Get first 10 rows of data (excluding header)
                 var rows = new List<List<string>>();
@@ -179,6 +193,8 @@ namespace ExcelUploader.Services
                     rows.Add(rowData);
                     sampleData.Add(rowDict);
                 }
+
+                _logger.LogInformation($"Data rows collected (.xls): {rows.Count}");
 
                 // Determine data types based on sample data
                 for (int col = 0; col < headers.Count; col++)
@@ -223,6 +239,41 @@ namespace ExcelUploader.Services
             }
         }
 
+        private (int rowCount, int colCount) ScanForDataXls(ISheet sheet)
+        {
+            int lastRow = 0;
+            int lastCol = 0;
+            
+            // Scan up to 1000 rows and 100 columns
+            for (int row = 0; row <= 1000; row++)
+            {
+                var sheetRow = sheet.GetRow(row);
+                if (sheetRow == null) continue;
+                
+                bool rowHasData = false;
+                for (int col = 0; col < 100; col++)
+                {
+                    var cell = sheetRow.GetCell(col);
+                    if (cell != null && !string.IsNullOrWhiteSpace(cell.ToString()))
+                    {
+                        rowHasData = true;
+                        lastCol = Math.Max(lastCol, (int)(col + 1));
+                    }
+                }
+                if (rowHasData)
+                {
+                    lastRow = row + 1; // Convert to 1-based
+                }
+                else if (row > 10 && lastRow > 0)
+                {
+                    // If we've found data and then hit empty rows, we can stop
+                    break;
+                }
+            }
+            
+            return (lastRow, lastCol);
+        }
+
         private Task<object> GetXlsxPreviewAsync(IFormFile file, int sheetIndex = 0)
         {
             try
@@ -244,20 +295,33 @@ namespace ExcelUploader.Services
                 var rowCount = worksheet.Dimension?.Rows ?? 0;
                 var colCount = worksheet.Dimension?.Columns ?? 0;
 
+                _logger.LogInformation($"Excel preview: {file.FileName}, Sheet: {worksheet.Name}, Initial Rows: {rowCount}, Columns: {colCount}");
+
+                // If Dimension is null or shows 0, try to find data by scanning
                 if (rowCount == 0 || colCount == 0)
                 {
-                    // Return empty result for empty sheets
-                    var emptyResult = new
+                    // Scan for actual data
+                    var actualData = ScanForData(worksheet);
+                    rowCount = actualData.rowCount;
+                    colCount = actualData.colCount;
+                    
+                    _logger.LogInformation($"After scanning: Rows: {rowCount}, Columns: {colCount}");
+                    
+                    if (rowCount == 0 || colCount == 0)
                     {
-                        headers = new List<string>(),
-                        rows = new List<List<string>>(),
-                        dataTypes = new List<string>(),
-                        totalRows = 0,
-                        totalColumns = 0,
-                        sheetName = worksheet.Name,
-                        sheetIndex = sheetIndex
-                    };
-                    return Task.FromResult<object>(emptyResult);
+                        // Return empty result for empty sheets
+                        var emptyResult = new
+                        {
+                            headers = new List<string>(),
+                            rows = new List<List<string>>(),
+                            dataTypes = new List<string>(),
+                            totalRows = 0,
+                            totalColumns = 0,
+                            sheetName = worksheet.Name,
+                            sheetIndex = sheetIndex
+                        };
+                        return Task.FromResult<object>(emptyResult);
+                    }
                 }
 
                 // Get headers (first row)
@@ -267,6 +331,8 @@ namespace ExcelUploader.Services
                     var headerValue = GetCellValue(worksheet, 1, col);
                     headers.Add(string.IsNullOrEmpty(headerValue) ? $"Sütun_{col}" : headerValue);
                 }
+
+                _logger.LogInformation($"Headers found: {string.Join(", ", headers)}");
 
                 // Get first 10 rows of data (excluding header)
                 var rows = new List<List<string>>();
@@ -291,6 +357,8 @@ namespace ExcelUploader.Services
                     rows.Add(rowData);
                     sampleData.Add(rowDict);
                 }
+
+                _logger.LogInformation($"Data rows collected: {rows.Count}");
 
                 // Determine data types based on sample data
                 for (int col = 0; col < headers.Count; col++)
@@ -318,6 +386,46 @@ namespace ExcelUploader.Services
                 _logger.LogError(ex, "Error in GetXlsxPreviewAsync");
                 throw;
             }
+        }
+
+        private (int rowCount, int colCount) ScanForData(ExcelWorksheet worksheet)
+        {
+            // Scan from bottom up to find the last row with data
+            int lastRow = 0;
+            int lastCol = 0;
+            
+            // Scan up to 1000 rows and 100 columns
+            for (int row = 1; row <= 1000; row++)
+            {
+                bool rowHasData = false;
+                for (int col = 1; col <= 100; col++)
+                {
+                    try
+                    {
+                        var cell = worksheet.Cells[row, col];
+                        if (cell?.Value != null && !string.IsNullOrWhiteSpace(cell.Value.ToString()))
+                        {
+                            rowHasData = true;
+                            lastCol = Math.Max(lastCol, col);
+                        }
+                    }
+                    catch
+                    {
+                        // Cell doesn't exist, continue
+                    }
+                }
+                if (rowHasData)
+                {
+                    lastRow = row;
+                }
+                else if (row > 10 && lastRow > 0)
+                {
+                    // If we've found data and then hit empty rows, we can stop
+                    break;
+                }
+            }
+            
+            return (lastRow, lastCol);
         }
 
         private string DetermineDataTypeImproved(List<object> values)
@@ -653,10 +761,14 @@ namespace ExcelUploader.Services
             try
             {
                 var cell = worksheet.Cells[row, col];
-                return cell?.Value?.ToString()?.Trim();
+                if (cell?.Value == null) return null;
+                
+                var value = cell.Value.ToString();
+                return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogWarning(ex, $"Error reading cell at row {row}, col {col}");
                 return null;
             }
         }

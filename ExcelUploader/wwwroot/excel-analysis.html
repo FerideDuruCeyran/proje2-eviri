@@ -240,8 +240,11 @@
                                 <button type="button" class="btn btn-success me-2" onclick="createTableStructure()">
                                     <i class="fas fa-table"></i> Tablo Yapısı Oluştur
                                 </button>
-                                <button type="button" class="btn btn-warning" onclick="createTableWithData()">
+                                <button type="button" class="btn btn-warning me-2" onclick="createTableWithData()">
                                     <i class="fas fa-database"></i> Tablo ve Veri Oluştur
+                                </button>
+                                <button type="button" class="btn btn-info" onclick="debugExcel()">
+                                    <i class="fas fa-bug"></i> Debug
                                 </button>
                             </div>
                         </div>
@@ -598,6 +601,67 @@
                 }
             } catch (error) {
                 showMessage(`Tablo oluşturulurken hata oluştu: ${error.message}`, 'error');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        async function debugExcel() {
+            const fileInput = document.getElementById('excelFile');
+            const file = fileInput.files[0];
+            const sheetSelect = document.getElementById('sheetSelect');
+            
+            if (!file) {
+                showMessage('Lütfen bir Excel dosyası seçin.', 'error');
+                return;
+            }
+
+            showLoading();
+
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+
+                let url = '/api/ExcelAnalysis/debug';
+                if (sheetSelect.value !== '') {
+                    url += `?sheetIndex=${sheetSelect.value}`;
+                }
+
+                const response = await fetch(url, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Display debug information in a modal or alert
+                    const debugInfo = `
+Dosya Bilgileri:
+- Dosya Adı: ${result.debugInfo.fileName}
+- Dosya Boyutu: ${result.debugInfo.fileSize} bytes
+- İçerik Türü: ${result.debugInfo.contentType}
+
+Sayfa Bilgileri:
+- Sayfa Adları: ${result.sheetNames.join(', ')}
+- Seçili Sayfa: ${result.selectedSheet.sheetName}
+- Sayfa İndeksi: ${result.selectedSheet.sheetIndex}
+- Veri Var mı: ${result.selectedSheet.hasData}
+
+Örnek Hücreler (İlk 5x5):
+${result.sampleCells.map(cell => 
+    `Satır ${cell.row}, Sütun ${cell.col}: ${cell.hasValue ? cell.value : 'BOŞ'} (${cell.valueType || cell.cellType || 'N/A'})`
+).join('\n')}
+                    `;
+                    
+                    alert(debugInfo);
+                    console.log('Debug result:', result);
+                    showMessage('Debug bilgileri başarıyla alındı. Konsolu kontrol edin.', 'success');
+                } else {
+                    showMessage(result.message, 'error');
+                }
+            } catch (error) {
+                showMessage(`Debug sırasında hata oluştu: ${error.message}`, 'error');
             } finally {
                 hideLoading();
             }

@@ -260,7 +260,7 @@
                     // Handle both array and object responses
                     if (Array.isArray(response)) {
                         displayRecentActivities(response);
-                    } else if (response && response.activities) {
+                    } else if (response && response.activities && Array.isArray(response.activities)) {
                         displayRecentActivities(response.activities);
                     } else {
                         displayRecentActivities([]);
