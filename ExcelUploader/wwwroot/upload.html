@@ -1059,10 +1059,39 @@
                     return;
                 }
 
+                // Check if file exists
+                if (!excelData || !excelData.file) {
+                    showAlert('Lütfen bir Excel dosyası seçin.', 'warning');
+                    createStructureBtn.disabled = false;
+                    stage1Status.textContent = '✗ Hata!';
+                    stage1Status.style.background = '#f8d7da';
+                    stage1Status.style.color = '#721c24';
+                    creationProgress.style.display = 'none';
+                    return;
+                }
+
+                // Debug: Log file details
+                console.log('File details:');
+                console.log('File object:', excelData.file);
+                console.log('File name:', excelData.file.name);
+                console.log('File size:', excelData.file.size);
+                console.log('File type:', excelData.file.type);
+
+                // Check if user is authenticated
+                const token = getToken();
+                if (!token) {
+                    showAlert('Oturum açmanız gerekiyor. Lütfen giriş yapın.', 'warning');
+                    createStructureBtn.disabled = false;
+                    stage1Status.textContent = '✗ Hata!';
+                    stage1Status.style.background = '#f8d7da';
+                    stage1Status.style.color = '#721c24';
+                    creationProgress.style.display = 'none';
+                    return;
+                }
+
                 // Prepare data
                 const formData = new FormData();
                 formData.append('ExcelFile', excelData.file);
-                formData.append('TableName', tableName);
                 formData.append('Description', tableDescription);
                 
                 // Add database connection ID (force empty to use default connection)
@@ -1077,9 +1106,23 @@
                 }));
                 formData.append('SelectedColumns', JSON.stringify(selectedColumnsData));
 
+                // Debug: Log form data
+                console.log('Form Data being sent:');
+                console.log('ExcelFile:', excelData.file?.name);
+                console.log('Description:', tableDescription);
+                console.log('DatabaseConnectionId:', databaseConnectionId);
+                console.log('SelectedColumns:', selectedColumnsData);
+                console.log('Token exists:', !!getToken());
+                
+                // Log FormData contents
+                for (let [key, value] of formData.entries()) {
+                    console.log(`${key}:`, value);
+                }
+
                 // Update progress
                 updateProgress(25, 'Dosya yükleniyor...');
 
+                console.log('Making API request to /api/home/create-table-structure');
                 const response = await fetch('/api/home/create-table-structure', {
                     method: 'POST',
                     body: formData,
@@ -1087,6 +1130,9 @@
                         'Authorization': `Bearer ${getToken()}`
                     }
                 });
+
+                console.log('Response status:', response.status);
+                console.log('Response headers:', response.headers);
 
                 updateProgress(50, 'Tablo yapısı oluşturuluyor...');
 
@@ -1099,54 +1145,74 @@
                     // Show SQL output
                     showSqlOutput(result);
                     
-                                         setTimeout(() => {
-                         const message = result.dataInserted ? 
-                             `Veriler mevcut tabloya başarıyla eklendi: ${result.tableName} (${result.rowCount} satır)` : 
-                             `Tablo yapısı başarıyla oluşturuldu: ${result.tableName}`;
-                         
-                         showAlert(message, 'success');
-                         stage1Status.textContent = result.dataInserted ? '✓ Veriler Eklendi!' : '✓ Tamamlandı!';
-                         stage1Status.style.background = '#d4edda';
-                         stage1Status.style.color = '#155724';
-                         
-                         // Only show stage 2 if data was not already inserted
-                         if (!result.dataInserted) {
-                             stage2Section.style.display = 'block';
-                         } else {
-                             // If data was already inserted, hide the create structure button and show completion message
-                             createStructureBtn.style.display = 'none';
-                             
-                             // Add a completion message
-                             const completionMessage = document.createElement('div');
-                             completionMessage.className = 'alert alert-success mt-3';
-                             completionMessage.innerHTML = `
-                                 <i class="fas fa-check-circle"></i>
-                                 <strong>İşlem Tamamlandı!</strong> Veriler mevcut tabloya başarıyla eklendi. 
-                                 <a href="/tables" class="btn btn-sm btn-outline-success ml-2">
-                                     <i class="fas fa-table"></i> Tabloları Görüntüle
-                                 </a>
-                             `;
-                             
-                             // Insert the completion message after the stage1Status
-                             const stage1Status = document.getElementById('stage1Status');
-                             stage1Status.parentNode.insertBefore(completionMessage, stage1Status.nextSibling);
-                         }
-                         
-                         viewTableBtn.style.display = 'inline-block';
-                         createStructureBtn.disabled = false;
-                         window.createdTableId = result.tableId; // Store table ID for stage 2
-                         window.tableExists = result.tableExists; // Store table exists status
-                         window.dataInserted = result.dataInserted; // Store data inserted status
-                         
-                         // Update button text if table exists but data wasn't inserted yet
-                         if (result.tableExists && !result.dataInserted) {
-                             document.getElementById('insertDataBtn').innerHTML = '<i class="fas fa-plus"></i> Verileri Ekle';
-                             document.getElementById('createStructureBtn').innerHTML = '<i class="fas fa-plus"></i> Verileri Mevcut Tabloya Ekle';
-                         }
-                     }, 1000);
+                    setTimeout(() => {
+                        let message;
+                        if (result.sameNameInsert) {
+                            message = `Aynı isimli tabloya veri eklendi: ${result.tableName} (${result.rowCount} satır)`;
+                        } else if (result.dataInserted) {
+                            message = `Veriler mevcut tabloya başarıyla eklendi: ${result.tableName} (${result.rowCount} satır)`;
+                        } else {
+                            message = `Yeni tablo oluşturuldu: ${result.tableName}`;
+                        }
+                        
+                        showAlert(message, 'success');
+                        stage1Status.textContent = result.dataInserted ? '✓ Veriler Eklendi!' : '✓ Tablo Oluşturuldu!';
+                        stage1Status.style.background = '#d4edda';
+                        stage1Status.style.color = '#155724';
+                        
+                        // Only show stage 2 if data was not already inserted
+                        if (!result.dataInserted) {
+                            stage2Section.style.display = 'block';
+                        } else {
+                            // If data was already inserted, hide the create structure button and show completion message
+                            createStructureBtn.style.display = 'none';
+                            
+                            // Add a completion message
+                            const completionMessage = document.createElement('div');
+                            completionMessage.className = 'alert alert-success mt-3';
+                            completionMessage.innerHTML = `
+                                <i class="fas fa-check-circle"></i>
+                                <strong>İşlem Tamamlandı!</strong> ${result.sameNameInsert ? 'Aynı isimli tabloya veri eklendi.' : 'Veriler mevcut tabloya başarıyla eklendi.'} 
+                                <a href="/tables" class="btn btn-sm btn-outline-success ml-2">
+                                    <i class="fas fa-table"></i> Tabloları Görüntüle
+                                </a>
+                            `;
+                            
+                            // Insert the completion message after the stage1Status
+                            const stage1Status = document.getElementById('stage1Status');
+                            stage1Status.parentNode.insertBefore(completionMessage, stage1Status.nextSibling);
+                        }
+                        
+                        viewTableBtn.style.display = 'inline-block';
+                        createStructureBtn.disabled = false;
+                        window.createdTableId = result.tableId; // Store table ID for stage 2
+                        window.tableExists = result.tableExists; // Store table exists status
+                        window.dataInserted = result.dataInserted; // Store data inserted status
+                        
+                        // Update button text if table exists but data wasn't inserted yet
+                        if (result.tableExists && !result.dataInserted) {
+                            document.getElementById('insertDataBtn').innerHTML = '<i class="fas fa-plus"></i> Verileri Ekle';
+                            document.getElementById('createStructureBtn').innerHTML = '<i class="fas fa-plus"></i> Verileri Mevcut Tabloya Ekle';
+                        }
+                    }, 1000);
                 } else {
                     const error = await response.json();
-                    showAlert(error.error || 'Tablo yapısı oluşturulurken hata oluştu', 'danger');
+                    console.error('API Error Response:', error);
+                    console.error('Response Status:', response.status);
+                    console.error('Response Headers:', response.headers);
+                    
+                    let errorMessage = 'Tablo yapısı oluşturulurken hata oluştu';
+                    if (error.error) {
+                        errorMessage = error.error;
+                    } else if (error.message) {
+                        errorMessage = error.message;
+                    } else if (error.details) {
+                        errorMessage = `Hata: ${error.details}`;
+                    } else if (error.errors && Array.isArray(error.errors)) {
+                        errorMessage = `Validation Errors: ${error.errors.map(e => e.Errors?.join(', ') || e).join('; ')}`;
+                    }
+                    
+                    showAlert(errorMessage, 'danger');
                     createStructureBtn.disabled = false;
                     stage1Status.textContent = '✗ Hata!';
                     stage1Status.style.background = '#f8d7da';

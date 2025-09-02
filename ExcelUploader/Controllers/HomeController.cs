@@ -233,7 +233,20 @@ namespace ExcelUploader.Controllers
         {
             if (!ModelState.IsValid)
             {
-                return BadRequest(ModelState);
+                var errors = ModelState
+                    .Where(x => x.Value.Errors.Count > 0)
+                    .Select(x => new { Field = x.Key, Errors = x.Value.Errors.Select(e => e.ErrorMessage).ToList() })
+                    .ToList();
+                
+                var errorDetails = string.Join("; ", errors.SelectMany(e => e.Errors));
+                _logger.LogWarning("Model validation failed: {Errors}", errorDetails);
+                
+                return BadRequest(new { 
+                    error = "Validation failed", 
+                    errors = errors,
+                    details = errorDetails,
+                    modelState = ModelState.Select(x => new { Field = x.Key, Errors = x.Value.Errors.Select(e => e.ErrorMessage).ToList() }).ToList()
+                });
             }
 
             try
@@ -410,8 +423,15 @@ namespace ExcelUploader.Controllers
                         .Select(x => new { Field = x.Key, Errors = x.Value.Errors.Select(e => e.ErrorMessage).ToList() })
                         .ToList();
                     
-                    _logger.LogWarning("Model validation failed: {Errors}", string.Join(", ", errors.SelectMany(e => e.Errors)));
-                    return BadRequest(new { error = "Validation failed", errors = errors });
+                    var errorDetails = string.Join("; ", errors.SelectMany(e => e.Errors));
+                    _logger.LogWarning("Model validation failed: {Errors}", errorDetails);
+                    
+                    return BadRequest(new { 
+                        error = "Validation failed", 
+                        errors = errors,
+                        details = errorDetails,
+                        modelState = ModelState.Select(x => new { Field = x.Key, Errors = x.Value.Errors.Select(e => e.ErrorMessage).ToList() }).ToList()
+                    });
                 }
 
                 if (model.ExcelFile == null)
@@ -476,7 +496,8 @@ namespace ExcelUploader.Controllers
                         stage = "data_inserted_into_existing",
                         tableExists = true,
                         dataInserted = true,
-                        sameNameInsert = true
+                        sameNameInsert = true,
+                        action = "INSERT" // Açıkça belirtiyoruz ki INSERT yapıldı
                     });
                 }
                 
@@ -615,7 +636,8 @@ namespace ExcelUploader.Controllers
                     stage = action,
                     tableExists = exactTableExists,
                     dataInserted = exactTableExists,
-                    sameNameInsert = false
+                    sameNameInsert = false,
+                    action = exactTableExists ? "INSERT" : "CREATE" // Açıkça belirtiyoruz ki CREATE veya INSERT yapıldı
                 });
             }
             catch (Exception ex)

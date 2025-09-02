@@ -257,58 +257,58 @@ namespace ExcelUploader.Services
                 {
                     _logger.LogInformation("Creating new table structure for: {TableName}", tableName);
                     
-                    // Read Excel headers and determine data types
+                // Read Excel headers and determine data types
                     _logger.LogInformation("Analyzing Excel file: {FileName}", file.FileName);
-                    var (headers, dataTypes, sampleData) = await AnalyzeExcelFileAsync(file);
+                var (headers, dataTypes, sampleData) = await AnalyzeExcelFileAsync(file);
                     _logger.LogInformation("Excel analysis completed. Headers: {HeaderCount}, Sample data rows: {SampleDataCount}", headers.Count, sampleData.Count);
-                    
-                    // Create DynamicTable entity
+                
+                // Create DynamicTable entity
                     dynamicTable = new DynamicTable
-                    {
-                        TableName = tableName,
-                        FileName = file.FileName,
-                        UploadedBy = uploadedBy,
+                {
+                    TableName = tableName,
+                    FileName = file.FileName,
+                    UploadedBy = uploadedBy,
                         Description = description ?? string.Empty,
-                        RowCount = sampleData.Count,
-                        ColumnCount = headers.Count,
-                        UploadDate = DateTime.UtcNow,
-                        IsProcessed = false // Not processed yet
-                    };
+                    RowCount = sampleData.Count,
+                    ColumnCount = headers.Count,
+                    UploadDate = DateTime.UtcNow,
+                    IsProcessed = false // Not processed yet
+                };
 
                     _logger.LogInformation("Created DynamicTable entity: {TableName}, Columns: {ColumnCount}", dynamicTable.TableName, dynamicTable.ColumnCount);
 
-                    // Create table columns
-                    for (int i = 0; i < headers.Count; i++)
+                // Create table columns
+                for (int i = 0; i < headers.Count; i++)
+                {
+                    var column = new TableColumn
                     {
-                        var column = new TableColumn
-                        {
-                            ColumnName = SanitizeColumnName(headers[i]),
-                            DisplayName = headers[i],
-                            DataType = dataTypes[i],
-                            ColumnOrder = i + 1,
-                            MaxLength = dataTypes[i] == "nvarchar" ? 1000 : null,
-                            IsRequired = false,
-                            IsUnique = false
-                        };
-                        
-                        dynamicTable.Columns.Add(column);
+                        ColumnName = SanitizeColumnName(headers[i]),
+                        DisplayName = headers[i],
+                        DataType = dataTypes[i],
+                        ColumnOrder = i + 1,
+                        MaxLength = dataTypes[i] == "nvarchar" ? 1000 : null,
+                        IsRequired = false,
+                        IsUnique = false
+                    };
+                    
+                    dynamicTable.Columns.Add(column);
                         _logger.LogDebug("Added column: {ColumnName} ({DataType})", column.ColumnName, column.DataType);
-                    }
+                }
 
-                    // Save to database
+                // Save to database
                     _logger.LogInformation("Saving DynamicTable to database");
-                    _context.DynamicTables.Add(dynamicTable);
-                    await _context.SaveChangesAsync();
+                _context.DynamicTables.Add(dynamicTable);
+                await _context.SaveChangesAsync();
                     _logger.LogInformation("DynamicTable saved to database with ID: {TableId}", dynamicTable.Id);
 
-                    // Create SQL table structure only
+                // Create SQL table structure only
                     _logger.LogInformation("Creating SQL table structure for: {TableName}", dynamicTable.TableName);
-                    var sqlTableCreated = await CreateSqlTableAsync(dynamicTable, databaseConnectionId);
-                    if (!sqlTableCreated)
-                    {
+                var sqlTableCreated = await CreateSqlTableAsync(dynamicTable, databaseConnectionId);
+                if (!sqlTableCreated)
+                {
                         _logger.LogError("SQL table creation failed for: {TableName}", dynamicTable.TableName);
-                        throw new InvalidOperationException("SQL table creation failed");
-                    }
+                    throw new InvalidOperationException("SQL table creation failed");
+                }
 
                     _logger.LogInformation("SQL table created successfully: {TableName}", dynamicTable.TableName);
 
@@ -334,7 +334,7 @@ namespace ExcelUploader.Services
                         }
                     }
 
-                    _logger.LogInformation("Table structure created successfully: {TableName}", dynamicTable.TableName);
+                _logger.LogInformation("Table structure created successfully: {TableName}", dynamicTable.TableName);
                 }
                 
                 return dynamicTable;
@@ -478,26 +478,33 @@ namespace ExcelUploader.Services
         {
             try
             {
-                var sql = @"
-                    SELECT TABLE_NAME 
-                    FROM INFORMATION_SCHEMA.TABLES 
-                    WHERE TABLE_NAME LIKE @BaseTableName + '%'
-                    ORDER BY TABLE_NAME";
-
+                // Get all table names from database
+                var sql = "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'BASE TABLE'";
                 using var command = new SqlCommand(sql, connection);
-                command.Parameters.AddWithValue("@BaseTableName", baseTableName);
-
                 using var reader = await command.ExecuteReaderAsync();
-                if (await reader.ReadAsync())
+                
+                var tableNames = new List<string>();
+                while (await reader.ReadAsync())
                 {
-                    return reader.GetString(0);
+                    tableNames.Add(reader.GetString(0));
                 }
-
-                return null;
+                
+                // Find the most similar table name
+                var mostSimilarTable = tableNames
+                    .Where(t => GetSimilarityScore(t, baseTableName) > 50) // Only consider tables with >50% similarity
+                    .OrderByDescending(t => GetSimilarityScore(t, baseTableName))
+                    .FirstOrDefault();
+                
+                if (!string.IsNullOrEmpty(mostSimilarTable))
+                {
+                    _logger.LogInformation("Found similar table: {SimilarTable} for base name: {BaseTableName}", mostSimilarTable, baseTableName);
+                }
+                
+                return mostSimilarTable;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error finding existing table with similar name: {BaseTableName}", baseTableName);
+                _logger.LogError(ex, "Error finding similar table names for: {BaseTableName}", baseTableName);
                 return null;
             }
         }
@@ -1130,13 +1137,13 @@ namespace ExcelUploader.Services
             {
                 _logger.LogInformation("AnalyzeExcelFileAsync called with file: {FileName}", file.FileName);
                 
-                // ExcelAnalyzerService kullanarak dosyayı analiz et
-                var analysisResult = await _excelAnalyzerService.AnalyzeExcelFileAsync(file);
-                
+            // ExcelAnalyzerService kullanarak dosyayı analiz et
+            var analysisResult = await _excelAnalyzerService.AnalyzeExcelFileAsync(file);
+            
                 _logger.LogInformation("Excel analysis completed. Headers: {HeaderCount}, Data types: {DataTypeCount}, Sample data: {SampleDataCount}", 
                     analysisResult.Headers.Count, analysisResult.DataTypes.Count, analysisResult.SampleData.Count);
                 
-                return (analysisResult.Headers, analysisResult.DataTypes, analysisResult.SampleData);
+            return (analysisResult.Headers, analysisResult.DataTypes, analysisResult.SampleData);
             }
             catch (Exception ex)
             {
@@ -1274,7 +1281,27 @@ namespace ExcelUploader.Services
         {
             var baseName = Path.GetFileNameWithoutExtension(fileName);
             var sanitizedName = SanitizeTableName(baseName);
-            return sanitizedName; // Remove Excel_ prefix to match existing table names
+            
+            // Limit table name length to 50 characters to avoid SQL Server limitations
+            if (sanitizedName.Length > 50)
+            {
+                sanitizedName = sanitizedName.Substring(0, 50);
+            }
+            
+            // Remove timestamp patterns more aggressively
+            sanitizedName = System.Text.RegularExpressions.Regex.Replace(sanitizedName, @"_\d{8}_\d{6}$", "");
+            sanitizedName = System.Text.RegularExpressions.Regex.Replace(sanitizedName, @"_\d{8}_\d{4}$", "");
+            sanitizedName = System.Text.RegularExpressions.Regex.Replace(sanitizedName, @"_\d{8}$", "");
+            sanitizedName = System.Text.RegularExpressions.Regex.Replace(sanitizedName, @"_\d{6}$", "");
+            sanitizedName = System.Text.RegularExpressions.Regex.Replace(sanitizedName, @"_\d{4}$", "");
+            
+            // Remove Excel_ prefix if it exists
+            if (sanitizedName.StartsWith("Excel_"))
+            {
+                sanitizedName = sanitizedName.Substring(6);
+            }
+            
+            return sanitizedName;
         }
 
         private string SanitizeTableName(string name)
@@ -1955,6 +1982,21 @@ namespace ExcelUploader.Services
                     return (true, null, similarTableName);
                 }
                 
+                // Check for similar table names in tracking system
+                var similarTables = await _context.DynamicTables
+                    .Where(t => t.TableName.Contains(baseTableName) || baseTableName.Contains(t.TableName))
+                    .ToListAsync();
+                
+                if (similarTables.Any())
+                {
+                    var mostSimilarTable = similarTables
+                        .OrderByDescending(t => GetSimilarityScore(t.TableName, baseTableName))
+                        .First();
+                    
+                    _logger.LogInformation("Found similar table in tracking system: {SimilarTableName} for base name: {BaseTableName}", mostSimilarTable.TableName, baseTableName);
+                    return (true, mostSimilarTable, mostSimilarTable.TableName);
+                }
+                
                 _logger.LogInformation("No existing table found for: {TableName}", tableName);
                 return (false, null, null);
             }
@@ -1978,12 +2020,20 @@ namespace ExcelUploader.Services
                 if (!exists)
                 {
                     _logger.LogWarning("Table does not exist: {TableName}", tableName);
-                    return (false, 0, $"Tablo '{tableName}' bulunamadı");
+                    return (false, 0, $"Tablo '{tableName}' bulunamadı. Lütfen önce tablo yapısını oluşturun.");
                 }
                 
                 // Use actual table name if found
                 var targetTableName = actualTableName ?? tableName;
                 _logger.LogInformation("Using target table name: {TargetTableName}", targetTableName);
+                
+                // Verify table exists in database before attempting to insert
+                var tableExistsInDb = await CheckExactTableExistsAsync(targetTableName, databaseConnectionId);
+                if (!tableExistsInDb)
+                {
+                    _logger.LogError("Table does not exist in database: {TargetTableName}", targetTableName);
+                    return (false, 0, $"Tablo '{targetTableName}' veritabanında bulunamadı. Lütfen önce tablo yapısını oluşturun.");
+                }
                 
                 // Insert data into the existing table
                 var insertedRows = await InsertDataIntoExistingTableAsync(file, targetTableName, databaseConnectionId);
@@ -2054,6 +2104,36 @@ namespace ExcelUploader.Services
                 throw new ArgumentException($"Database connection with ID {databaseConnectionId} not found");
             
             return $"Server={dbConnection.ServerName},{dbConnection.Port};Database={dbConnection.DatabaseName};User Id={dbConnection.Username};Password={dbConnection.Password};TrustServerCertificate=true;";
+        }
+
+        private int GetSimilarityScore(string s1, string s2)
+        {
+            var len1 = s1.Length;
+            var len2 = s2.Length;
+            var matrix = new int[len1 + 1, len2 + 1];
+
+            for (int i = 0; i <= len1; i++)
+            {
+                matrix[i, 0] = i;
+            }
+            for (int j = 0; j <= len2; j++)
+            {
+                matrix[0, j] = j;
+            }
+
+            for (int i = 1; i <= len1; i++)
+            {
+                for (int j = 1; j <= len2; j++)
+                {
+                    var cost = (s1[i - 1] == s2[j - 1]) ? 0 : 1;
+                    matrix[i, j] = Math.Min(
+                        Math.Min(matrix[i - 1, j] + 1, matrix[i, j - 1] + 1),
+                        matrix[i - 1, j - 1] + cost
+                    );
+                }
+            }
+
+            return matrix[len1, len2];
         }
 
 
