@@ -399,29 +399,45 @@ namespace ExcelUploader.Controllers
         [Authorize]
         public async Task<IActionResult> CreateTableStructure([FromForm] UploadViewModel model)
         {
-            if (!ModelState.IsValid)
-            {
-                return BadRequest(ModelState);
-            }
-
             try
             {
+                _logger.LogInformation("CreateTableStructure called with file: {FileName}", model.ExcelFile?.FileName ?? "null");
+                
+                if (!ModelState.IsValid)
+                {
+                    var errors = ModelState
+                        .Where(x => x.Value.Errors.Count > 0)
+                        .Select(x => new { Field = x.Key, Errors = x.Value.Errors.Select(e => e.ErrorMessage).ToList() })
+                        .ToList();
+                    
+                    _logger.LogWarning("Model validation failed: {Errors}", string.Join(", ", errors.SelectMany(e => e.Errors)));
+                    return BadRequest(new { error = "Validation failed", errors = errors });
+                }
+
                 if (model.ExcelFile == null)
                 {
+                    _logger.LogWarning("ExcelFile is null");
                     return BadRequest(new { error = "Lütfen bir Excel dosyası seçin" });
                 }
+
+                _logger.LogInformation("Validating Excel file: {FileName}", model.ExcelFile.FileName);
 
                 // Validate file
                 if (!await _excelService.ValidateExcelFileAsync(model.ExcelFile))
                 {
+                    _logger.LogWarning("Excel file validation failed: {FileName}", model.ExcelFile.FileName);
                     return BadRequest(new { error = "Geçersiz dosya formatı veya boyut" });
                 }
 
+                _logger.LogInformation("Excel file validated successfully: {FileName}", model.ExcelFile.FileName);
+
                 // Process Excel file and create table structure only
                 var userName = User.FindFirstValue(ClaimTypes.Name) ?? User.Identity?.Name ?? "Unknown";
+                _logger.LogInformation("User: {UserName}", userName);
                 
                 // Generate table name from file name
                 var tableName = GenerateTableNameFromFileName(model.ExcelFile.FileName);
+                _logger.LogInformation("Generated table name: {TableName}", tableName);
                 
                 // Handle DatabaseConnectionId - if it's 0, treat as null
                 int? databaseConnectionId = model.DatabaseConnectionId;
@@ -429,29 +445,75 @@ namespace ExcelUploader.Controllers
                 {
                     databaseConnectionId = null;
                 }
+                _logger.LogInformation("Database connection ID: {DatabaseConnectionId}", databaseConnectionId);
+                
+                // Check if table with same name already exists
+                _logger.LogInformation("Checking if table with same name exists: {TableName}", tableName);
+                var (tableExists, existingTable, actualTableName) = await _dynamicTableService.CheckTableExistsForInsertAsync(tableName, databaseConnectionId);
+                
+                if (tableExists)
+                {
+                    _logger.LogInformation("Table with same name exists. Actual table name: {ActualTableName}", actualTableName);
+                    
+                    // Insert data into existing table with same name
+                    var (success, insertedRows, errorMessage) = await _dynamicTableService.InsertDataIntoExistingTableWithSameNameAsync(
+                        model.ExcelFile, tableName, databaseConnectionId);
+                    
+                    if (!success)
+                    {
+                        _logger.LogError("Failed to insert data into existing table: {ErrorMessage}", errorMessage);
+                        return BadRequest(new { error = errorMessage });
+                    }
+                    
+                    _logger.LogInformation("Successfully inserted {InsertedRows} rows into existing table: {TableName}", insertedRows, tableName);
+                    
+                    return Ok(new { 
+                        message = $"Aynı isimli tabloya veri eklendi: {actualTableName ?? tableName} ({insertedRows} satır)", 
+                        tableName = actualTableName ?? tableName,
+                        tableId = existingTable?.Id ?? 0,
+                        columnCount = existingTable?.ColumnCount ?? 0,
+                        rowCount = insertedRows,
+                        stage = "data_inserted_into_existing",
+                        tableExists = true,
+                        dataInserted = true,
+                        sameNameInsert = true
+                    });
+                }
+                
+                // If table doesn't exist, proceed with normal table creation
+                _logger.LogInformation("No existing table found, creating new table structure: {TableName}", tableName);
                 
                 // Check if exact table already exists in database
+                _logger.LogInformation("Checking if exact table exists: {TableName}", tableName);
                 var exactTableExists = await _dynamicTableService.CheckExactTableExistsAsync(tableName, databaseConnectionId);
                 var existingTableId = await _dynamicTableService.GetTableIdByNameAsync(tableName);
+                _logger.LogInformation("Exact table exists: {ExactTableExists}, Existing table ID: {ExistingTableId}", exactTableExists, existingTableId);
                 
                 DynamicTable dynamicTable;
                 string action;
                 
                 if (exactTableExists)
                 {
+                    _logger.LogInformation("Table exists in database, finding actual table name");
                     // Table exists in database, find the actual table name
-                    var actualTableName = await _dynamicTableService.FindExistingTableNameAsync(tableName, databaseConnectionId);
-                    if (actualTableName == null)
+                    var foundTableName = await _dynamicTableService.FindExistingTableNameAsync(tableName, databaseConnectionId);
+                    if (foundTableName == null)
                     {
+                        _logger.LogError("Actual table name not found for: {TableName}", tableName);
                         return BadRequest(new { error = "Mevcut tablo bulunamadı" });
                     }
                     
+                    _logger.LogInformation("Found actual table name: {FoundTableName}", foundTableName);
+                    
                     // Insert data directly into the existing table
-                    var insertedRows = await _dynamicTableService.InsertDataIntoExistingTableAsync(model.ExcelFile, actualTableName, databaseConnectionId);
+                    _logger.LogInformation("Inserting data into existing table: {FoundTableName}", foundTableName);
+                    var insertedRows = await _dynamicTableService.InsertDataIntoExistingTableAsync(model.ExcelFile, foundTableName, databaseConnectionId);
+                    _logger.LogInformation("Inserted {InsertedRows} rows into existing table", insertedRows);
                     
                     // Check if we have a tracking record for this table
                     if (existingTableId.HasValue)
                     {
+                        _logger.LogInformation("Using existing tracking record for table ID: {TableId}", existingTableId.Value);
                         // Use existing tracking record and update row count
                         dynamicTable = await _dynamicTableService.GetTableByIdAsync(existingTableId.Value);
                         if (dynamicTable != null)
@@ -460,16 +522,19 @@ namespace ExcelUploader.Controllers
                             dynamicTable.IsProcessed = true;
                             dynamicTable.ProcessedDate = DateTime.UtcNow;
                             await _context.SaveChangesAsync();
+                            _logger.LogInformation("Updated existing tracking record");
                         }
                     }
                     else
                     {
+                        _logger.LogInformation("Creating new tracking record for existing table");
                         // Check if a tracking record already exists for this table name
                         var existingTrackingTable = await _context.DynamicTables
-                            .FirstOrDefaultAsync(t => t.TableName == actualTableName);
+                            .FirstOrDefaultAsync(t => t.TableName == foundTableName);
                         
                         if (existingTrackingTable != null)
                         {
+                            _logger.LogInformation("Using existing tracking record for table name: {TableName}", foundTableName);
                             // Use existing tracking record and update row count
                             dynamicTable = existingTrackingTable;
                             dynamicTable.RowCount = insertedRows;
@@ -479,11 +544,14 @@ namespace ExcelUploader.Controllers
                         }
                         else
                         {
+                            _logger.LogInformation("Creating new tracking record for existing table: {TableName}", foundTableName);
                             // Create a new tracking record for the existing table WITHOUT calling CreateTableStructureAsync
                             var (headers, dataTypes, sampleData) = await _dynamicTableService.AnalyzeExcelFileAsync(model.ExcelFile);
+                            _logger.LogInformation("Analyzed Excel file, found {HeaderCount} headers", headers.Count);
+                            
                             dynamicTable = new DynamicTable
                             {
-                                TableName = actualTableName,
+                                TableName = foundTableName,
                                 FileName = model.ExcelFile.FileName,
                                 UploadedBy = userName,
                                 Description = model.Description ?? string.Empty,
@@ -512,12 +580,14 @@ namespace ExcelUploader.Controllers
                             
                             _context.DynamicTables.Add(dynamicTable);
                             await _context.SaveChangesAsync();
+                            _logger.LogInformation("Created new tracking record for existing table");
                         }
                     }
                     action = "data_inserted_into_existing";
                 }
                 else
                 {
+                    _logger.LogInformation("Creating new table structure for: {TableName}", tableName);
                     // Create new table structure
                     dynamicTable = await _dynamicTableService.CreateTableStructureAsync(
                         model.ExcelFile, 
@@ -525,12 +595,16 @@ namespace ExcelUploader.Controllers
                         databaseConnectionId, 
                         model.Description ?? string.Empty);
                     action = "structure_created";
+                    _logger.LogInformation("Table structure created successfully: {TableName}", dynamicTable?.TableName);
                 }
 
                 if (dynamicTable == null)
                 {
+                    _logger.LogError("DynamicTable is null after processing");
                     return BadRequest(new { error = "Excel dosyasından tablo yapısı oluşturulamadı" });
                 }
+
+                _logger.LogInformation("CreateTableStructure completed successfully. Action: {Action}, Table: {TableName}", action, dynamicTable.TableName);
 
                 return Ok(new { 
                     message = exactTableExists ? $"Veriler mevcut tabloya başarıyla eklendi: {tableName}" : $"Tablo yapısı başarıyla oluşturuldu: {tableName}", 
@@ -540,13 +614,15 @@ namespace ExcelUploader.Controllers
                     rowCount = exactTableExists ? dynamicTable.RowCount : 0,
                     stage = action,
                     tableExists = exactTableExists,
-                    dataInserted = exactTableExists
+                    dataInserted = exactTableExists,
+                    sameNameInsert = false
                 });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error creating table structure");
-                return StatusCode(500, new { error = "Tablo yapısı oluşturulurken hata oluştu" });
+                _logger.LogError(ex, "Error creating table structure. File: {FileName}, Error: {ErrorMessage}", 
+                    model.ExcelFile?.FileName ?? "null", ex.Message);
+                return StatusCode(500, new { error = "Tablo yapısı oluşturulurken hata oluştu", details = ex.Message });
             }
         }
 
