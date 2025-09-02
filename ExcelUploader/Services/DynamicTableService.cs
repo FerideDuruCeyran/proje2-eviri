@@ -15,12 +15,14 @@ namespace ExcelUploader.Services
         private readonly ApplicationDbContext _context;
         private readonly IConfiguration _configuration;
         private readonly ILogger<DynamicTableService> _logger;
+        private readonly IExcelAnalyzerService _excelAnalyzerService;
 
-        public DynamicTableService(ApplicationDbContext context, IConfiguration configuration, ILogger<DynamicTableService> logger)
+        public DynamicTableService(ApplicationDbContext context, IConfiguration configuration, ILogger<DynamicTableService> logger, IExcelAnalyzerService excelAnalyzerService)
         {
             _context = context;
             _configuration = configuration;
             _logger = logger;
+            _excelAnalyzerService = excelAnalyzerService;
         }
 
         public async Task<DynamicTable> CreateTableFromExcelAsync(IFormFile file, string uploadedBy, int? databaseConnectionId = null, string? description = null)
@@ -1081,20 +1083,10 @@ namespace ExcelUploader.Services
 
         public async Task<(List<string> headers, List<string> dataTypes, List<Dictionary<string, object>> sampleData)> AnalyzeExcelFileAsync(IFormFile file)
         {
-            var headers = new List<string>();
-            var dataTypes = new List<string>();
-            var sampleData = new List<Dictionary<string, object>>();
-
-            if (file.FileName.EndsWith(".xlsx"))
-            {
-                await AnalyzeXlsxFileAsync(file, headers, dataTypes, sampleData);
-            }
-            else if (file.FileName.EndsWith(".xls"))
-            {
-                await AnalyzeXlsFileAsync(file, headers, dataTypes, sampleData);
-            }
-
-            return (headers, dataTypes, sampleData);
+            // ExcelAnalyzerService kullanarak dosyayı analiz et
+            var analysisResult = await _excelAnalyzerService.AnalyzeExcelFileAsync(file);
+            
+            return (analysisResult.Headers, analysisResult.DataTypes, analysisResult.SampleData);
         }
 
         private Task AnalyzeXlsxFileAsync(IFormFile file, List<string> headers, List<string> dataTypes, List<Dictionary<string, object>> sampleData)
@@ -1112,7 +1104,14 @@ namespace ExcelUploader.Services
             for (int col = 1; col <= colCount; col++)
             {
                 var headerValue = GetCellValue(worksheet, 1, col);
-                headers.Add(headerValue ?? $"Column{col}");
+                if (!string.IsNullOrEmpty(headerValue))
+                {
+                    headers.Add(headerValue);
+                }
+                else
+                {
+                    headers.Add($"Column{col}");
+                }
             }
 
             // Analyze data types and collect sample data
@@ -1122,7 +1121,7 @@ namespace ExcelUploader.Services
                 for (int col = 1; col <= colCount; col++)
                 {
                     var cellValue = worksheet.Cells[row, col].Value;
-                    rowData[headers[col - 1]] = cellValue;
+                    rowData[headers[col - 1]] = cellValue ?? string.Empty;
                 }
                 sampleData.Add(rowData);
             }
@@ -1142,10 +1141,8 @@ namespace ExcelUploader.Services
             using var stream = file.OpenReadStream();
             IWorkbook workbook;
             
-            if (file.FileName.EndsWith(".xlsx"))
-                workbook = new XSSFWorkbook(stream);
-            else
-                workbook = new HSSFWorkbook(stream);
+            // For .xls files, always use HSSFWorkbook
+            workbook = new HSSFWorkbook(stream);
 
             var sheet = workbook.GetSheetAt(0);
             var rowCount = Math.Min(sheet.LastRowNum, 100); // Sample first 100 rows
@@ -1158,7 +1155,14 @@ namespace ExcelUploader.Services
                 {
                     var cell = headerRow.GetCell(col);
                     var headerValue = GetNpoiCellValue(cell);
-                    headers.Add(headerValue ?? $"Column{col + 1}");
+                    if (!string.IsNullOrEmpty(headerValue))
+                    {
+                        headers.Add(headerValue);
+                    }
+                    else
+                    {
+                        headers.Add($"Column{col + 1}");
+                    }
                 }
             }
 
@@ -1173,7 +1177,7 @@ namespace ExcelUploader.Services
                 {
                     var cell = sheetRow.GetCell(col);
                     var cellValue = GetNpoiCellValue(cell);
-                    rowData[headers[col]] = cellValue;
+                    rowData[headers[col]] = cellValue ?? string.Empty;
                 }
                 sampleData.Add(rowData);
             }
@@ -1404,7 +1408,14 @@ namespace ExcelUploader.Services
             for (int col = 1; col <= colCount; col++)
             {
                 var headerValue = GetCellValue(worksheet, 1, col);
-                headers.Add(headerValue ?? $"Column{col}");
+                if (!string.IsNullOrEmpty(headerValue))
+                {
+                    headers.Add(headerValue);
+                }
+                else
+                {
+                    headers.Add($"Column{col}");
+                }
             }
 
             // Read all data rows (starting from row 2)
@@ -1414,7 +1425,7 @@ namespace ExcelUploader.Services
                 for (int col = 1; col <= colCount; col++)
                 {
                     var cellValue = worksheet.Cells[row, col].Value;
-                    rowData[headers[col - 1]] = cellValue;
+                    rowData[headers[col - 1]] = cellValue ?? string.Empty;
                 }
                 allData.Add(rowData);
             }
@@ -1427,10 +1438,8 @@ namespace ExcelUploader.Services
             using var stream = file.OpenReadStream();
             IWorkbook workbook;
             
-            if (file.FileName.EndsWith(".xlsx"))
-                workbook = new XSSFWorkbook(stream);
-            else
-                workbook = new HSSFWorkbook(stream);
+            // For .xls files, always use HSSFWorkbook
+            workbook = new HSSFWorkbook(stream);
 
             var sheet = workbook.GetSheetAt(0);
             var rowCount = sheet.LastRowNum;
@@ -1446,7 +1455,14 @@ namespace ExcelUploader.Services
                 {
                     var cell = headerRow.GetCell(col);
                     var headerValue = GetNpoiCellValue(cell);
-                    headers.Add(headerValue ?? $"Column{col + 1}");
+                    if (!string.IsNullOrEmpty(headerValue))
+                    {
+                        headers.Add(headerValue);
+                    }
+                    else
+                    {
+                        headers.Add($"Column{col + 1}");
+                    }
                 }
             }
 
@@ -1461,7 +1477,7 @@ namespace ExcelUploader.Services
                 {
                     var cell = sheetRow.GetCell(col);
                     var cellValue = GetNpoiCellValue(cell);
-                    rowData[headers[col]] = cellValue;
+                    rowData[headers[col]] = cellValue ?? string.Empty;
                 }
                 allData.Add(rowData);
             }

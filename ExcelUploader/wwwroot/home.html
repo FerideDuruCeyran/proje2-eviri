@@ -255,7 +255,19 @@
                 
                 if (activitiesResponse.ok) {
                     const response = await activitiesResponse.json();
-                    displayRecentActivities(response.activities || []);
+                    console.log('Activities response:', response); // Debug log
+                    
+                    // Handle both array and object responses
+                    if (Array.isArray(response)) {
+                        displayRecentActivities(response);
+                    } else if (response && response.activities) {
+                        displayRecentActivities(response.activities);
+                    } else {
+                        displayRecentActivities([]);
+                    }
+                } else {
+                    console.error('Failed to load activities:', activitiesResponse.status);
+                    displayRecentActivities([]);
                 }
 
                 // Load user profile for last login

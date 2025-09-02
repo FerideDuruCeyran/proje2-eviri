@@ -43,159 +43,163 @@ namespace ExcelUploader.Services
             }
         }
 
-        private Task<object> GetXlsxPreviewAsync(IFormFile file)
+        public async Task<object> GetExcelPreviewAsync(IFormFile file, int sheetIndex = 0)
+        {
+            try
+            {
+                if (file.FileName.EndsWith(".xlsx"))
+                {
+                    return await GetXlsxPreviewAsync(file, sheetIndex);
+                }
+                else if (file.FileName.EndsWith(".xls"))
+                {
+                    return await GetXlsPreviewAsync(file, sheetIndex);
+                }
+                else
+                {
+                    throw new ArgumentException("Desteklenmeyen dosya formatı. Sadece .xlsx ve .xls dosyaları desteklenir.");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Excel dosyası önizlenirken hata oluştu: {file.FileName}");
+                throw;
+            }
+        }
+
+        public async Task<List<string>> GetSheetNamesAsync(IFormFile file)
+        {
+            try
+            {
+                if (file.FileName.EndsWith(".xlsx"))
+                {
+                    using var stream = file.OpenReadStream();
+                    using var package = new ExcelPackage(stream);
+                    return package.Workbook.Worksheets.Select(ws => ws.Name).ToList();
+                }
+                else if (file.FileName.EndsWith(".xls"))
+                {
+                    using var stream = file.OpenReadStream();
+                    using var workbook = new HSSFWorkbook(stream);
+                    var sheetNames = new List<string>();
+                    for (int i = 0; i < workbook.NumberOfSheets; i++)
+                    {
+                        sheetNames.Add(workbook.GetSheetName(i));
+                    }
+                    return sheetNames;
+                }
+                else
+                {
+                    throw new ArgumentException("Desteklenmeyen dosya formatı. Sadece .xlsx ve .xls dosyaları desteklenir.");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Excel dosyası sayfa adları alınırken hata oluştu: {file.FileName}");
+                throw;
+            }
+        }
+
+        private Task<object> GetXlsPreviewAsync(IFormFile file, int sheetIndex = 0)
         {
             try
             {
                 using var stream = file.OpenReadStream();
-                using var package = new ExcelPackage(stream);
-                var worksheet = package.Workbook.Worksheets.FirstOrDefault() ?? package.Workbook.Worksheets[0];
-
-                if (worksheet == null)
+                
+                // For .xls files, use HSSFWorkbook (NPOI)
+                using var workbook = new HSSFWorkbook(stream);
+                
+                if (workbook.NumberOfSheets == 0)
                     throw new InvalidOperationException("Excel dosyasında çalışma sayfası bulunamadı.");
 
-                var rowCount = worksheet.Dimension?.Rows ?? 0;
-                var colCount = worksheet.Dimension?.Columns ?? 0;
+                if (sheetIndex >= workbook.NumberOfSheets)
+                    throw new ArgumentException($"Sayfa indeksi geçersiz. Dosyada {workbook.NumberOfSheets} sayfa var.");
+
+                var sheet = workbook.GetSheetAt(sheetIndex);
+
+                if (sheet == null)
+                    throw new InvalidOperationException("Excel dosyasında çalışma sayfası bulunamadı.");
+
+                var rowCount = sheet.LastRowNum + 1; // LastRowNum is 0-based
+                var headerRow = sheet.GetRow(0);
+                var colCount = headerRow?.LastCellNum ?? 0;
+
+                if (rowCount == 0 || colCount == 0)
+                {
+                    // Return empty result for empty sheets
+                    var emptyResult = new
+                    {
+                        headers = new List<string>(),
+                        rows = new List<List<string>>(),
+                        dataTypes = new List<string>(),
+                        totalRows = 0,
+                        totalColumns = 0,
+                        sheetName = sheet.SheetName,
+                        sheetIndex = sheetIndex
+                    };
+                    return Task.FromResult<object>(emptyResult);
+                }
 
                 // Get headers (first row)
                 var headers = new List<string>();
-                for (int col = 1; col <= colCount; col++)
+                if (headerRow != null)
                 {
-                    var headerValue = GetCellValue(worksheet, 1, col);
-                    headers.Add(string.IsNullOrEmpty(headerValue) ? $"Sütun_{col}" : headerValue);
+                    for (int col = 0; col < colCount; col++)
+                    {
+                        var cell = headerRow.GetCell(col);
+                        var headerValue = GetNpoiCellValue(cell);
+                        headers.Add(string.IsNullOrEmpty(headerValue) ? $"Sütun_{col + 1}" : headerValue);
+                    }
                 }
 
                 // Get first 10 rows of data (excluding header)
                 var rows = new List<List<string>>();
-                for (int row = 2; row <= Math.Min(11, rowCount); row++)
+                var dataTypes = new List<string>();
+                var sampleData = new List<Dictionary<string, object>>();
+
+                for (int row = 1; row <= Math.Min(10, rowCount - 1); row++)
                 {
+                    var sheetRow = sheet.GetRow(row);
+                    if (sheetRow == null) continue;
+
                     var rowData = new List<string>();
-                    for (int col = 1; col <= colCount; col++)
+                    var rowDict = new Dictionary<string, object>();
+                    
+                    for (int col = 0; col < headers.Count; col++)
                     {
-                        var cellValue = GetCellValue(worksheet, row, col);
-                        rowData.Add(cellValue ?? "");
+                        var cell = sheetRow.GetCell(col);
+                        var cellValue = GetNpoiCellValue(cell);
+                        var displayValue = cellValue ?? "";
+                        rowData.Add(displayValue);
+                        
+                        // Store the actual cell value with proper type for analysis
+                        var actualValue = GetNpoiCellValueWithType(cell);
+                        rowDict[headers[col]] = actualValue;
                     }
                     rows.Add(rowData);
+                    sampleData.Add(rowDict);
+                }
+
+                // Determine data types based on sample data
+                for (int col = 0; col < headers.Count; col++)
+                {
+                    var columnValues = sampleData.Select(r => r.Values.ElementAt(col)).ToList();
+                    var dataType = DetermineDataTypeByColumnName(headers[col], columnValues);
+                    dataTypes.Add(dataType);
                 }
 
                 var result = new
                 {
                     headers = headers,
                     rows = rows,
-                    totalRows = rowCount - 1, // Exclude header
-                    totalColumns = colCount
+                    dataTypes = dataTypes,
+                    totalRows = rowCount - 1, // Total rows excluding header
+                    totalColumns = headers.Count,
+                    sheetName = sheet.SheetName,
+                    sheetIndex = sheetIndex
                 };
 
                 return Task.FromResult<object>(result);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error in GetXlsxPreviewAsync");
-                throw;
-            }
-        }
-
-        private Task<object> GetXlsPreviewAsync(IFormFile file)
-        {
-            try
-            {
-                using var stream = file.OpenReadStream();
-                
-                // Try to read as XLSX first (some .xls files are actually XLSX)
-                try
-                {
-                    using var workbook = new XLWorkbook(stream);
-                    var worksheet = workbook.Worksheets.FirstOrDefault() ?? workbook.Worksheets.First();
-
-                    if (worksheet == null)
-                        throw new InvalidOperationException("Excel dosyasında çalışma sayfası bulunamadı.");
-
-                    var rowCount = worksheet.RowCount();
-                    var colCount = worksheet.ColumnCount();
-
-                    // Get headers (first row)
-                    var headers = new List<string>();
-                    for (int col = 1; col <= colCount; col++)
-                    {
-                        var headerValue = worksheet.Cell(1, col).Value.ToString() ?? "";
-                        headers.Add(string.IsNullOrEmpty(headerValue) ? $"Sütun_{col}" : headerValue);
-                    }
-
-                    // Get first 10 rows of data (excluding header)
-                    var rows = new List<List<string>>();
-                    for (int row = 2; row <= Math.Min(11, rowCount); row++)
-                    {
-                        var rowData = new List<string>();
-                        for (int col = 1; col <= colCount; col++)
-                        {
-                            var cellValue = worksheet.Cell(row, col).Value.ToString() ?? "";
-                            rowData.Add(cellValue);
-                        }
-                        rows.Add(rowData);
-                    }
-
-                    var result = new
-                    {
-                        headers = headers,
-                        rows = rows,
-                        totalRows = rowCount - 1, // Exclude header
-                        totalColumns = colCount
-                    };
-
-                    return Task.FromResult<object>(result);
-                }
-                catch
-                {
-                    // If XLSX reading fails, try alternative approach
-                    stream.Position = 0;
-                    
-                    // Check if file is empty or corrupted
-                    if (file.Length == 0)
-                    {
-                        throw new InvalidOperationException("Excel dosyası boş.");
-                    }
-                    
-                    // Try to read with basic validation
-                    using var workbook = new XLWorkbook(stream);
-                    var worksheet = workbook.Worksheets.FirstOrDefault();
-                    
-                    if (worksheet == null)
-                        throw new InvalidOperationException("Excel dosyasında çalışma sayfası bulunamadı veya dosya bozuk.");
-
-                    var rowCount = worksheet.RowCount();
-                    var colCount = worksheet.ColumnCount();
-
-                    // Get headers (first row)
-                    var headers = new List<string>();
-                    for (int col = 1; col <= colCount; col++)
-                    {
-                        var headerValue = worksheet.Cell(1, col).Value.ToString() ?? "";
-                        headers.Add(string.IsNullOrEmpty(headerValue) ? $"Sütun_{col}" : headerValue);
-                    }
-
-                    // Get first 10 rows of data (excluding header)
-                    var rows = new List<List<string>>();
-                    for (int row = 2; row <= Math.Min(11, rowCount); row++)
-                    {
-                        var rowData = new List<string>();
-                        for (int col = 1; col <= colCount; col++)
-                        {
-                            var cellValue = worksheet.Cell(row, col).Value.ToString() ?? "";
-                            rowData.Add(cellValue);
-                        }
-                        rows.Add(rowData);
-                    }
-
-                    var result = new
-                    {
-                        headers = headers,
-                        rows = rows,
-                        totalRows = rowCount - 1, // Exclude header
-                        totalColumns = colCount
-                    };
-
-                    return Task.FromResult<object>(result);
-                }
             }
             catch (Exception ex)
             {
@@ -208,12 +212,255 @@ namespace ExcelUploader.Services
                     message = $"Excel dosyası okunamadı: {ex.Message}",
                     headers = new List<string>(),
                     rows = new List<List<string>>(),
+                    dataTypes = new List<string>(),
                     totalRows = 0,
-                    totalColumns = 0
+                    totalColumns = 0,
+                    sheetName = "",
+                    sheetIndex = sheetIndex
                 };
                 
                 return Task.FromResult<object>(errorResult);
             }
+        }
+
+        private Task<object> GetXlsxPreviewAsync(IFormFile file, int sheetIndex = 0)
+        {
+            try
+            {
+                using var stream = file.OpenReadStream();
+                using var package = new ExcelPackage(stream);
+                
+                if (package.Workbook.Worksheets.Count == 0)
+                    throw new InvalidOperationException("Excel dosyasında çalışma sayfası bulunamadı.");
+
+                if (sheetIndex >= package.Workbook.Worksheets.Count)
+                    throw new ArgumentException($"Sayfa indeksi geçersiz. Dosyada {package.Workbook.Worksheets.Count} sayfa var.");
+
+                var worksheet = package.Workbook.Worksheets[sheetIndex];
+
+                if (worksheet == null)
+                    throw new InvalidOperationException("Excel dosyasında çalışma sayfası bulunamadı.");
+
+                var rowCount = worksheet.Dimension?.Rows ?? 0;
+                var colCount = worksheet.Dimension?.Columns ?? 0;
+
+                if (rowCount == 0 || colCount == 0)
+                {
+                    // Return empty result for empty sheets
+                    var emptyResult = new
+                    {
+                        headers = new List<string>(),
+                        rows = new List<List<string>>(),
+                        dataTypes = new List<string>(),
+                        totalRows = 0,
+                        totalColumns = 0,
+                        sheetName = worksheet.Name,
+                        sheetIndex = sheetIndex
+                    };
+                    return Task.FromResult<object>(emptyResult);
+                }
+
+                // Get headers (first row)
+                var headers = new List<string>();
+                for (int col = 1; col <= colCount; col++)
+                {
+                    var headerValue = GetCellValue(worksheet, 1, col);
+                    headers.Add(string.IsNullOrEmpty(headerValue) ? $"Sütun_{col}" : headerValue);
+                }
+
+                // Get first 10 rows of data (excluding header)
+                var rows = new List<List<string>>();
+                var dataTypes = new List<string>();
+                var sampleData = new List<Dictionary<string, object>>();
+
+                for (int row = 2; row <= Math.Min(11, rowCount); row++)
+                {
+                    var rowData = new List<string>();
+                    var rowDict = new Dictionary<string, object>();
+                    
+                    for (int col = 1; col <= colCount; col++)
+                    {
+                        var cellValue = GetCellValue(worksheet, row, col);
+                        var displayValue = cellValue ?? "";
+                        rowData.Add(displayValue);
+                        
+                        // Store the actual cell value with proper type for analysis
+                        var actualValue = GetCellValueWithType(worksheet, row, col);
+                        rowDict[headers[col - 1]] = actualValue;
+                    }
+                    rows.Add(rowData);
+                    sampleData.Add(rowDict);
+                }
+
+                // Determine data types based on sample data
+                for (int col = 0; col < headers.Count; col++)
+                {
+                    var columnValues = sampleData.Select(r => r.Values.ElementAt(col)).ToList();
+                    var dataType = DetermineDataTypeByColumnName(headers[col], columnValues);
+                    dataTypes.Add(dataType);
+                }
+
+                var result = new
+                {
+                    headers = headers,
+                    rows = rows,
+                    dataTypes = dataTypes,
+                    totalRows = rowCount - 1, // Exclude header
+                    totalColumns = colCount,
+                    sheetName = worksheet.Name,
+                    sheetIndex = sheetIndex
+                };
+
+                return Task.FromResult<object>(result);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in GetXlsxPreviewAsync");
+                throw;
+            }
+        }
+
+        private string DetermineDataTypeImproved(List<object> values)
+        {
+            var nonNullValues = values.Where(v => v != null && !string.IsNullOrEmpty(v.ToString())).ToList();
+            if (!nonNullValues.Any()) return "nvarchar(255)";
+
+            // Count different types in the column
+            int intCount = 0, decimalCount = 0, dateCount = 0, boolCount = 0, stringCount = 0;
+            int totalCount = nonNullValues.Count;
+
+            foreach (var value in nonNullValues)
+            {
+                if (value is DateTime)
+                    dateCount++;
+                else if (value is bool)
+                    boolCount++;
+                else if (value is int || value is long)
+                    intCount++;
+                else if (value is decimal || value is double || value is float)
+                    decimalCount++;
+                else if (value is string strValue)
+                {
+                    // Try to parse string values
+                    if (DateTime.TryParse(strValue, out _))
+                        dateCount++;
+                    else if (int.TryParse(strValue, out _))
+                        intCount++;
+                    else if (decimal.TryParse(strValue, out _))
+                        decimalCount++;
+                    else if (bool.TryParse(strValue, out _))
+                        boolCount++;
+                    else
+                        stringCount++;
+                }
+                else
+                    stringCount++;
+            }
+
+            // Determine the most common type
+            if (dateCount > totalCount * 0.5) return "datetime2";
+            if (boolCount > totalCount * 0.5) return "bit";
+            if (intCount > totalCount * 0.5) return "int";
+            if (decimalCount > totalCount * 0.5) return "decimal(18,2)";
+            if (stringCount > totalCount * 0.5)
+            {
+                // Check if any string is very long
+                var maxLength = nonNullValues.OfType<string>().Max(s => s?.Length ?? 0);
+                if (maxLength > 255) return "nvarchar(max)";
+                return "nvarchar(255)";
+            }
+
+            // If no clear majority, use the most specific type found
+            if (dateCount > 0) return "datetime2";
+            if (boolCount > 0) return "bit";
+            if (intCount > 0) return "int";
+            if (decimalCount > 0) return "decimal(18,2)";
+            
+            return "nvarchar(255)";
+        }
+
+        private string DetermineDataTypeByColumnName(string columnName, List<object> values)
+        {
+            if (string.IsNullOrEmpty(columnName)) return DetermineDataTypeImproved(values);
+
+            var lowerColumnName = columnName.ToLowerInvariant();
+            
+            // Date-related column names - HIGH PRIORITY
+            if (lowerColumnName.Contains("tarih") || lowerColumnName.Contains("date") || 
+                lowerColumnName.Contains("zaman") || lowerColumnName.Contains("time") ||
+                lowerColumnName.Contains("başlangıç") || lowerColumnName.Contains("bitiş") ||
+                lowerColumnName.Contains("start") || lowerColumnName.Contains("end") ||
+                lowerColumnName.Contains("doğum") || lowerColumnName.Contains("birth") ||
+                lowerColumnName.Contains("ödeme") && lowerColumnName.Contains("tarih"))
+            {
+                return "datetime2";
+            }
+
+            // Money/amount-related column names - HIGH PRIORITY
+            if (lowerColumnName.Contains("tutar") || lowerColumnName.Contains("amount") ||
+                lowerColumnName.Contains("fiyat") || lowerColumnName.Contains("price") ||
+                lowerColumnName.Contains("ücret") || lowerColumnName.Contains("fee") ||
+                lowerColumnName.Contains("maliyet") || lowerColumnName.Contains("cost") ||
+                lowerColumnName.Contains("öde") || lowerColumnName.Contains("pay") ||
+                lowerColumnName.Contains("para") || lowerColumnName.Contains("money") ||
+                lowerColumnName.Contains("oran") || lowerColumnName.Contains("rate") ||
+                lowerColumnName.Contains("yüzde") || lowerColumnName.Contains("percent") ||
+                lowerColumnName.Contains("odenecek") || lowerColumnName.Contains("odendiginde"))
+            {
+                return "decimal(18,2)";
+            }
+
+            // Number-related column names
+            if (lowerColumnName.Contains("numara") || lowerColumnName.Contains("no") ||
+                lowerColumnName.Contains("id") || lowerColumnName.Contains("kod") ||
+                lowerColumnName.Contains("code") || lowerColumnName.Contains("sıra") ||
+                lowerColumnName.Contains("order") || lowerColumnName.Contains("index") ||
+                lowerColumnName.Contains("yıl") || lowerColumnName.Contains("year"))
+            {
+                return "int";
+            }
+
+            // Boolean-related column names
+            if (lowerColumnName.Contains("aktif") || lowerColumnName.Contains("active") ||
+                lowerColumnName.Contains("pasif") || lowerColumnName.Contains("passive") ||
+                lowerColumnName.Contains("evet") || lowerColumnName.Contains("hayır") ||
+                lowerColumnName.Contains("yes") || lowerColumnName.Contains("no") ||
+                lowerColumnName.Contains("var") || lowerColumnName.Contains("yok") ||
+                lowerColumnName.Contains("true") || lowerColumnName.Contains("false"))
+            {
+                return "bit";
+            }
+
+            // Long text column names
+            if (lowerColumnName.Contains("açıklama") || lowerColumnName.Contains("description") ||
+                lowerColumnName.Contains("detay") || lowerColumnName.Contains("detail") ||
+                lowerColumnName.Contains("not") || lowerColumnName.Contains("comment") ||
+                lowerColumnName.Contains("yorum") || lowerColumnName.Contains("adres") ||
+                lowerColumnName.Contains("address") || lowerColumnName.Contains("içerik") ||
+                lowerColumnName.Contains("content"))
+            {
+                return "nvarchar(max)";
+            }
+
+            // Try content-based detection as fallback
+            var contentBasedType = DetermineDataTypeImproved(values);
+            
+            // If content-based detection suggests varchar, try to be more specific
+            if (contentBasedType == "nvarchar(255)")
+            {
+                // Check if any values look like numbers
+                var hasNumbers = values.Any(v => 
+                    v != null && 
+                    decimal.TryParse(v.ToString(), out _) && 
+                    !DateTime.TryParse(v.ToString(), out _));
+                
+                if (hasNumbers)
+                {
+                    return "decimal(18,2)";
+                }
+            }
+            
+            return contentBasedType;
         }
 
         public async Task<List<ExcelData>> ProcessExcelFileAsync(IFormFile file, string uploadedBy)
@@ -352,43 +599,43 @@ namespace ExcelUploader.Services
                 };
 
                 // Map columns based on the Excel structure from the images
-                excelData.BasvuruYili = GetNpoiCellValue(sheetRow, 0); // Column A
-                excelData.HareketlilikTipi = GetNpoiCellValue(sheetRow, 1); // Column B
-                excelData.BasvuruTipi = GetNpoiCellValue(sheetRow, 2); // Column C
-                excelData.Ad = GetNpoiCellValue(sheetRow, 3); // Column D
-                excelData.Soyad = GetNpoiCellValue(sheetRow, 4); // Column E
-                excelData.OdemeTipi = GetNpoiCellValue(sheetRow, 5); // Column F
-                excelData.Taksit = GetNpoiCellValue(sheetRow, 6); // Column G
+                excelData.BasvuruYili = GetNpoiCellValue(sheetRow.GetCell(0)); // Column A
+                excelData.HareketlilikTipi = GetNpoiCellValue(sheetRow.GetCell(1)); // Column B
+                excelData.BasvuruTipi = GetNpoiCellValue(sheetRow.GetCell(2)); // Column C
+                excelData.Ad = GetNpoiCellValue(sheetRow.GetCell(3)); // Column D
+                excelData.Soyad = GetNpoiCellValue(sheetRow.GetCell(4)); // Column E
+                excelData.OdemeTipi = GetNpoiCellValue(sheetRow.GetCell(5)); // Column F
+                excelData.Taksit = GetNpoiCellValue(sheetRow.GetCell(6)); // Column G
                 excelData.Odenecek = GetNpoiDecimalValue(sheetRow, 7); // Column H
                 excelData.Odendiginde = GetNpoiDecimalValue(sheetRow, 8); // Column I
                 excelData.OdemeTarihi = GetNpoiDateValue(sheetRow, 9); // Column J
-                excelData.Aciklama = GetNpoiCellValue(sheetRow, 10); // Column K
+                excelData.Aciklama = GetNpoiCellValue(sheetRow.GetCell(10)); // Column K
                 excelData.OdemeOrani = GetNpoiDecimalValue(sheetRow, 11); // Column L
 
                 // Additional columns for detailed student information
-                if (sheetRow.LastCellNum >= 13) excelData.KullaniciAdi = GetNpoiCellValue(sheetRow, 12);
-                if (sheetRow.LastCellNum >= 14) excelData.TCKimlikNo = GetNpoiCellValue(sheetRow, 13);
-                if (sheetRow.LastCellNum >= 15) excelData.PasaportNo = GetNpoiCellValue(sheetRow, 14);
+                if (sheetRow.LastCellNum >= 13) excelData.KullaniciAdi = GetNpoiCellValue(sheetRow.GetCell(12));
+                if (sheetRow.LastCellNum >= 14) excelData.TCKimlikNo = GetNpoiCellValue(sheetRow.GetCell(13));
+                if (sheetRow.LastCellNum >= 15) excelData.PasaportNo = GetNpoiCellValue(sheetRow.GetCell(14));
                 if (sheetRow.LastCellNum >= 16) excelData.DogumTarihi = GetNpoiDateValue(sheetRow, 15);
-                if (sheetRow.LastCellNum >= 17) excelData.DogumYeri = GetNpoiCellValue(sheetRow, 16);
-                if (sheetRow.LastCellNum >= 18) excelData.Cinsiyet = GetNpoiCellValue(sheetRow, 17);
+                if (sheetRow.LastCellNum >= 17) excelData.DogumYeri = GetNpoiCellValue(sheetRow.GetCell(16));
+                if (sheetRow.LastCellNum >= 18) excelData.Cinsiyet = GetNpoiCellValue(sheetRow.GetCell(17));
 
                 // Address and bank information
-                if (sheetRow.LastCellNum >= 19) excelData.AdresIl = GetNpoiCellValue(sheetRow, 18);
-                if (sheetRow.LastCellNum >= 20) excelData.AdresUlke = GetNpoiCellValue(sheetRow, 19);
-                if (sheetRow.LastCellNum >= 21) excelData.BankaHesapSahibi = GetNpoiCellValue(sheetRow, 20);
-                if (sheetRow.LastCellNum >= 22) excelData.BankaAdi = GetNpoiCellValue(sheetRow, 21);
-                if (sheetRow.LastCellNum >= 23) excelData.BankaSubeKodu = GetNpoiCellValue(sheetRow, 22);
-                if (sheetRow.LastCellNum >= 24) excelData.BankaSubeAdi = GetNpoiCellValue(sheetRow, 23);
-                if (sheetRow.LastCellNum >= 25) excelData.BankaHesapNumarasi = GetNpoiCellValue(sheetRow, 24);
-                if (sheetRow.LastCellNum >= 26) excelData.BankaIBANNo = GetNpoiCellValue(sheetRow, 25);
+                if (sheetRow.LastCellNum >= 19) excelData.AdresIl = GetNpoiCellValue(sheetRow.GetCell(18));
+                if (sheetRow.LastCellNum >= 20) excelData.AdresUlke = GetNpoiCellValue(sheetRow.GetCell(19));
+                if (sheetRow.LastCellNum >= 21) excelData.BankaHesapSahibi = GetNpoiCellValue(sheetRow.GetCell(20));
+                if (sheetRow.LastCellNum >= 22) excelData.BankaAdi = GetNpoiCellValue(sheetRow.GetCell(21));
+                if (sheetRow.LastCellNum >= 23) excelData.BankaSubeKodu = GetNpoiCellValue(sheetRow.GetCell(22));
+                if (sheetRow.LastCellNum >= 24) excelData.BankaSubeAdi = GetNpoiCellValue(sheetRow.GetCell(23));
+                if (sheetRow.LastCellNum >= 25) excelData.BankaHesapNumarasi = GetNpoiCellValue(sheetRow.GetCell(24));
+                if (sheetRow.LastCellNum >= 26) excelData.BankaIBANNo = GetNpoiCellValue(sheetRow.GetCell(25));
 
                 // Student and academic information
-                if (sheetRow.LastCellNum >= 27) excelData.OgrenciNo = GetNpoiCellValue(sheetRow, 26);
-                if (sheetRow.LastCellNum >= 28) excelData.FakulteAdi = GetNpoiCellValue(sheetRow, 27);
-                if (sheetRow.LastCellNum >= 29) excelData.BirimAdi = GetNpoiCellValue(sheetRow, 28);
-                if (sheetRow.LastCellNum >= 30) excelData.DiplomaDerecesi = GetNpoiCellValue(sheetRow, 29);
-                if (sheetRow.LastCellNum >= 31) excelData.Sinif = GetNpoiCellValue(sheetRow, 30);
+                if (sheetRow.LastCellNum >= 27) excelData.OgrenciNo = GetNpoiCellValue(sheetRow.GetCell(26));
+                if (sheetRow.LastCellNum >= 28) excelData.FakulteAdi = GetNpoiCellValue(sheetRow.GetCell(27));
+                if (sheetRow.LastCellNum >= 29) excelData.BirimAdi = GetNpoiCellValue(sheetRow.GetCell(28));
+                if (sheetRow.LastCellNum >= 30) excelData.DiplomaDerecesi = GetNpoiCellValue(sheetRow.GetCell(29));
+                if (sheetRow.LastCellNum >= 31) excelData.Sinif = GetNpoiCellValue(sheetRow.GetCell(30));
 
                 // Only add if at least one field has data
                 if (!string.IsNullOrWhiteSpace(excelData.Ad) || !string.IsNullOrWhiteSpace(excelData.Soyad) || 
@@ -466,6 +713,27 @@ namespace ExcelUploader.Services
             }
         }
 
+        private string GetNpoiCellValue(ICell? cell)
+        {
+            if (cell == null) return string.Empty;
+            
+            switch (cell.CellType)
+            {
+                case CellType.String:
+                    return cell.StringCellValue ?? string.Empty;
+                case CellType.Numeric:
+                    if (DateUtil.IsCellDateFormatted(cell))
+                        return cell.DateCellValue.ToString();
+                    return cell.NumericCellValue.ToString();
+                case CellType.Boolean:
+                    return cell.BooleanCellValue.ToString();
+                case CellType.Formula:
+                    return cell.StringCellValue ?? string.Empty;
+                default:
+                    return string.Empty;
+            }
+        }
+
         private decimal? GetNpoiDecimalValue(IRow row, int col)
         {
             try
@@ -505,6 +773,63 @@ namespace ExcelUploader.Services
             catch
             {
                 return null;
+            }
+        }
+
+        private object GetNpoiCellValueWithType(ICell? cell)
+        {
+            if (cell == null) return string.Empty;
+            
+            switch (cell.CellType)
+            {
+                case CellType.String:
+                    return cell.StringCellValue ?? string.Empty;
+                case CellType.Numeric:
+                    if (DateUtil.IsCellDateFormatted(cell))
+                        return cell.DateCellValue;
+                    return cell.NumericCellValue;
+                case CellType.Boolean:
+                    return cell.BooleanCellValue;
+                case CellType.Formula:
+                    // For formulas, try to get the calculated value
+                    try
+                    {
+                        switch (cell.CachedFormulaResultType)
+                        {
+                            case CellType.String:
+                                return cell.StringCellValue ?? string.Empty;
+                            case CellType.Numeric:
+                                if (DateUtil.IsCellDateFormatted(cell))
+                                    return cell.DateCellValue;
+                                return cell.NumericCellValue;
+                            case CellType.Boolean:
+                                return cell.BooleanCellValue;
+                            default:
+                                return cell.StringCellValue ?? string.Empty;
+                        }
+                    }
+                    catch
+                    {
+                        return cell.StringCellValue ?? string.Empty;
+                    }
+                default:
+                    return string.Empty;
+            }
+        }
+
+        private object GetCellValueWithType(ExcelWorksheet worksheet, int row, int col)
+        {
+            try
+            {
+                var cell = worksheet.Cells[row, col];
+                if (cell?.Value == null) return string.Empty;
+                
+                // Return the actual value with its type
+                return cell.Value;
+            }
+            catch
+            {
+                return string.Empty;
             }
         }
 

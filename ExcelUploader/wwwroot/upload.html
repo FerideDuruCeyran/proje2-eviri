@@ -647,7 +647,37 @@
             const columnsGrid = document.getElementById('columnsGrid');
             columnsGrid.innerHTML = '';
 
+            // Add edit mode toggle
+            const editModeDiv = document.createElement('div');
+            editModeDiv.className = 'edit-mode-toggle';
+            editModeDiv.innerHTML = `
+                <div class="alert alert-info">
+                    <label class="checkbox-container">
+                        <input type="checkbox" id="enableDataTypeEditing" onchange="toggleDataTypeEditing()">
+                        <span class="checkmark"></span>
+                        <strong>Veri Tipi Düzenlemeyi Etkinleştir</strong>
+                    </label>
+                    <small class="text-muted d-block mt-2">
+                        <i class="fas fa-info-circle"></i> 
+                        Veri tipleri otomatik olarak algılanmıştır. Düzenlemek istiyorsanız bu seçeneği etkinleştirin.
+                    </small>
+                </div>
+            `;
+            columnsGrid.appendChild(editModeDiv);
+
             excelData.preview.headers.forEach((header, index) => {
+                // Get detected data type from backend
+                const detectedType = excelData.preview.dataTypes ? excelData.preview.dataTypes[index] : 'nvarchar(255)';
+                
+                // Map SQL data type to frontend option value
+                let defaultType = 'string';
+                if (detectedType.includes('int')) defaultType = 'int';
+                else if (detectedType.includes('decimal')) defaultType = 'decimal';
+                else if (detectedType.includes('datetime')) defaultType = 'datetime';
+                else if (detectedType.includes('bit')) defaultType = 'boolean';
+                else if (detectedType.includes('nvarchar(max)')) defaultType = 'longtext';
+                else defaultType = 'string';
+
                 const columnDiv = document.createElement('div');
                 columnDiv.className = 'column-item';
                 columnDiv.innerHTML = `
@@ -657,14 +687,20 @@
                             <span class="checkmark"></span>
                             <strong>${header}</strong>
                         </label>
+                        <div class="detected-type">
+                            <small class="text-success">
+                                <i class="fas fa-magic"></i> Otomatik tespit: <strong>${detectedType}</strong>
+                            </small>
+                        </div>
                     </div>
                     <div class="column-options">
-                        <select class="form-control" onchange="updateColumnType(${index}, this.value)">
-                            <option value="string">Metin (VARCHAR)</option>
-                            <option value="int">Tam Sayı (INT)</option>
-                            <option value="decimal">Ondalık (DECIMAL)</option>
-                            <option value="datetime">Tarih/Saat (DATETIME)</option>
-                            <option value="boolean">Mantık (BIT)</option>
+                        <select class="form-control data-type-select" id="dataType_${index}" disabled onchange="updateColumnType(${index}, this.value)">
+                            <option value="string" ${defaultType === 'string' ? 'selected' : ''}>Metin (VARCHAR)</option>
+                            <option value="int" ${defaultType === 'int' ? 'selected' : ''}>Tam Sayı (INT)</option>
+                            <option value="decimal" ${defaultType === 'decimal' ? 'selected' : ''}>Ondalık (DECIMAL)</option>
+                            <option value="datetime" ${defaultType === 'datetime' ? 'selected' : ''}>Tarih/Saat (DATETIME)</option>
+                            <option value="boolean" ${defaultType === 'boolean' ? 'selected' : ''}>Mantık (BIT)</option>
+                            <option value="longtext" ${defaultType === 'longtext' ? 'selected' : ''}>Uzun Metin (MAX)</option>
                         </select>
                     </div>
                 `;
@@ -674,7 +710,7 @@
                 selectedColumns.push({
                     index: index,
                     name: header,
-                    type: 'string',
+                    type: defaultType,
                     selected: true
                 });
             });
@@ -688,6 +724,23 @@
         // Update column type
         function updateColumnType(index, type) {
             selectedColumns[index].type = type;
+        }
+
+        // Toggle data type editing
+        function toggleDataTypeEditing() {
+            const enableEditing = document.getElementById('enableDataTypeEditing').checked;
+            const dataTypeSelects = document.querySelectorAll('.data-type-select');
+            
+            dataTypeSelects.forEach(select => {
+                select.disabled = !enableEditing;
+                if (enableEditing) {
+                    select.style.backgroundColor = '#ffffff';
+                    select.style.borderColor = '#667eea';
+                } else {
+                    select.style.backgroundColor = '#f8f9fa';
+                    select.style.borderColor = '#e1e5e9';
+                }
+            });
         }
 
                          // Setup table naming

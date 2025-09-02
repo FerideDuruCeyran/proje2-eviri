@@ -10,5 +10,7 @@ namespace ExcelUploader.Services
         Task<bool> ValidateExcelFileAsync(IFormFile file);
         Task<string> GetFileSummaryAsync(IFormFile file);
         Task<object> GetExcelPreviewAsync(IFormFile file);
+        Task<object> GetExcelPreviewAsync(IFormFile file, int sheetIndex);
+        Task<List<string>> GetSheetNamesAsync(IFormFile file);
     }
 }
