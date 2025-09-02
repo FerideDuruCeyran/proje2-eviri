@@ -22,12 +22,16 @@ namespace ExcelUploader.Services
         {
             try
             {
+                _logger.LogInformation("Starting Excel file analysis for: {FileName}", file.FileName);
+                
                 if (file.FileName.EndsWith(".xlsx"))
                 {
+                    _logger.LogInformation("Processing XLSX file: {FileName}", file.FileName);
                     return await AnalyzeXlsxFileAsync(file, 0);
                 }
                 else if (file.FileName.EndsWith(".xls"))
                 {
+                    _logger.LogInformation("Processing XLS file: {FileName}", file.FileName);
                     return await AnalyzeXlsFileAsync(file, 0);
                 }
                 else
@@ -37,7 +41,8 @@ namespace ExcelUploader.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Excel dosyası analiz edilirken hata oluştu: {file.FileName}");
+                _logger.LogError(ex, "Excel dosyası analiz edilirken hata oluştu: {FileName}, Error: {Message}", file.FileName, ex.Message);
+                _logger.LogError(ex, "Stack trace: {StackTrace}", ex.StackTrace);
                 throw;
             }
         }
@@ -101,113 +106,162 @@ namespace ExcelUploader.Services
 
         private Task<ExcelAnalysisResult> AnalyzeXlsxFileAsync(IFormFile file, int sheetIndex = 0)
         {
-            using var stream = file.OpenReadStream();
-            using var package = new ExcelPackage(stream);
-            
-            if (package.Workbook.Worksheets.Count == 0)
-                throw new InvalidOperationException("Excel dosyasında çalışma sayfası bulunamadı.");
-
-            if (sheetIndex >= package.Workbook.Worksheets.Count)
-                throw new ArgumentException($"Sayfa indeksi geçersiz. Dosyada {package.Workbook.Worksheets.Count} sayfa var.");
-
-            var worksheet = package.Workbook.Worksheets[sheetIndex];
-
-            if (worksheet == null)
-                throw new InvalidOperationException("Excel dosyasında çalışma sayfası bulunamadı.");
-
-            var rowCount = worksheet.Dimension?.Rows ?? 0;
-            var colCount = worksheet.Dimension?.Columns ?? 0;
-
-            _logger.LogInformation($"Excel file analysis: {file.FileName}, Sheet: {worksheet.Name}, Initial Rows: {rowCount}, Columns: {colCount}");
-
-            // If Dimension is null or shows 0, try to find data by scanning
-            if (rowCount == 0 || colCount == 0)
+            try
             {
-                // Scan for actual data
-                var actualData = ScanForData(worksheet);
-                rowCount = actualData.rowCount;
-                colCount = actualData.colCount;
+                _logger.LogInformation("Starting XLSX file analysis: {FileName}, SheetIndex: {SheetIndex}", file.FileName, sheetIndex);
                 
-                _logger.LogInformation($"After scanning: Rows: {rowCount}, Columns: {colCount}");
-                
+                using var stream = file.OpenReadStream();
+                using var package = new ExcelPackage(stream);
+            
+                if (package.Workbook.Worksheets.Count == 0)
+                    throw new InvalidOperationException("Excel dosyasında çalışma sayfası bulunamadı.");
+
+                if (sheetIndex >= package.Workbook.Worksheets.Count)
+                    throw new ArgumentException($"Sayfa indeksi geçersiz. Dosyada {package.Workbook.Worksheets.Count} sayfa var.");
+
+                var worksheet = package.Workbook.Worksheets[sheetIndex];
+
+                if (worksheet == null)
+                    throw new InvalidOperationException("Excel dosyasında çalışma sayfası bulunamadı.");
+
+                var rowCount = worksheet.Dimension?.Rows ?? 0;
+                var colCount = worksheet.Dimension?.Columns ?? 0;
+
+                _logger.LogInformation($"Excel file analysis: {file.FileName}, Sheet: {worksheet.Name}, Initial Rows: {rowCount}, Columns: {colCount}");
+
+                // If Dimension is null or shows 0, try to find data by scanning
                 if (rowCount == 0 || colCount == 0)
                 {
-                    // Return empty result for empty sheets
-                    return Task.FromResult(new ExcelAnalysisResult
+                    // Scan for actual data
+                    var actualData = ScanForData(worksheet);
+                    rowCount = actualData.rowCount;
+                    colCount = actualData.colCount;
+                    
+                    _logger.LogInformation($"After scanning: Rows: {rowCount}, Columns: {colCount}");
+                    
+                    if (rowCount == 0 || colCount == 0)
                     {
-                        FileName = file.FileName,
-                        TotalRows = 0,
-                        TotalColumns = 0,
-                        Headers = new List<string>(),
-                        ExcelColumnHeaders = new List<string>(),
-                        DataTypes = new List<string>(),
-                        DataTypeAnalysis = new List<ColumnDataTypeAnalysis>(),
-                        SampleData = new List<Dictionary<string, object>>(),
-                        AnalysisDate = DateTime.UtcNow,
-                        SheetName = worksheet.Name,
-                        SheetIndex = sheetIndex
-                    });
+                        // Return empty result for empty sheets
+                        return Task.FromResult(new ExcelAnalysisResult
+                        {
+                            FileName = file.FileName,
+                            TotalRows = 0,
+                            TotalColumns = 0,
+                            Headers = new List<string>(),
+                            ExcelColumnHeaders = new List<string>(),
+                            DataTypes = new List<string>(),
+                            DataTypeAnalysis = new List<ColumnDataTypeAnalysis>(),
+                            SampleData = new List<Dictionary<string, object>>(),
+                            AnalysisDate = DateTime.UtcNow,
+                            SheetName = worksheet.Name,
+                            SheetIndex = sheetIndex
+                        });
+                    }
                 }
-            }
 
-            // Excel sütun başlıklarını oluştur (A, B, C, D, ...)
-            var columnHeaders = GenerateExcelColumnHeaders(colCount);
-            
-            // İlk satırı oku (gerçek başlıklar varsa)
-            var actualHeaders = new List<string>();
-            for (int col = 1; col <= colCount; col++)
-            {
-                var headerValue = GetCellValue(worksheet, 1, col);
-                actualHeaders.Add(string.IsNullOrEmpty(headerValue) ? columnHeaders[col - 1] : headerValue);
-            }
-
-            _logger.LogInformation($"Headers found: {string.Join(", ", actualHeaders)}");
-
-            // İlk 10 satırı oku ve veri tiplerini analiz et
-            var sampleData = new List<Dictionary<string, object>>();
-            var dataTypes = new List<string>();
-            var dataTypeAnalysis = new List<ColumnDataTypeAnalysis>();
-
-            // Start from row 2 (after header) and read up to 10 rows
-            for (int row = 2; row <= Math.Min(11, rowCount); row++)
-            {
-                var rowData = new Dictionary<string, object>();
+                // Excel sütun başlıklarını oluştur (A, B, C, D, ...)
+                var columnHeaders = GenerateExcelColumnHeaders(colCount);
+                
+                // İlk satırı oku (gerçek başlıklar varsa)
+                var actualHeaders = new List<string>();
                 for (int col = 1; col <= colCount; col++)
                 {
-                    var cellValue = GetCellValueWithType(worksheet, row, col);
-                    rowData[actualHeaders[col - 1]] = cellValue;
+                    try
+                    {
+                        var headerValue = GetCellValue(worksheet, 1, col);
+                        actualHeaders.Add(string.IsNullOrEmpty(headerValue) ? columnHeaders[col - 1] : headerValue);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Error reading header at column {Column}", col);
+                        actualHeaders.Add(columnHeaders[col - 1]);
+                    }
                 }
-                sampleData.Add(rowData);
+
+                _logger.LogInformation($"Headers found: {string.Join(", ", actualHeaders)}");
+
+                // İlk 10 satırı oku ve veri tiplerini analiz et
+                var sampleData = new List<Dictionary<string, object>>();
+                var dataTypes = new List<string>();
+                var dataTypeAnalysis = new List<ColumnDataTypeAnalysis>();
+
+                // Start from row 2 (after header) and read up to 10 rows
+                for (int row = 2; row <= Math.Min(11, rowCount); row++)
+                {
+                    try
+                    {
+                        var rowData = new Dictionary<string, object>();
+                        for (int col = 1; col <= colCount; col++)
+                        {
+                            try
+                            {
+                                var cellValue = GetCellValueWithType(worksheet, row, col);
+                                rowData[actualHeaders[col - 1]] = cellValue;
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogWarning(ex, "Error reading cell at row {Row}, col {Column}", row, col);
+                                rowData[actualHeaders[col - 1]] = string.Empty;
+                            }
+                        }
+                        sampleData.Add(rowData);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Error reading row {Row}", row);
+                        // Continue with next row
+                    }
+                }
+
+                _logger.LogInformation($"Sample data rows collected: {sampleData.Count}");
+
+                // Her sütun için veri tipi analizi yap
+                for (int col = 0; col < actualHeaders.Count; col++)
+                {
+                    try
+                    {
+                        var columnValues = sampleData.Select(r => r.Values.ElementAt(col)).ToList();
+                        var analysis = AnalyzeColumnDataType(actualHeaders[col], columnValues);
+                        dataTypes.Add(analysis.DetectedDataType);
+                        dataTypeAnalysis.Add(analysis);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogWarning(ex, "Error analyzing column {Column}", col);
+                        dataTypes.Add("nvarchar(255)");
+                        dataTypeAnalysis.Add(new ColumnDataTypeAnalysis
+                        {
+                            ColumnName = actualHeaders[col],
+                            DetectedDataType = "nvarchar(255)",
+                            Confidence = 0.0
+                        });
+                    }
+                }
+
+                var result = new ExcelAnalysisResult
+                {
+                    FileName = file.FileName,
+                    TotalRows = rowCount - 1, // Header satırını çıkar
+                    TotalColumns = colCount,
+                    Headers = actualHeaders,
+                    ExcelColumnHeaders = columnHeaders,
+                    DataTypes = dataTypes,
+                    DataTypeAnalysis = dataTypeAnalysis,
+                    SampleData = sampleData,
+                    AnalysisDate = DateTime.UtcNow,
+                    SheetName = worksheet.Name,
+                    SheetIndex = sheetIndex
+                };
+
+                _logger.LogInformation($"Excel dosyası analiz edildi: {file.FileName}, Sayfa: {worksheet.Name}, {result.TotalRows} satır, {result.TotalColumns} sütun");
+                return Task.FromResult(result);
             }
-
-            _logger.LogInformation($"Sample data rows collected: {sampleData.Count}");
-
-            // Her sütun için veri tipi analizi yap
-            for (int col = 0; col < actualHeaders.Count; col++)
+            catch (Exception ex)
             {
-                var columnValues = sampleData.Select(r => r.Values.ElementAt(col)).ToList();
-                var analysis = AnalyzeColumnDataType(actualHeaders[col], columnValues);
-                dataTypes.Add(analysis.DetectedDataType);
-                dataTypeAnalysis.Add(analysis);
+                _logger.LogError(ex, "Error analyzing XLSX file: {FileName}, Error: {Message}", file.FileName, ex.Message);
+                _logger.LogError(ex, "Stack trace: {StackTrace}", ex.StackTrace);
+                throw;
             }
-
-            var result = new ExcelAnalysisResult
-            {
-                FileName = file.FileName,
-                TotalRows = rowCount - 1, // Header satırını çıkar
-                TotalColumns = colCount,
-                Headers = actualHeaders,
-                ExcelColumnHeaders = columnHeaders,
-                DataTypes = dataTypes,
-                DataTypeAnalysis = dataTypeAnalysis,
-                SampleData = sampleData,
-                AnalysisDate = DateTime.UtcNow,
-                SheetName = worksheet.Name,
-                SheetIndex = sheetIndex
-            };
-
-            _logger.LogInformation($"Excel dosyası analiz edildi: {file.FileName}, Sayfa: {worksheet.Name}, {result.TotalRows} satır, {result.TotalColumns} sütun");
-            return Task.FromResult(result);
         }
 
         private Task<ExcelAnalysisResult> AnalyzeXlsFileAsync(IFormFile file, int sheetIndex = 0)

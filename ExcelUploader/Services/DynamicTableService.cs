@@ -319,7 +319,8 @@ namespace ExcelUploader.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error creating table structure from Excel file: {FileName}", file.FileName);
+                _logger.LogError(ex, "Error creating table structure from Excel file: {FileName}, Error: {Message}", file.FileName, ex.Message);
+                _logger.LogError(ex, "Stack trace: {StackTrace}", ex.StackTrace);
                 throw;
             }
         }
@@ -1083,10 +1084,24 @@ namespace ExcelUploader.Services
 
         public async Task<(List<string> headers, List<string> dataTypes, List<Dictionary<string, object>> sampleData)> AnalyzeExcelFileAsync(IFormFile file)
         {
-            // ExcelAnalyzerService kullanarak dosyayı analiz et
-            var analysisResult = await _excelAnalyzerService.AnalyzeExcelFileAsync(file);
-            
-            return (analysisResult.Headers, analysisResult.DataTypes, analysisResult.SampleData);
+            try
+            {
+                _logger.LogInformation("Starting Excel file analysis for: {FileName}", file.FileName);
+                
+                // ExcelAnalyzerService kullanarak dosyayı analiz et
+                var analysisResult = await _excelAnalyzerService.AnalyzeExcelFileAsync(file);
+                
+                _logger.LogInformation("Excel analysis completed. Headers: {HeaderCount}, DataTypes: {DataTypeCount}, SampleData: {SampleDataCount}", 
+                    analysisResult.Headers.Count, analysisResult.DataTypes.Count, analysisResult.SampleData.Count);
+                
+                return (analysisResult.Headers, analysisResult.DataTypes, analysisResult.SampleData);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error analyzing Excel file: {FileName}, Error: {Message}", file.FileName, ex.Message);
+                _logger.LogError(ex, "Stack trace: {StackTrace}", ex.StackTrace);
+                throw;
+            }
         }
 
         private Task AnalyzeXlsxFileAsync(IFormFile file, List<string> headers, List<string> dataTypes, List<Dictionary<string, object>> sampleData)

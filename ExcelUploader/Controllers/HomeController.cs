@@ -545,8 +545,13 @@ namespace ExcelUploader.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error creating table structure");
-                return StatusCode(500, new { error = "Tablo yapısı oluşturulurken hata oluştu" });
+                _logger.LogError(ex, "Error creating table structure: {Message}", ex.Message);
+                _logger.LogError(ex, "Stack trace: {StackTrace}", ex.StackTrace);
+                return StatusCode(500, new { 
+                    error = "Tablo yapısı oluşturulurken hata oluştu", 
+                    details = ex.Message,
+                    stackTrace = ex.StackTrace
+                });
             }
         }
 
