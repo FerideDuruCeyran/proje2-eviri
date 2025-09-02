@@ -248,49 +248,74 @@ namespace ExcelUploader.Services
                 }
                 else
                 {
-                // Read Excel headers and determine data types
-                var (headers, dataTypes, sampleData) = await AnalyzeExcelFileAsync(file);
-                
-                // Create DynamicTable entity
-                    dynamicTable = new DynamicTable
-                {
-                    TableName = tableName,
-                    FileName = file.FileName,
-                    UploadedBy = uploadedBy,
-                        Description = description ?? string.Empty,
-                    RowCount = sampleData.Count,
-                    ColumnCount = headers.Count,
-                    UploadDate = DateTime.UtcNow,
-                    IsProcessed = false // Not processed yet
-                };
-
-                // Create table columns
-                for (int i = 0; i < headers.Count; i++)
-                {
-                    var column = new TableColumn
+                    try
                     {
-                        ColumnName = SanitizeColumnName(headers[i]),
-                        DisplayName = headers[i],
-                        DataType = dataTypes[i],
-                        ColumnOrder = i + 1,
-                        MaxLength = dataTypes[i] == "nvarchar" ? 1000 : null,
-                        IsRequired = false,
-                        IsUnique = false
-                    };
-                    
-                    dynamicTable.Columns.Add(column);
-                }
+                        // Read Excel headers and determine data types
+                        _logger.LogInformation("Starting Excel analysis for table structure creation: {FileName}", file.FileName);
+                        var (headers, dataTypes, sampleData) = await AnalyzeExcelFileAsync(file);
+                        
+                        _logger.LogInformation("Excel analysis completed. Headers: {HeaderCount}, DataTypes: {DataTypeCount}, SampleData: {SampleDataCount}", 
+                            headers.Count, dataTypes.Count, sampleData.Count);
+                        
+                        // Create DynamicTable entity
+                        dynamicTable = new DynamicTable
+                        {
+                            TableName = tableName,
+                            FileName = file.FileName,
+                            UploadedBy = uploadedBy,
+                            Description = description ?? string.Empty,
+                            RowCount = sampleData.Count,
+                            ColumnCount = headers.Count,
+                            UploadDate = DateTime.UtcNow,
+                            IsProcessed = false // Not processed yet
+                        };
 
-                // Save to database
-                _context.DynamicTables.Add(dynamicTable);
-                await _context.SaveChangesAsync();
+                        // Create table columns
+                        for (int i = 0; i < headers.Count; i++)
+                        {
+                            try
+                            {
+                                var column = new TableColumn
+                                {
+                                    ColumnName = SanitizeColumnName(headers[i]),
+                                    DisplayName = headers[i],
+                                    DataType = dataTypes[i],
+                                    ColumnOrder = i + 1,
+                                    MaxLength = dataTypes[i] == "nvarchar" ? 1000 : null,
+                                    IsRequired = false,
+                                    IsUnique = false
+                                };
+                                
+                                dynamicTable.Columns.Add(column);
+                                _logger.LogInformation("Added column: {ColumnName} ({DataType})", column.ColumnName, column.DataType);
+                            }
+                            catch (Exception ex)
+                            {
+                                _logger.LogWarning(ex, "Error creating column {Index}: {Header}", i, headers[i]);
+                                // Continue with next column
+                            }
+                        }
 
-                // Create SQL table structure only
-                var sqlTableCreated = await CreateSqlTableAsync(dynamicTable, databaseConnectionId);
-                if (!sqlTableCreated)
-                {
-                    throw new InvalidOperationException("SQL table creation failed");
-                }
+                        // Save to database
+                        _logger.LogInformation("Saving DynamicTable to database: {TableName}", dynamicTable.TableName);
+                        _context.DynamicTables.Add(dynamicTable);
+                        await _context.SaveChangesAsync();
+                        _logger.LogInformation("DynamicTable saved successfully with ID: {TableId}", dynamicTable.Id);
+
+                        // Create SQL table structure only
+                        _logger.LogInformation("Creating SQL table structure: {TableName}", dynamicTable.TableName);
+                        var sqlTableCreated = await CreateSqlTableAsync(dynamicTable, databaseConnectionId);
+                        if (!sqlTableCreated)
+                        {
+                            throw new InvalidOperationException("SQL table creation failed");
+                        }
+                        _logger.LogInformation("SQL table structure created successfully: {TableName}", dynamicTable.TableName);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Error in table structure creation process: {FileName}", file.FileName);
+                        throw;
+                    }
 
                     // Check if CreateSqlTableAsync found an existing table and updated the table name
                     if (dynamicTable.TableName != tableName)
@@ -603,6 +628,7 @@ namespace ExcelUploader.Services
                 var createTableSql = BuildCreateTableSql(dynamicTable);
                 
                 using var command = new SqlCommand(createTableSql, connection);
+                command.Parameters.AddWithValue("@TableName", dynamicTable.TableName);
                 await command.ExecuteNonQueryAsync();
 
                 _logger.LogInformation("SQL table created successfully: {TableName} using connection {ConnectionId}", 
@@ -618,21 +644,29 @@ namespace ExcelUploader.Services
 
         private string BuildCreateTableSql(DynamicTable dynamicTable)
         {
-            var columns = dynamicTable.Columns.OrderBy(c => c.ColumnOrder);
-            var columnDefinitions = columns.Select(c => 
-                $"[{c.ColumnName}] {GetSqlDataType(c.DataType, c.MaxLength)} {(c.IsRequired ? "NOT NULL" : "NULL")}"
-            );
+            try
+            {
+                var columns = dynamicTable.Columns.OrderBy(c => c.ColumnOrder);
+                var columnDefinitions = columns.Select(c => 
+                    $"[{c.ColumnName}] {GetSqlDataType(c.DataType, c.MaxLength)} {(c.IsRequired ? "NOT NULL" : "NULL")}"
+                );
 
-            return $@"
-                IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = '{dynamicTable.TableName}')
-                BEGIN
-                    CREATE TABLE [{dynamicTable.TableName}] (
-                        [Id] INT IDENTITY(1,1) PRIMARY KEY,
-                        {string.Join(",\n                        ", columnDefinitions)},
-                        [CreatedAt] DATETIME2 DEFAULT GETDATE(),
-                        [UpdatedAt] DATETIME2 DEFAULT GETDATE()
-                    )
-                END";
+                return $@"
+                    IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = @TableName)
+                    BEGIN
+                        CREATE TABLE [{dynamicTable.TableName}] (
+                            [Id] INT IDENTITY(1,1) PRIMARY KEY,
+                            {string.Join(",\n                            ", columnDefinitions)},
+                            [CreatedAt] DATETIME2 DEFAULT GETDATE(),
+                            [UpdatedAt] DATETIME2 DEFAULT GETDATE()
+                        )
+                    END";
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error building CREATE TABLE SQL for table: {TableName}", dynamicTable.TableName);
+                throw;
+            }
         }
 
         private string GetSqlDataType(string dataType, int? maxLength)
