@@ -1080,7 +1080,7 @@
                 // Update progress
                 updateProgress(25, 'Dosya yükleniyor...');
 
-                const response = await fetch('/api/home/create-table-structure', {
+                const response = await fetch('/api/home/insert-data', {
                     method: 'POST',
                     body: formData,
                     headers: {
@@ -1229,34 +1229,16 @@
                  // Determine the correct endpoint based on table existence
                  let endpoint;
                  
-                 if (window.tableExists) {
-                     // Table already exists - only upload data to existing table
-                     endpoint = '/api/home/create-table-structure';
-                     
-                     // Add table name for existing table
-                     const tableName = document.getElementById('tableName').value;
-                     formData.append('TableName', tableName);
-                     
-                     // Add description if available
-                     const description = document.getElementById('tableDescription')?.value;
-                     if (description && description.trim() !== '') {
-                         formData.append('Description', description);
-                     }
-                     
-                     console.log('Table exists - will only upload data to existing table');
-                 } else {
-                     // Table doesn't exist - use insert-data endpoint for new table
-                     endpoint = '/api/home/insert-data';
-                     formData.append('TableId', window.createdTableId);
-                     
-                     // Add description if available
-                     const description = document.getElementById('tableDescription')?.value;
-                     if (description && description.trim() !== '') {
-                         formData.append('Description', description);
-                     }
-                     
-                     console.log('Table does not exist - will create new table and upload data');
+                 // Artık sadece insert-data endpoint'ini kullanıyoruz
+                 endpoint = '/api/home/insert-data';
+                 
+                 // Add description if available
+                 const description = document.getElementById('tableDescription')?.value;
+                 if (description && description.trim() !== '') {
+                     formData.append('Description', description);
                  }
+                 
+                 console.log('Using insert-data endpoint for all operations');
                  
                  // Add database connection ID only if it's not empty
                  const databaseConnectionId = document.getElementById('databaseConnection').value;
