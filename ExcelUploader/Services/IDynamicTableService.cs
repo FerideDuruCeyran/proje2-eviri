@@ -32,5 +32,7 @@ namespace ExcelUploader.Services
         Task<(List<string> headers, List<string> dataTypes, List<Dictionary<string, object>> sampleData)> AnalyzeExcelFileAsync(IFormFile file);
         string SanitizeColumnName(string name);
         Task<List<Dictionary<string, object>>> ReadAllExcelDataAsync(IFormFile file);
+        Task<(bool exists, DynamicTable? existingTable, string? actualTableName)> CheckTableExistsForInsertAsync(string tableName, int? databaseConnectionId = null);
+        Task<(bool success, int insertedRows, string? errorMessage)> InsertDataIntoExistingTableWithSameNameAsync(IFormFile file, string tableName, int? databaseConnectionId = null);
     }
 }

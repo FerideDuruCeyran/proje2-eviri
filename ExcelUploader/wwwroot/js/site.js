@@ -562,11 +562,11 @@ function updateUserInterface() {
 }
 
 // Check authentication
-function checkAuthentication() {
+async function checkAuthentication() {
     const token = localStorage.getItem('authToken');
     if (token) {
         // Verify token is still valid
-        verifyToken(token);
+        await verifyToken(token);
     } else {
         isAuthenticated = false;
         currentUser = null;

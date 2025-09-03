@@ -67,7 +67,7 @@ namespace ExcelUploader.Services
             }
         }
 
-        public async Task<List<string>> GetSheetNamesAsync(IFormFile file)
+        public Task<List<string>> GetSheetNamesAsync(IFormFile file)
         {
             try
             {
@@ -75,7 +75,7 @@ namespace ExcelUploader.Services
                 {
                     using var stream = file.OpenReadStream();
                     using var package = new ExcelPackage(stream);
-                    return package.Workbook.Worksheets.Select(ws => ws.Name).ToList();
+                    return Task.FromResult(package.Workbook.Worksheets.Select(ws => ws.Name).ToList());
                 }
                 else if (file.FileName.EndsWith(".xls"))
                 {
@@ -86,7 +86,7 @@ namespace ExcelUploader.Services
                     {
                         sheetNames.Add(workbook.GetSheetName(i));
                     }
-                    return sheetNames;
+                    return Task.FromResult(sheetNames);
                 }
                 else
                 {
@@ -99,6 +99,8 @@ namespace ExcelUploader.Services
                 throw;
             }
         }
+
+
 
         private Task<object> GetXlsPreviewAsync(IFormFile file, int sheetIndex = 0)
         {
@@ -614,8 +616,10 @@ namespace ExcelUploader.Services
             var rowCount = worksheet.Dimension?.Rows ?? 0;
             var colCount = worksheet.Dimension?.Columns ?? 0;
 
-            // Skip header row (row 1)
-            for (int row = 2; row <= rowCount; row++)
+            _logger.LogInformation($"Processing XLSX file: {file.FileName}, Total rows: {rowCount}, Total columns: {colCount}");
+
+            // Basit yaklaşım: İlk satırdan başla ve tüm verileri oku
+            for (int row = 1; row <= rowCount; row++)
             {
                 var excelData = new ExcelData
                 {
@@ -626,53 +630,46 @@ namespace ExcelUploader.Services
                     IsProcessed = false
                 };
 
-                // Map columns based on the Excel structure from the images
-                excelData.BasvuruYili = GetCellValue(worksheet, row, 1); // Column A
-                excelData.HareketlilikTipi = GetCellValue(worksheet, row, 2); // Column B
-                excelData.BasvuruTipi = GetCellValue(worksheet, row, 3); // Column C
-                excelData.Ad = GetCellValue(worksheet, row, 4); // Column D
-                excelData.Soyad = GetCellValue(worksheet, row, 5); // Column E
-                excelData.OdemeTipi = GetCellValue(worksheet, row, 6); // Column F
-                excelData.Taksit = GetCellValue(worksheet, row, 7); // Column G
-                excelData.Odenecek = GetDecimalValue(worksheet, row, 8); // Column H
-                excelData.Odendiginde = GetDecimalValue(worksheet, row, 9); // Column I
-                excelData.OdemeTarihi = GetDateValue(worksheet, row, 10); // Column J
-                excelData.Aciklama = GetCellValue(worksheet, row, 11); // Column K
-                excelData.OdemeOrani = GetDecimalValue(worksheet, row, 12); // Column L
+                // Her satırdan tüm hücreleri oku
+                var rowValues = new List<string>();
+                for (int col = 1; col <= colCount; col++)
+                {
+                    var cellValue = GetCellValue(worksheet, row, col);
+                    rowValues.Add(cellValue ?? "");
+                }
 
-                // Additional columns for detailed student information
-                if (colCount >= 13) excelData.KullaniciAdi = GetCellValue(worksheet, row, 13);
-                if (colCount >= 14) excelData.TCKimlikNo = GetCellValue(worksheet, row, 14);
-                if (colCount >= 15) excelData.PasaportNo = GetCellValue(worksheet, row, 15);
-                if (colCount >= 16) excelData.DogumTarihi = GetDateValue(worksheet, row, 16);
-                if (colCount >= 17) excelData.DogumYeri = GetCellValue(worksheet, row, 17);
-                if (colCount >= 18) excelData.Cinsiyet = GetCellValue(worksheet, row, 18);
+                _logger.LogInformation($"Row {row} raw values: {string.Join(" | ", rowValues)}");
 
-                // Address and bank information
-                if (colCount >= 19) excelData.AdresIl = GetCellValue(worksheet, row, 19);
-                if (colCount >= 20) excelData.AdresUlke = GetCellValue(worksheet, row, 20);
-                if (colCount >= 21) excelData.BankaHesapSahibi = GetCellValue(worksheet, row, 21);
-                if (colCount >= 22) excelData.BankaAdi = GetCellValue(worksheet, row, 22);
-                if (colCount >= 23) excelData.BankaSubeKodu = GetCellValue(worksheet, row, 23);
-                if (colCount >= 24) excelData.BankaSubeAdi = GetCellValue(worksheet, row, 24);
-                if (colCount >= 25) excelData.BankaHesapNumarasi = GetCellValue(worksheet, row, 25);
-                if (colCount >= 26) excelData.BankaIBANNo = GetCellValue(worksheet, row, 26);
+                // Pozisyon bazlı mapping - kesin çalışır
+                if (rowValues.Count > 0) excelData.Ad = rowValues[0];
+                if (rowValues.Count > 1) excelData.Soyad = rowValues[1];
+                if (rowValues.Count > 2) excelData.TCKimlikNo = rowValues[2];
+                if (rowValues.Count > 3) excelData.OgrenciNo = rowValues[3];
+                if (rowValues.Count > 4) excelData.DogumTarihi = GetDateValue(worksheet, row, 5);
+                if (rowValues.Count > 5) excelData.DogumYeri = rowValues[5];
+                if (rowValues.Count > 6) excelData.Cinsiyet = rowValues[6];
+                if (rowValues.Count > 7) excelData.Odenecek = GetDecimalValue(worksheet, row, 8);
+                if (rowValues.Count > 8) excelData.OdemeTarihi = GetDateValue(worksheet, row, 9);
+                if (rowValues.Count > 9) excelData.Aciklama = rowValues[9];
 
-                // Student and academic information
-                if (colCount >= 27) excelData.OgrenciNo = GetCellValue(worksheet, row, 27);
-                if (colCount >= 28) excelData.FakulteAdi = GetCellValue(worksheet, row, 28);
-                if (colCount >= 29) excelData.BirimAdi = GetCellValue(worksheet, row, 29);
-                if (colCount >= 30) excelData.DiplomaDerecesi = GetCellValue(worksheet, row, 30);
-                if (colCount >= 31) excelData.Sinif = GetCellValue(worksheet, row, 31);
-
-                // Only add if at least one field has data
-                if (!string.IsNullOrWhiteSpace(excelData.Ad) || !string.IsNullOrWhiteSpace(excelData.Soyad) || 
-                    !string.IsNullOrWhiteSpace(excelData.TCKimlikNo) || !string.IsNullOrWhiteSpace(excelData.OgrenciNo))
+                // Herhangi bir veri varsa ekle
+                var hasAnyData = !string.IsNullOrWhiteSpace(excelData.Ad) || !string.IsNullOrWhiteSpace(excelData.Soyad) || 
+                    !string.IsNullOrWhiteSpace(excelData.TCKimlikNo) || !string.IsNullOrWhiteSpace(excelData.OgrenciNo) ||
+                    !string.IsNullOrWhiteSpace(excelData.DogumTarihi?.ToString()) || !string.IsNullOrWhiteSpace(excelData.DogumYeri) ||
+                    !string.IsNullOrWhiteSpace(excelData.Cinsiyet) || !string.IsNullOrWhiteSpace(excelData.Aciklama);
+                
+                if (hasAnyData)
                 {
                     data.Add(excelData);
+                    _logger.LogInformation($"Row {row} added with data: Ad='{excelData.Ad}', Soyad='{excelData.Soyad}', TC='{excelData.TCKimlikNo}', OgrenciNo='{excelData.OgrenciNo}'");
+                }
+                else
+                {
+                    _logger.LogWarning($"Row {row} skipped - no data found in any field");
                 }
             }
 
+            _logger.LogInformation($"Total rows processed: {data.Count}");
             return Task.FromResult(data);
         }
 
@@ -691,8 +688,10 @@ namespace ExcelUploader.Services
             var sheet = workbook.GetSheetAt(0);
             var rowCount = sheet.LastRowNum;
 
-            // Skip header row (row 0)
-            for (int row = 1; row <= rowCount; row++)
+            _logger.LogInformation($"Processing XLS file: {file.FileName}, Total rows: {rowCount}");
+
+            // Basit yaklaşım: İlk satırdan başla ve tüm verileri oku
+            for (int row = 0; row <= rowCount; row++)
             {
                 var sheetRow = sheet.GetRow(row);
                 if (sheetRow == null) continue;
@@ -706,53 +705,46 @@ namespace ExcelUploader.Services
                     IsProcessed = false
                 };
 
-                // Map columns based on the Excel structure from the images
-                excelData.BasvuruYili = GetNpoiCellValue(sheetRow.GetCell(0)); // Column A
-                excelData.HareketlilikTipi = GetNpoiCellValue(sheetRow.GetCell(1)); // Column B
-                excelData.BasvuruTipi = GetNpoiCellValue(sheetRow.GetCell(2)); // Column C
-                excelData.Ad = GetNpoiCellValue(sheetRow.GetCell(3)); // Column D
-                excelData.Soyad = GetNpoiCellValue(sheetRow.GetCell(4)); // Column E
-                excelData.OdemeTipi = GetNpoiCellValue(sheetRow.GetCell(5)); // Column F
-                excelData.Taksit = GetNpoiCellValue(sheetRow.GetCell(6)); // Column G
-                excelData.Odenecek = GetNpoiDecimalValue(sheetRow, 7); // Column H
-                excelData.Odendiginde = GetNpoiDecimalValue(sheetRow, 8); // Column I
-                excelData.OdemeTarihi = GetNpoiDateValue(sheetRow, 9); // Column J
-                excelData.Aciklama = GetNpoiCellValue(sheetRow.GetCell(10)); // Column K
-                excelData.OdemeOrani = GetNpoiDecimalValue(sheetRow, 11); // Column L
+                // Her satırdan tüm hücreleri oku
+                var rowValues = new List<string>();
+                for (int col = 0; col < sheetRow.LastCellNum; col++)
+                {
+                    var cellValue = GetNpoiCellValue(sheetRow.GetCell(col));
+                    rowValues.Add(cellValue);
+                }
 
-                // Additional columns for detailed student information
-                if (sheetRow.LastCellNum >= 13) excelData.KullaniciAdi = GetNpoiCellValue(sheetRow.GetCell(12));
-                if (sheetRow.LastCellNum >= 14) excelData.TCKimlikNo = GetNpoiCellValue(sheetRow.GetCell(13));
-                if (sheetRow.LastCellNum >= 15) excelData.PasaportNo = GetNpoiCellValue(sheetRow.GetCell(14));
-                if (sheetRow.LastCellNum >= 16) excelData.DogumTarihi = GetNpoiDateValue(sheetRow, 15);
-                if (sheetRow.LastCellNum >= 17) excelData.DogumYeri = GetNpoiCellValue(sheetRow.GetCell(16));
-                if (sheetRow.LastCellNum >= 18) excelData.Cinsiyet = GetNpoiCellValue(sheetRow.GetCell(17));
+                _logger.LogInformation($"Row {row} raw values: {string.Join(" | ", rowValues)}");
 
-                // Address and bank information
-                if (sheetRow.LastCellNum >= 19) excelData.AdresIl = GetNpoiCellValue(sheetRow.GetCell(18));
-                if (sheetRow.LastCellNum >= 20) excelData.AdresUlke = GetNpoiCellValue(sheetRow.GetCell(19));
-                if (sheetRow.LastCellNum >= 21) excelData.BankaHesapSahibi = GetNpoiCellValue(sheetRow.GetCell(20));
-                if (sheetRow.LastCellNum >= 22) excelData.BankaAdi = GetNpoiCellValue(sheetRow.GetCell(21));
-                if (sheetRow.LastCellNum >= 23) excelData.BankaSubeKodu = GetNpoiCellValue(sheetRow.GetCell(22));
-                if (sheetRow.LastCellNum >= 24) excelData.BankaSubeAdi = GetNpoiCellValue(sheetRow.GetCell(23));
-                if (sheetRow.LastCellNum >= 25) excelData.BankaHesapNumarasi = GetNpoiCellValue(sheetRow.GetCell(24));
-                if (sheetRow.LastCellNum >= 26) excelData.BankaIBANNo = GetNpoiCellValue(sheetRow.GetCell(25));
+                // Pozisyon bazlı mapping - kesin çalışır
+                if (rowValues.Count > 0) excelData.Ad = rowValues[0];
+                if (rowValues.Count > 1) excelData.Soyad = rowValues[1];
+                if (rowValues.Count > 2) excelData.TCKimlikNo = rowValues[2];
+                if (rowValues.Count > 3) excelData.OgrenciNo = rowValues[3];
+                if (rowValues.Count > 4) excelData.DogumTarihi = GetNpoiDateValue(sheetRow, 4);
+                if (rowValues.Count > 5) excelData.DogumYeri = rowValues[5];
+                if (rowValues.Count > 6) excelData.Cinsiyet = rowValues[6];
+                if (rowValues.Count > 7) excelData.Odenecek = GetNpoiDecimalValue(sheetRow, 7);
+                if (rowValues.Count > 8) excelData.OdemeTarihi = GetNpoiDateValue(sheetRow, 8);
+                if (rowValues.Count > 9) excelData.Aciklama = rowValues[9];
 
-                // Student and academic information
-                if (sheetRow.LastCellNum >= 27) excelData.OgrenciNo = GetNpoiCellValue(sheetRow.GetCell(26));
-                if (sheetRow.LastCellNum >= 28) excelData.FakulteAdi = GetNpoiCellValue(sheetRow.GetCell(27));
-                if (sheetRow.LastCellNum >= 29) excelData.BirimAdi = GetNpoiCellValue(sheetRow.GetCell(28));
-                if (sheetRow.LastCellNum >= 30) excelData.DiplomaDerecesi = GetNpoiCellValue(sheetRow.GetCell(29));
-                if (sheetRow.LastCellNum >= 31) excelData.Sinif = GetNpoiCellValue(sheetRow.GetCell(30));
-
-                // Only add if at least one field has data
-                if (!string.IsNullOrWhiteSpace(excelData.Ad) || !string.IsNullOrWhiteSpace(excelData.Soyad) || 
-                    !string.IsNullOrWhiteSpace(excelData.TCKimlikNo) || !string.IsNullOrWhiteSpace(excelData.OgrenciNo))
+                // Herhangi bir veri varsa ekle
+                var hasAnyData = !string.IsNullOrWhiteSpace(excelData.Ad) || !string.IsNullOrWhiteSpace(excelData.Soyad) || 
+                    !string.IsNullOrWhiteSpace(excelData.TCKimlikNo) || !string.IsNullOrWhiteSpace(excelData.OgrenciNo) ||
+                    !string.IsNullOrWhiteSpace(excelData.DogumTarihi?.ToString()) || !string.IsNullOrWhiteSpace(excelData.DogumYeri) ||
+                    !string.IsNullOrWhiteSpace(excelData.Cinsiyet) || !string.IsNullOrWhiteSpace(excelData.Aciklama);
+                
+                if (hasAnyData)
                 {
                     data.Add(excelData);
+                    _logger.LogInformation($"Row {row} added with data: Ad='{excelData.Ad}', Soyad='{excelData.Soyad}', TC='{excelData.TCKimlikNo}', OgrenciNo='{excelData.OgrenciNo}'");
+                }
+                else
+                {
+                    _logger.LogWarning($"Row {row} skipped - no data found in any field");
                 }
             }
 
+            _logger.LogInformation($"Total rows processed: {data.Count}");
             return Task.FromResult(data);
         }
 
@@ -840,7 +832,27 @@ namespace ExcelUploader.Services
                 case CellType.Boolean:
                     return cell.BooleanCellValue.ToString();
                 case CellType.Formula:
+                    // For formulas, try to get the calculated value
+                    try
+                    {
+                        switch (cell.CachedFormulaResultType)
+                        {
+                            case CellType.String:
                     return cell.StringCellValue ?? string.Empty;
+                            case CellType.Numeric:
+                                if (DateUtil.IsCellDateFormatted(cell))
+                                    return cell.DateCellValue.ToString();
+                                return cell.NumericCellValue.ToString();
+                            case CellType.Boolean:
+                                return cell.BooleanCellValue.ToString();
+                            default:
+                                return cell.StringCellValue ?? string.Empty;
+                        }
+                    }
+                    catch
+                    {
+                        return cell.StringCellValue ?? string.Empty;
+                    }
                 default:
                     return string.Empty;
             }

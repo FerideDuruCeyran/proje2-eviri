@@ -64,39 +64,39 @@ namespace ExcelUploader.Controllers
         }
 
         [HttpPost("get-sheet-names")]
-        public async Task<IActionResult> GetSheetNames(IFormFile file)
+        public Task<IActionResult> GetSheetNames(IFormFile file)
         {
             try
             {
                 if (file == null || file.Length == 0)
                 {
-                    return BadRequest("Dosya seçilmedi.");
+                    return Task.FromResult<IActionResult>(BadRequest("Dosya seçilmedi."));
                 }
 
                 // Dosya formatını kontrol et
                 if (!file.FileName.EndsWith(".xlsx") && !file.FileName.EndsWith(".xls"))
                 {
-                    return BadRequest("Sadece .xlsx ve .xls dosyaları desteklenir.");
+                    return Task.FromResult<IActionResult>(BadRequest("Sadece .xlsx ve .xls dosyaları desteklenir."));
                 }
 
                 // Excel dosyasının sayfa adlarını al
-                var sheetNames = await _excelAnalyzerService.GetSheetNamesAsync(file);
+                var sheetNames = _excelAnalyzerService.GetSheetNamesAsync(file).Result;
 
-                return Ok(new
+                return Task.FromResult<IActionResult>(Ok(new
                 {
                     success = true,
                     data = sheetNames,
                     message = "Sayfa adları başarıyla alındı."
-                });
+                }));
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Sayfa adları alınırken hata oluştu: {FileName}", file?.FileName);
-                return StatusCode(500, new
+                return Task.FromResult<IActionResult>(StatusCode(500, new
                 {
                     success = false,
                     message = $"Sayfa adları alınırken hata oluştu: {ex.Message}"
-                });
+                }));
             }
         }
 

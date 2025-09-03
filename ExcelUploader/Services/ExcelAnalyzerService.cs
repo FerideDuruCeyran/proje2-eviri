@@ -24,11 +24,11 @@ namespace ExcelUploader.Services
             {
                 if (file.FileName.EndsWith(".xlsx"))
                 {
-                    return await AnalyzeXlsxFileAsync(file);
+                    return await AnalyzeXlsxFileAsync(file, 0);
                 }
                 else if (file.FileName.EndsWith(".xls"))
                 {
-                    return await AnalyzeXlsFileAsync(file);
+                    return await AnalyzeXlsFileAsync(file, 0);
                 }
                 else
                 {
@@ -66,7 +66,7 @@ namespace ExcelUploader.Services
             }
         }
 
-        public async Task<List<string>> GetSheetNamesAsync(IFormFile file)
+        public Task<List<string>> GetSheetNamesAsync(IFormFile file)
         {
             try
             {
@@ -74,7 +74,7 @@ namespace ExcelUploader.Services
                 {
                     using var stream = file.OpenReadStream();
                     using var package = new ExcelPackage(stream);
-                    return package.Workbook.Worksheets.Select(ws => ws.Name).ToList();
+                    return Task.FromResult(package.Workbook.Worksheets.Select(ws => ws.Name).ToList());
                 }
                 else if (file.FileName.EndsWith(".xls"))
                 {
@@ -85,7 +85,7 @@ namespace ExcelUploader.Services
                     {
                         sheetNames.Add(workbook.GetSheetName(i));
                     }
-                    return sheetNames;
+                    return Task.FromResult(sheetNames);
                 }
                 else
                 {
@@ -99,7 +99,7 @@ namespace ExcelUploader.Services
             }
         }
 
-        private async Task<ExcelAnalysisResult> AnalyzeXlsxFileAsync(IFormFile file, int sheetIndex = 0)
+        private Task<ExcelAnalysisResult> AnalyzeXlsxFileAsync(IFormFile file, int sheetIndex = 0)
         {
             using var stream = file.OpenReadStream();
             using var package = new ExcelPackage(stream);
@@ -133,7 +133,7 @@ namespace ExcelUploader.Services
                 if (rowCount == 0 || colCount == 0)
                 {
                     // Return empty result for empty sheets
-                    return new ExcelAnalysisResult
+                    return Task.FromResult(new ExcelAnalysisResult
                     {
                         FileName = file.FileName,
                         TotalRows = 0,
@@ -146,7 +146,7 @@ namespace ExcelUploader.Services
                         AnalysisDate = DateTime.UtcNow,
                         SheetName = worksheet.Name,
                         SheetIndex = sheetIndex
-                    };
+                    });
                 }
             }
 
@@ -207,10 +207,10 @@ namespace ExcelUploader.Services
             };
 
             _logger.LogInformation($"Excel dosyası analiz edildi: {file.FileName}, Sayfa: {worksheet.Name}, {result.TotalRows} satır, {result.TotalColumns} sütun");
-            return result;
+            return Task.FromResult(result);
         }
 
-        private async Task<ExcelAnalysisResult> AnalyzeXlsFileAsync(IFormFile file, int sheetIndex = 0)
+        private Task<ExcelAnalysisResult> AnalyzeXlsFileAsync(IFormFile file, int sheetIndex = 0)
         {
             using var stream = file.OpenReadStream();
             using var workbook = new HSSFWorkbook(stream);
@@ -244,7 +244,7 @@ namespace ExcelUploader.Services
                 if (rowCount == 0 || colCount == 0)
                 {
                     // Return empty result for empty sheets
-                    return new ExcelAnalysisResult
+                    return Task.FromResult(new ExcelAnalysisResult
                     {
                         FileName = file.FileName,
                         TotalRows = 0,
@@ -257,7 +257,7 @@ namespace ExcelUploader.Services
                         AnalysisDate = DateTime.UtcNow,
                         SheetName = sheet.SheetName,
                         SheetIndex = sheetIndex
-                    };
+                    });
                 }
             }
 
@@ -326,7 +326,7 @@ namespace ExcelUploader.Services
             };
 
             _logger.LogInformation($"Excel dosyası analiz edildi (.xls): {file.FileName}, Sayfa: {sheet.SheetName}, {result.TotalRows} satır, {result.TotalColumns} sütun");
-            return result;
+            return Task.FromResult(result);
         }
 
         private List<string> GenerateExcelColumnHeaders(int columnCount)
@@ -568,7 +568,27 @@ namespace ExcelUploader.Services
                 case CellType.Boolean:
                     return cell.BooleanCellValue.ToString();
                 case CellType.Formula:
-                    return cell.StringCellValue ?? string.Empty;
+                    // For formulas, try to get the calculated value
+                    try
+                    {
+                        switch (cell.CachedFormulaResultType)
+                        {
+                            case CellType.String:
+                                return cell.StringCellValue ?? string.Empty;
+                            case CellType.Numeric:
+                                if (DateUtil.IsCellDateFormatted(cell))
+                                    return cell.DateCellValue.ToString();
+                                return cell.NumericCellValue.ToString();
+                            case CellType.Boolean:
+                                return cell.BooleanCellValue.ToString();
+                            default:
+                                return cell.StringCellValue ?? string.Empty;
+                        }
+                    }
+                    catch
+                    {
+                        return cell.StringCellValue ?? string.Empty;
+                    }
                 default:
                     return string.Empty;
             }
