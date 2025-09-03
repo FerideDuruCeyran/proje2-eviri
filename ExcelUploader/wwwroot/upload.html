@@ -590,7 +590,7 @@
             tableBody.innerHTML = '';
 
             // Check if data exists
-            if (!data || !data.headers || !data.previewData) {
+            if (!data || !data.headers) {
                 console.error('Invalid preview data:', data);
                 showAlert('Önizleme verisi alınamadı', 'danger');
                 return;
@@ -618,11 +618,24 @@
                     }
                     tableBody.appendChild(tr);
                 });
+            } else if (data.rows && Array.isArray(data.rows)) {
+                // Fallback for old format
+                data.rows.slice(0, 10).forEach(row => {
+                    const tr = document.createElement('tr');
+                    if (Array.isArray(row)) {
+                        row.forEach(cell => {
+                            const td = document.createElement('td');
+                            td.textContent = cell || '';
+                            tr.appendChild(td);
+                        });
+                    }
+                    tableBody.appendChild(tr);
+                });
             }
 
             // Update stats
             document.getElementById('columnCount').textContent = data.totalColumns || data.headers.length;
-            document.getElementById('rowCount').textContent = data.totalRows || 0;
+            document.getElementById('rowCount').textContent = data.totalRows || (data.rows ? data.rows.length : 0);
 
             // Store data for later use
             excelData.preview = data;
