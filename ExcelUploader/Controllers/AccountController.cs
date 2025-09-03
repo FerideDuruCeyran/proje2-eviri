@@ -296,7 +296,7 @@ namespace ExcelUploader.Controllers
             }
             else
             {
-                return RedirectToAction(nameof(HomeController.Index), "Home");
+                return RedirectToAction("Health", "Home");
             }
         }
     }

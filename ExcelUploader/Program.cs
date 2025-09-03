@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 
+
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
@@ -74,9 +75,23 @@ builder.Services.AddScoped<IUserLoginLogService, UserLoginLogService>();
 builder.Services.AddScoped<ILoginLogService, LoginLogService>();
 builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<IExcelAnalyzerService, ExcelAnalyzerService>();
-builder.Services.AddScoped<ITranslationService, TranslationService>();
 
 var app = builder.Build();
+
+// Add global exception handling
+app.Use(async (context, next) =>
+{
+    try
+    {
+        await next();
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Global error: {ex.Message}");
+        Console.WriteLine($"Stack trace: {ex.StackTrace}");
+        throw;
+    }
+});
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())

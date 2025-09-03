@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Excel Uploader - Yeni Tablo Oluştur</title>
+    <title>Excel Uploader - Otomatik Tablo Oluşturma</title>
     <link rel="stylesheet" href="css/site.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
@@ -88,15 +88,15 @@
                 </div>
                 <div class="step" data-step="3" onclick="goToStep(3)">
                     <div class="step-number">3</div>
-                    <div class="step-title">Veri Görselleştirme</div>
+                    <div class="step-title">Veri Önizleme</div>
                 </div>
                 <div class="step" data-step="4" onclick="goToStep(4)">
                     <div class="step-number">4</div>
-                    <div class="step-title">Veri Seçimi</div>
+                    <div class="step-title">Tablo Adı</div>
                 </div>
                 <div class="step" data-step="5" onclick="goToStep(5)">
                     <div class="step-number">5</div>
-                    <div class="step-title">Tablo Adı</div>
+                    <div class="step-title">Özet</div>
                 </div>
                 <div class="step" data-step="6" onclick="goToStep(6)">
                     <div class="step-number">6</div>
@@ -109,7 +109,7 @@
                 <div class="card">
                     <div class="card-header">
                         <h2 class="card-title">
-                            <i class="fas fa-play-circle"></i> Yeni Tablo Oluşturma Sihirbazı
+                            <i class="fas fa-play-circle"></i> Excel Tablo Oluşturma Sihirbazı
                         </h2>
                     </div>
                     <div class="card-body">
@@ -117,25 +117,25 @@
                             <div class="welcome-icon">
                                 <i class="fas fa-magic fa-4x"></i>
                             </div>
-                            <h3>Excel Dosyasından Yeni Tablo Oluştur</h3>
-                            <p>Bu sihirbaz size Excel dosyasından SQL Server'da yeni bir tablo oluşturmanızda yardımcı olacak.</p>
+                            <h3>Excel Dosyasından Tablo Oluştur veya Veri Ekle</h3>
+                            <p>Bu sihirbaz Excel dosyasından otomatik olarak tablo adı oluşturur. Eğer tablo varsa verileri ekler, yoksa yeni tablo oluşturur.</p>
                             
                             <div class="feature-list">
                                 <div class="feature-item">
                                     <i class="fas fa-check-circle"></i>
-                                    <span>Otomatik veri tipi tespiti</span>
+                                    <span>Otomatik tablo adı oluşturma</span>
                                 </div>
                                 <div class="feature-item">
                                     <i class="fas fa-check-circle"></i>
-                                    <span>SQL Server'a otomatik bağlantı</span>
+                                    <span>Mevcut tabloya veri ekleme</span>
                                 </div>
                                 <div class="feature-item">
                                     <i class="fas fa-check-circle"></i>
-                                    <span>Veri önizleme ve düzenleme</span>
+                                    <span>Yeni tablo oluşturma</span>
                                 </div>
                                 <div class="feature-item">
                                     <i class="fas fa-check-circle"></i>
-                                    <span>Tablo şeması özelleştirme</span>
+                                    <span>Tek tıkla işlem</span>
                                 </div>
                             </div>
                         </div>
@@ -151,34 +151,34 @@
 
             <!-- Step 2: Dosya Yükleme -->
             <div class="step-content" id="step2">
-            <div class="card">
-                <div class="card-header">
-                    <h2 class="card-title">
-                        <i class="fas fa-upload"></i> Excel Dosyası Yükle
-                    </h2>
-                </div>
-                <div class="card-body">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">
+                            <i class="fas fa-upload"></i> Excel Dosyası Yükle
+                        </h2>
+                    </div>
+                    <div class="card-body">
                         <div class="upload-instructions">
                             <h4><i class="fas fa-info-circle"></i> Yükleme Kuralları</h4>
                             <ul>
-                            <li>Sadece Excel dosyaları (.xlsx, .xls) yüklenebilir</li>
-                            <li>Maksimum dosya boyutu: 50MB</li>
-                            <li>Dosya ilk satırında sütun başlıkları bulunmalıdır</li>
-                            <li>Desteklenen veri tipleri: Metin, Sayı, Tarih</li>
-                        </ul>
-                    </div>
-
-                    <div class="upload-area" id="uploadArea">
-                        <div class="upload-icon">
-                            <i class="fas fa-cloud-upload-alt"></i>
+                                <li>Sadece Excel dosyaları (.xlsx, .xls) yüklenebilir</li>
+                                <li>Maksimum dosya boyutu: 50MB</li>
+                                <li>Dosya ilk satırında sütun başlıkları bulunmalıdır</li>
+                                <li>Tablo adı dosya adından otomatik oluşturulur</li>
+                            </ul>
                         </div>
+
+                        <div class="upload-area" id="uploadArea">
+                            <div class="upload-icon">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                            </div>
                             <h3>Dosyayı buraya sürükleyin veya tıklayın</h3>
                             <p>Excel dosyasını seçin veya buraya sürükleyin</p>
                             <input type="file" id="excelFile" accept=".xlsx,.xls" style="display: none;">
                             <button type="button" class="btn btn-outline" onclick="document.getElementById('excelFile').click()">
                                 <i class="fas fa-folder-open"></i> Dosya Seç
                             </button>
-                    </div>
+                        </div>
 
                         <div class="file-info" id="fileInfo" style="display: none;">
                             <div class="file-details">
@@ -191,7 +191,7 @@
                                     <i class="fas fa-times"></i>
                                 </button>
                             </div>
-                            </div>
+                        </div>
 
                         <div class="step-actions">
                             <button type="button" class="btn btn-secondary" onclick="previousStep()">
@@ -200,20 +200,20 @@
                             <button type="button" class="btn btn-primary" id="nextStep2" onclick="nextStep()" disabled>
                                 Devam Et <i class="fas fa-arrow-right"></i>
                             </button>
-                                </div>
-                            </div>
                         </div>
                     </div>
+                </div>
+            </div>
 
-            <!-- Step 3: Veri Görselleştirme -->
+            <!-- Step 3: Veri Önizleme -->
             <div class="step-content" id="step3">
                 <div class="card">
-                        <div class="card-header">
+                    <div class="card-header">
                         <h2 class="card-title">
                             <i class="fas fa-table"></i> Veri Önizleme
                         </h2>
-                        </div>
-                        <div class="card-body">
+                    </div>
+                    <div class="card-body">
                         <div class="data-preview">
                             <div class="preview-header">
                                 <h4>Excel Verileri Önizleme</h4>
@@ -231,11 +231,11 @@
                                 <table class="preview-table" id="previewTable">
                                     <thead id="previewTableHead">
                                         <!-- Headers will be populated here -->
-                                </thead>
+                                    </thead>
                                     <tbody id="previewTableBody">
                                         <!-- Data will be populated here -->
-                                </tbody>
-                            </table>
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
 
@@ -251,58 +251,27 @@
                 </div>
             </div>
 
-            <!-- Step 4: Veri Seçimi -->
+            <!-- Step 4: Tablo Adı -->
             <div class="step-content" id="step4">
                 <div class="card">
                     <div class="card-header">
                         <h2 class="card-title">
-                            <i class="fas fa-check-square"></i> Veri Seçimi ve Düzenleme
-                        </h2>
-                    </div>
-                    <div class="card-body">
-                        <div class="column-selection">
-                            <h4>Sütun Seçimi ve Düzenleme</h4>
-                            <p>Hangi sütunların tabloya dahil edileceğini seçin ve veri tiplerini düzenleyin.</p>
-                            
-                            <div class="columns-grid" id="columnsGrid">
-                                <!-- Column selection will be populated here -->
-                            </div>
-                        </div>
-
-                        <div class="step-actions">
-                            <button type="button" class="btn btn-secondary" onclick="previousStep()">
-                                <i class="fas fa-arrow-left"></i> Geri
-                            </button>
-                            <button type="button" class="btn btn-primary" onclick="nextStep()">
-                                Devam Et <i class="fas fa-arrow-right"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Step 5: Tablo Adı -->
-            <div class="step-content" id="step5">
-                <div class="card">
-                    <div class="card-header">
-                        <h2 class="card-title">
-                            <i class="fas fa-tag"></i> Tablo Adı ve Açıklama
+                            <i class="fas fa-tag"></i> Tablo Adı ve Durum
                         </h2>
                     </div>
                     <div class="card-body">
                         <div class="table-naming">
                             <div class="form-group">
                                 <label for="tableName" class="form-label">
-                                    <i class="fas fa-table"></i> Tablo Adı
+                                    <i class="fas fa-table"></i> Tablo Adı (Otomatik Oluşturuldu)
                                 </label>
-                                <input type="text" id="tableName" class="form-control" 
-                                       placeholder="ornek_tablo_adi" required>
-                                <small class="form-text">Sadece harf, rakam ve alt çizgi kullanın. Türkçe karakter kullanmayın.</small>
+                                <input type="text" id="tableName" class="form-control" readonly>
+                                <small class="form-text">Tablo adı dosya adından otomatik olarak oluşturulmuştur.</small>
                             </div>
                             
                             <div class="form-group">
                                 <label for="tableDescription" class="form-label">
-                                    <i class="fas fa-comment"></i> Tablo Açıklaması
+                                    <i class="fas fa-comment"></i> Tablo Açıklaması (İsteğe Bağlı)
                                 </label>
                                 <textarea id="tableDescription" class="form-control" rows="3" 
                                           placeholder="Bu tablo ne için kullanılacak?"></textarea>
@@ -318,12 +287,37 @@
                                 <small class="form-text">Özel bir veritabanı bağlantısı seçin veya varsayılan bağlantıyı kullanın.</small>
                             </div>
 
-                            <div class="table-preview">
-                                <h5>Tablo Önizlemesi</h5>
-                                <div class="preview-schema" id="previewSchema">
-                                    <!-- Schema preview will be populated here -->
+                            <div class="table-status" id="tableStatus">
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle"></i>
+                                    <strong>Durum:</strong> Tablo varlığı kontrol ediliyor...
                                 </div>
                             </div>
+                        </div>
+
+                        <div class="step-actions">
+                            <button type="button" class="btn btn-secondary" onclick="previousStep()">
+                                <i class="fas fa-arrow-left"></i> Geri
+                            </button>
+                            <button type="button" class="btn btn-primary" onclick="nextStep()">
+                                Devam Et <i class="fas fa-arrow-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 5: Özet -->
+            <div class="step-content" id="step5">
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">
+                            <i class="fas fa-clipboard-list"></i> İşlem Özeti
+                        </h2>
+                    </div>
+                    <div class="card-body">
+                        <div class="summary-details" id="summaryDetails">
+                            <!-- Summary will be populated here -->
                         </div>
 
                         <div class="step-actions">
@@ -343,35 +337,19 @@
                 <div class="card">
                     <div class="card-header">
                         <h2 class="card-title">
-                            <i class="fas fa-database"></i> Tablo Oluştur ve Veri Yükle
+                            <i class="fas fa-database"></i> Tablo İşlemi
                         </h2>
                     </div>
                     <div class="card-body">
-                        <div class="creation-summary">
-                            <h4>Oluşturulacak Tablo Özeti</h4>
-                            <div class="summary-details" id="summaryDetails">
-                                <!-- Summary will be populated here -->
-                            </div>
+                        <div class="action-summary" id="actionSummary">
+                            <!-- Action summary will be populated here -->
                         </div>
 
-                                                 <div class="two-stage-process">
-                             <div class="stage-section" id="stage1Section">
-                                 <h5><i class="fas fa-layer-group"></i> Aşama 1: Tablo Yapısı Oluştur</h5>
-                                 <p class="text-muted">Excel dosyasından tablo yapısı oluşturulacak ve veritabanında tablo oluşturulacak.</p>
-                                 <button type="button" class="btn btn-primary" id="createStructureBtn" onclick="createTableStructure()">
-                                     <i class="fas fa-table"></i> Tablo Yapısını Oluştur
-                                 </button>
-                                 <div class="stage-status" id="stage1Status"></div>
-                             </div>
-
-                            <div class="stage-section" id="stage2Section" style="display: none;">
-                                <h5><i class="fas fa-database"></i> Aşama 2: Verileri Yükle</h5>
-                                <p class="text-muted">Oluşturulan tabloya Excel verileri yüklenecek.</p>
-                                <button type="button" class="btn btn-success" id="insertDataBtn" onclick="insertData()">
-                                    <i class="fas fa-upload"></i> Verileri Yükle
-                                </button>
-                                <div class="stage-status" id="stage2Status"></div>
-                            </div>
+                        <div class="single-action">
+                            <button type="button" class="btn btn-success btn-large" id="processButton" onclick="processExcelFile()">
+                                <i class="fas fa-play"></i> İşlemi Başlat
+                            </button>
+                            <div class="action-status" id="actionStatus"></div>
                         </div>
 
                         <div class="creation-progress" id="creationProgress" style="display: none;">
@@ -416,9 +394,6 @@
 
         let currentStep = 1;
         let excelData = null;
-        let selectedColumns = [];
-        let tableName = '';
-        let tableDescription = '';
 
         // Initialize page
         document.addEventListener('DOMContentLoaded', async function() {
@@ -502,11 +477,11 @@
                     if (currentStep === 3) {
                         loadExcelPreview();
                     } else if (currentStep === 4) {
-                        setupColumnSelection();
-                    } else if (currentStep === 5) {
                         setupTableNaming();
-                    } else if (currentStep === 6) {
+                    } else if (currentStep === 5) {
                         showCreationSummary();
+                    } else if (currentStep === 6) {
+                        setupActionSummary();
                     }
                 }
             }
@@ -550,9 +525,9 @@
                 case 3:
                     return true;
                 case 4:
-                    return selectedColumns.length > 0;
+                    return true; // Table name is automatically generated
                 case 5:
-                    return tableName && tableName.trim() !== '';
+                    return true; // Summary is always shown
                 default:
                     return true;
             }
@@ -561,13 +536,16 @@
         // Load Excel preview
         async function loadExcelPreview() {
             try {
-                // Check if user is authenticated
                 if (!isAuthenticated) {
                     showAlert('Dosya yüklemek için giriş yapmanız gerekiyor. Lütfen önce giriş yapın.', 'warning');
-                    // Redirect to login page
                     setTimeout(() => {
                         window.location.href = '/login';
                     }, 2000);
+                    return;
+                }
+
+                if (!excelData.file) {
+                    showAlert('Lütfen önce bir Excel dosyası seçin', 'warning');
                     return;
                 }
 
@@ -584,9 +562,8 @@
 
                 if (response.ok) {
                     const previewData = await response.json();
+                    console.log('Preview data received:', previewData);
                     displayExcelPreview(previewData);
-                    
-                    // Check if table already exists after Excel file is processed
                     await checkTableExistsAfterUpload();
                 } else if (response.status === 401) {
                     showAlert('Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.', 'warning');
@@ -612,6 +589,13 @@
             tableHead.innerHTML = '';
             tableBody.innerHTML = '';
 
+            // Check if data exists
+            if (!data || !data.headers || !data.previewData) {
+                console.error('Invalid preview data:', data);
+                showAlert('Önizleme verisi alınamadı', 'danger');
+                return;
+            }
+
             // Create headers
             const headerRow = document.createElement('tr');
             data.headers.forEach(header => {
@@ -621,179 +605,39 @@
             });
             tableHead.appendChild(headerRow);
 
-            // Create data rows (show first 10 rows)
-            data.rows.slice(0, 10).forEach(row => {
-                const tr = document.createElement('tr');
-                row.forEach(cell => {
-                    const td = document.createElement('td');
-                    td.textContent = cell;
-                    tr.appendChild(td);
+            // Create data rows (show preview data)
+            if (data.previewData && Array.isArray(data.previewData)) {
+                data.previewData.forEach(row => {
+                    const tr = document.createElement('tr');
+                    if (Array.isArray(row)) {
+                        row.forEach(cell => {
+                            const td = document.createElement('td');
+                            td.textContent = cell || '';
+                            tr.appendChild(td);
+                        });
+                    }
+                    tableBody.appendChild(tr);
                 });
-                tableBody.appendChild(tr);
-            });
+            }
 
             // Update stats
-            document.getElementById('columnCount').textContent = data.headers.length;
-            document.getElementById('rowCount').textContent = data.rows.length;
+            document.getElementById('columnCount').textContent = data.totalColumns || data.headers.length;
+            document.getElementById('rowCount').textContent = data.totalRows || 0;
 
             // Store data for later use
             excelData.preview = data;
-            
-            // Show table existence status if available
-            if (window.tableExists !== undefined && window.expectedTableName) {
-                const previewHeader = document.querySelector('.preview-header h4');
-                if (previewHeader && window.tableExists === true) {
-                    const statusDiv = document.createElement('div');
-                    statusDiv.className = 'alert alert-info';
-                    statusDiv.style.marginTop = '10px';
-                    statusDiv.innerHTML = `
-                        <i class="fas fa-info-circle"></i>
-                        <strong>Tablo Durumu:</strong> "${window.expectedTableName}" tablosu zaten mevcut. Veriler mevcut tabloya eklenecek.
-                    `;
-                    previewHeader.parentElement.appendChild(statusDiv);
-                }
-            }
         }
 
-        // Setup column selection
-        function setupColumnSelection() {
-            const columnsGrid = document.getElementById('columnsGrid');
-            columnsGrid.innerHTML = '';
-
-            // Add edit mode toggle
-            const editModeDiv = document.createElement('div');
-            editModeDiv.className = 'edit-mode-toggle';
-            editModeDiv.innerHTML = `
-                <div class="alert alert-info">
-                    <label class="checkbox-container">
-                        <input type="checkbox" id="enableDataTypeEditing" onchange="toggleDataTypeEditing()">
-                        <span class="checkmark"></span>
-                        <strong>Veri Tipi Düzenlemeyi Etkinleştir</strong>
-                    </label>
-                    <small class="text-muted d-block mt-2">
-                        <i class="fas fa-info-circle"></i> 
-                        Veri tipleri otomatik olarak algılanmıştır. Düzenlemek istiyorsanız bu seçeneği etkinleştirin.
-                    </small>
-                </div>
-            `;
-            columnsGrid.appendChild(editModeDiv);
-
-            excelData.preview.headers.forEach((header, index) => {
-                // Get detected data type from backend
-                const detectedType = excelData.preview.dataTypes ? excelData.preview.dataTypes[index] : 'nvarchar(255)';
-                
-                // Map SQL data type to frontend option value
-                let defaultType = 'string';
-                if (detectedType.includes('int')) defaultType = 'int';
-                else if (detectedType.includes('decimal')) defaultType = 'decimal';
-                else if (detectedType.includes('datetime')) defaultType = 'datetime';
-                else if (detectedType.includes('bit')) defaultType = 'boolean';
-                else if (detectedType.includes('nvarchar(max)')) defaultType = 'longtext';
-                else defaultType = 'string';
-
-                const columnDiv = document.createElement('div');
-                columnDiv.className = 'column-item';
-                columnDiv.innerHTML = `
-                    <div class="column-header">
-                        <label class="checkbox-container">
-                            <input type="checkbox" checked onchange="toggleColumn(${index})">
-                            <span class="checkmark"></span>
-                            <strong>${header}</strong>
-                        </label>
-                        <div class="detected-type">
-                            <small class="text-success">
-                                <i class="fas fa-magic"></i> Otomatik tespit: <strong>${detectedType}</strong>
-                            </small>
-                        </div>
-                    </div>
-                    <div class="column-options">
-                        <select class="form-control data-type-select" id="dataType_${index}" disabled onchange="updateColumnType(${index}, this.value)">
-                            <option value="string" ${defaultType === 'string' ? 'selected' : ''}>Metin (VARCHAR)</option>
-                            <option value="int" ${defaultType === 'int' ? 'selected' : ''}>Tam Sayı (INT)</option>
-                            <option value="decimal" ${defaultType === 'decimal' ? 'selected' : ''}>Ondalık (DECIMAL)</option>
-                            <option value="datetime" ${defaultType === 'datetime' ? 'selected' : ''}>Tarih/Saat (DATETIME)</option>
-                            <option value="boolean" ${defaultType === 'boolean' ? 'selected' : ''}>Mantık (BIT)</option>
-                            <option value="longtext" ${defaultType === 'longtext' ? 'selected' : ''}>Uzun Metin (MAX)</option>
-                        </select>
-                    </div>
-                `;
-                columnsGrid.appendChild(columnDiv);
-
-                // Add to selected columns
-                selectedColumns.push({
-                    index: index,
-                    name: header,
-                    type: defaultType,
-                    selected: true
-                });
-            });
-        }
-
-        // Toggle column selection
-        function toggleColumn(index) {
-            selectedColumns[index].selected = !selectedColumns[index].selected;
-        }
-
-        // Update column type
-        function updateColumnType(index, type) {
-            selectedColumns[index].type = type;
-        }
-
-        // Toggle data type editing
-        function toggleDataTypeEditing() {
-            const enableEditing = document.getElementById('enableDataTypeEditing').checked;
-            const dataTypeSelects = document.querySelectorAll('.data-type-select');
-            
-            dataTypeSelects.forEach(select => {
-                select.disabled = !enableEditing;
-                if (enableEditing) {
-                    select.style.backgroundColor = '#ffffff';
-                    select.style.borderColor = '#667eea';
-                } else {
-                    select.style.backgroundColor = '#f8f9fa';
-                    select.style.borderColor = '#e1e5e9';
-                }
-            });
-        }
-
-                         // Setup table naming
+        // Setup table naming
         function setupTableNaming() {
             // Generate default table name from Excel file name
             const fileName = excelData.file.name.replace(/\.[^/.]+$/, "");
             const defaultName = fileName.replace(/ /g, '_'); // Only replace spaces with underscores
             
             document.getElementById('tableName').value = defaultName;
-            document.getElementById('tableName').readOnly = true; // Make it read-only
             
-            // Use pre-checked table existence status if available
-            if (window.expectedTableName === defaultName && window.tableExists !== undefined) {
-                // Table existence was already checked after upload
-                if (window.tableExists === true) {
-                    // Show message that table exists and data will be inserted
-                    const tableNameElement = document.getElementById('tableName');
-                    tableNameElement.style.backgroundColor = '#fff3cd';
-                    tableNameElement.style.borderColor = '#ffc107';
-                    
-                    // Add info message
-                    const infoDiv = document.createElement('div');
-                    infoDiv.id = 'tableExistsInfo';
-                    infoDiv.className = 'alert alert-info';
-                    infoDiv.innerHTML = `
-                        <i class="fas fa-info-circle"></i>
-                        <strong>Bilgi:</strong> "${defaultName}" tablosu zaten mevcut. Veriler mevcut tabloya eklenecek.
-                    `;
-                    
-                    const tableNameContainer = tableNameElement.parentElement;
-                    if (!document.getElementById('tableExistsInfo')) {
-                        tableNameContainer.appendChild(infoDiv);
-                    }
-                }
-            } else {
-                // Fallback: Check if table exists now
-                checkTableExists(defaultName);
-            }
-            
-            updateSchemaPreview();
+            // Check if table exists
+            checkTableExists(defaultName);
             
             // Load database connections
             loadDatabaseConnections();
@@ -807,9 +651,8 @@
         // Check if table already exists after Excel file upload
         async function checkTableExistsAfterUpload() {
             try {
-                // Generate table name from Excel file name
                 const fileName = excelData.file.name.replace(/\.[^/.]+$/, "");
-                const tableName = fileName.replace(/ /g, '_'); // Only replace spaces with underscores
+                const tableName = fileName.replace(/ /g, '_');
                 
                 const databaseConnectionId = document.getElementById('databaseConnection').value;
                 const response = await fetch(`/api/home/check-table-exists?tableName=${encodeURIComponent(tableName)}&databaseConnectionId=${databaseConnectionId || ''}`, {
@@ -824,7 +667,6 @@
                     window.expectedTableName = tableName;
                     
                     if (result.exists === true) {
-                        // Show notification that table exists
                         showAlert(`"${tableName}" tablosu zaten mevcut. Veriler mevcut tabloya eklenecek.`, 'info');
                     }
                 }
@@ -847,35 +689,32 @@
                     const result = await response.json();
                     window.tableExists = result.exists === true;
                     
+                    const tableStatus = document.getElementById('tableStatus');
                     if (result.exists === true) {
-                        // Show message that table exists and data will be inserted
-                        const tableNameElement = document.getElementById('tableName');
-                        tableNameElement.style.backgroundColor = '#fff3cd';
-                        tableNameElement.style.borderColor = '#ffc107';
-                        
-                        // Add info message
-                        const infoDiv = document.createElement('div');
-                        infoDiv.id = 'tableExistsInfo';
-                        infoDiv.className = 'alert alert-info';
-                        infoDiv.innerHTML = `
-                            <i class="fas fa-info-circle"></i>
-                            <strong>Bilgi:</strong> "${tableName}" tablosu zaten mevcut. Veriler mevcut tabloya eklenecek.
+                        tableStatus.innerHTML = `
+                            <div class="alert alert-warning">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                <strong>Durum:</strong> "${tableName}" tablosu zaten mevcut. Veriler mevcut tabloya eklenecek.
+                            </div>
                         `;
-                        
-                        const tableNameContainer = tableNameElement.parentElement;
-                        if (!document.getElementById('tableExistsInfo')) {
-                            tableNameContainer.appendChild(infoDiv);
-                        }
-                        
-                        // Update button text to indicate data will be inserted into existing table
-                        const createStructureBtn = document.getElementById('createStructureBtn');
-                        if (createStructureBtn) {
-                            createStructureBtn.innerHTML = '<i class="fas fa-plus"></i> Verileri Mevcut Tabloya Ekle';
-                        }
+                    } else {
+                        tableStatus.innerHTML = `
+                            <div class="alert alert-success">
+                                <i class="fas fa-plus-circle"></i>
+                                <strong>Durum:</strong> "${tableName}" tablosu mevcut değil. Yeni tablo oluşturulacak.
+                            </div>
+                        `;
                     }
                 }
             } catch (error) {
                 console.error('Error checking table exists:', error);
+                const tableStatus = document.getElementById('tableStatus');
+                tableStatus.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-circle"></i>
+                        <strong>Hata:</strong> Tablo durumu kontrol edilemedi.
+                    </div>
+                `;
             }
         }
 
@@ -892,10 +731,8 @@
                     const connections = await response.json();
                     const select = document.getElementById('databaseConnection');
                     
-                    // Clear existing options except the first one
                     select.innerHTML = '<option value="">Varsayılan bağlantı kullan</option>';
                     
-                    // Add active connections
                     connections.filter(conn => conn.isActive).forEach(conn => {
                         const option = document.createElement('option');
                         option.value = conn.id;
@@ -908,546 +745,224 @@
             }
         }
 
-        // Update schema preview
-        function updateSchemaPreview() {
-            const previewSchema = document.getElementById('previewSchema');
+        // Show creation summary
+        function showCreationSummary() {
+            const summaryDetails = document.getElementById('summaryDetails');
+            const tableName = document.getElementById('tableName').value;
+            const tableDescription = document.getElementById('tableDescription').value;
+
+            let summaryHtml = `
+                <div class="summary-item">
+                    <strong>Tablo Adı:</strong> ${tableName}
+                </div>
+                <div class="summary-item">
+                    <strong>Açıklama:</strong> ${tableDescription || 'Açıklama yok'}
+                </div>
+                <div class="summary-item">
+                    <strong>Sütun Sayısı:</strong> ${excelData.preview.totalColumns || excelData.preview.headers.length}
+                </div>
+                <div class="summary-item">
+                    <strong>Veri Sayısı:</strong> ${excelData.preview.totalRows || 0}
+                </div>
+                <div class="summary-item">
+                    <strong>Dosya:</strong> ${excelData.file.name}
+                </div>
+            `;
+            
+            if (window.tableExists === true) {
+                summaryHtml += `
+                    <div class="summary-item" style="color: #856404; background-color: #fff3cd; padding: 10px; border-radius: 5px; margin-top: 10px;">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>Durum:</strong> "${tableName}" tablosu zaten mevcut. Veriler mevcut tabloya eklenecek.
+                    </div>
+                `;
+            } else {
+                summaryHtml += `
+                    <div class="summary-item" style="color: #155724; background-color: #d4edda; padding: 10px; border-radius: 5px; margin-top: 10px;">
+                        <i class="fas fa-plus-circle"></i>
+                        <strong>Durum:</strong> Yeni tablo oluşturulacak ve veriler yüklenecek.
+                    </div>
+                `;
+            }
+            
+            summaryDetails.innerHTML = summaryHtml;
+        }
+
+        // Setup action summary
+        function setupActionSummary() {
+            const actionSummary = document.getElementById('actionSummary');
             const tableName = document.getElementById('tableName').value;
             
-            if (!tableName) return;
-
-            let schemaHtml = '';
-            
-            // Check if table exists by looking at the global variable
-            const tableExists = window.tableExists === true;
-            
-            if (tableExists) {
-                // Table exists - show INSERT preview
-                schemaHtml = `
-                    <div class="schema-table">
-                        <div class="alert alert-info">
-                            <i class="fas fa-info-circle"></i>
-                            <strong>Mevcut Tablo:</strong> "${tableName}" tablosu zaten mevcut. Veriler mevcut tabloya eklenecek.
-                        </div>
-                        <h6>INSERT INTO ${tableName} (</h6>
-                        <div class="schema-columns">
-                `;
-            } else {
-                // New table - show CREATE preview
-                schemaHtml = `
-                    <div class="schema-table">
-                        <h6>CREATE TABLE ${tableName} (</h6>
-                        <div class="schema-columns">
-                `;
-            }
-
-            selectedColumns.filter(col => col.selected).forEach((col, index) => {
-                const sqlType = getSqlType(col.type);
-                const comma = index < selectedColumns.filter(c => c.selected).length - 1 ? ',' : '';
-                schemaHtml += `
-                    <div class="schema-column">
-                        &nbsp;&nbsp;${col.name} ${sqlType}${comma}
-                    </div>
-                `;
-            });
-
-            if (tableExists) {
-                schemaHtml += `
-                        </div>
-                        ) VALUES (...);
+            if (window.tableExists === true) {
+                actionSummary.innerHTML = `
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>İşlem:</strong> "${tableName}" tablosuna veri eklenecek.
                     </div>
                 `;
             } else {
-                schemaHtml += `
-                        </div>
-                        );
+                actionSummary.innerHTML = `
+                    <div class="alert alert-success">
+                        <i class="fas fa-plus-circle"></i>
+                        <strong>İşlem:</strong> "${tableName}" adında yeni tablo oluşturulacak ve veriler eklenecek.
                     </div>
                 `;
             }
-
-            previewSchema.innerHTML = schemaHtml;
         }
 
-        // Get SQL type
-        function getSqlType(type) {
-            switch (type) {
-                case 'int': return 'INT';
-                case 'decimal': return 'DECIMAL(18,2)';
-                case 'datetime': return 'DATETIME';
-                case 'boolean': return 'BIT';
-                default: return 'VARCHAR(255)';
-            }
-        }
-
-                 // Show creation summary
-         function showCreationSummary() {
-             const summaryDetails = document.getElementById('summaryDetails');
-             const tableName = document.getElementById('tableName').value;
-             const tableDescription = document.getElementById('tableDescription').value;
-             const stage1Section = document.getElementById('stage1Section');
-             const stage2Section = document.getElementById('stage2Section');
-
-             let summaryHtml = `
-                 <div class="summary-item">
-                     <strong>Tablo Adı:</strong> ${tableName}
-                 </div>
-                 <div class="summary-item">
-                     <strong>Açıklama:</strong> ${tableDescription || 'Açıklama yok'}
-                 </div>
-                 <div class="summary-item">
-                     <strong>Sütun Sayısı:</strong> ${selectedColumns.filter(col => col.selected).length}
-                 </div>
-                 <div class="summary-item">
-                     <strong>Veri Sayısı:</strong> ${excelData.preview.rows.length}
-                 </div>
-                 <div class="summary-item">
-                     <strong>Dosya:</strong> ${excelData.file.name}
-                 </div>
-             `;
-             
-             // Add table existence status
-             if (window.tableExists === true) {
-                 summaryHtml += `
-                     <div class="summary-item" style="color: #856404; background-color: #fff3cd; padding: 10px; border-radius: 5px; margin-top: 10px;">
-                         <i class="fas fa-info-circle"></i>
-                         <strong>Durum:</strong> "${tableName}" tablosu zaten mevcut. Veriler mevcut tabloya eklenecek.
-                     </div>
-                 `;
-             } else {
-                 summaryHtml += `
-                     <div class="summary-item" style="color: #155724; background-color: #d4edda; padding: 10px; border-radius: 5px; margin-top: 10px;">
-                         <i class="fas fa-plus-circle"></i>
-                         <strong>Durum:</strong> Yeni tablo oluşturulacak ve veriler yüklenecek.
-                     </div>
-                 `;
-             }
-             
-             summaryDetails.innerHTML = summaryHtml;
-
-             // Check if table exists and adjust UI accordingly
-             if (window.tableExists === true) {
-                 // Hide stage 1 (create structure) and show stage 2 (insert data) directly
-                 stage1Section.style.display = 'none';
-                 stage2Section.style.display = 'block';
-                 
-                 // Update stage 2 title and description for existing table
-                 const stage2Title = stage2Section.querySelector('h5');
-                 const stage2Description = stage2Section.querySelector('p');
-                 const insertDataBtn = document.getElementById('insertDataBtn');
-                 
-                 if (stage2Title) stage2Title.innerHTML = '<i class="fas fa-database"></i> Verileri Mevcut Tabloya Ekle';
-                 if (stage2Description) stage2Description.textContent = 'Mevcut tabloya Excel verileri eklenecek.';
-                 if (insertDataBtn) insertDataBtn.innerHTML = '<i class="fas fa-plus"></i> Verileri Ekle';
-             } else {
-                 // Show stage 1 for new table creation
-                 stage1Section.style.display = 'block';
-                 stage2Section.style.display = 'none';
-             }
-         }
-
-        // Create table
-        async function createTableStructure() {
+        // Process Excel file (main function)
+        async function processExcelFile() {
             try {
-                const createStructureBtn = document.getElementById('createStructureBtn');
-                const stage1Status = document.getElementById('stage1Status');
-                const stage2Section = document.getElementById('stage2Section');
-                const viewTableBtn = document.getElementById('viewTableBtn');
+                const processButton = document.getElementById('processButton');
+                const actionStatus = document.getElementById('actionStatus');
                 const creationProgress = document.getElementById('creationProgress');
+                const viewTableBtn = document.getElementById('viewTableBtn');
                 
-                createStructureBtn.disabled = true;
-                stage1Status.textContent = 'Oluşturuluyor...';
-                stage1Status.style.background = '#fff3cd';
-                stage1Status.style.color = '#856404';
-                stage2Section.style.display = 'none';
+                processButton.disabled = true;
+                actionStatus.textContent = 'İşleniyor...';
+                actionStatus.style.background = '#fff3cd';
+                actionStatus.style.color = '#856404';
                 viewTableBtn.style.display = 'none';
                 creationProgress.style.display = 'block';
 
-                // Get table name and description
                 const tableName = document.getElementById('tableName').value;
                 const tableDescription = document.getElementById('tableDescription').value;
                 
                 if (!tableName || !tableName.trim()) {
-                    showAlert('Lütfen tablo adını girin.', 'warning');
-                    createStructureBtn.disabled = false;
-                    stage1Status.textContent = '✗ Hata!';
-                    stage1Status.style.background = '#f8d7da';
-                    stage1Status.style.color = '#721c24';
+                    showAlert('Tablo adı bulunamadı.', 'warning');
+                    processButton.disabled = false;
+                    actionStatus.textContent = '✗ Hata!';
+                    actionStatus.style.background = '#f8d7da';
+                    actionStatus.style.color = '#721c24';
                     creationProgress.style.display = 'none';
                     return;
                 }
 
-                // Check if file exists
                 if (!excelData || !excelData.file) {
                     showAlert('Lütfen bir Excel dosyası seçin.', 'warning');
-                    createStructureBtn.disabled = false;
-                    stage1Status.textContent = '✗ Hata!';
-                    stage1Status.style.background = '#f8d7da';
-                    stage1Status.style.color = '#721c24';
+                    processButton.disabled = false;
+                    actionStatus.textContent = '✗ Hata!';
+                    actionStatus.style.background = '#f8d7da';
+                    actionStatus.style.color = '#721c24';
                     creationProgress.style.display = 'none';
                     return;
                 }
 
-                // Debug: Log file details
-                console.log('File details:');
-                console.log('File object:', excelData.file);
-                console.log('File name:', excelData.file.name);
-                console.log('File size:', excelData.file.size);
-                console.log('File type:', excelData.file.type);
-
-                // Check if user is authenticated
                 const token = getToken();
                 if (!token) {
                     showAlert('Oturum açmanız gerekiyor. Lütfen giriş yapın.', 'warning');
-                    createStructureBtn.disabled = false;
-                    stage1Status.textContent = '✗ Hata!';
-                    stage1Status.style.background = '#f8d7da';
-                    stage1Status.style.color = '#721c24';
+                    processButton.disabled = false;
+                    actionStatus.textContent = '✗ Hata!';
+                    actionStatus.style.background = '#f8d7da';
+                    actionStatus.style.color = '#721c24';
                     creationProgress.style.display = 'none';
                     return;
                 }
 
-                // Prepare data
+                // Prepare form data with correct field names
                 const formData = new FormData();
                 formData.append('ExcelFile', excelData.file);
-                formData.append('Description', tableDescription);
+                formData.append('Description', tableDescription || '');
                 
-                // Add database connection ID (force empty to use default connection)
                 const databaseConnectionId = document.getElementById('databaseConnection').value;
-                formData.append('DatabaseConnectionId', databaseConnectionId || '');
+                if (databaseConnectionId && databaseConnectionId.trim() !== '') {
+                    formData.append('DatabaseConnectionId', databaseConnectionId);
+                }
 
-                // Add selected columns data
-                const selectedColumnsData = selectedColumns.filter(col => col.selected).map(col => ({
-                    name: col.name,
-                    type: col.type,
-                    index: col.index
-                }));
-                formData.append('SelectedColumns', JSON.stringify(selectedColumnsData));
-
-                // Debug: Log form data
-                console.log('Form Data being sent:');
-                console.log('ExcelFile:', excelData.file?.name);
-                console.log('Description:', tableDescription);
-                console.log('DatabaseConnectionId:', databaseConnectionId);
-                console.log('SelectedColumns:', selectedColumnsData);
-                console.log('Token exists:', !!getToken());
-                
-                // Log FormData contents
+                // Debug: Log form data contents
+                console.log('Form data being sent:');
                 for (let [key, value] of formData.entries()) {
                     console.log(`${key}:`, value);
                 }
 
-                // Update progress
                 updateProgress(25, 'Dosya yükleniyor...');
 
-<<<<<<< HEAD
-                const response = await fetch('/api/home/insert-data', {
-=======
-                console.log('Making API request to /api/home/create-table-structure');
-                const response = await fetch('/api/home/create-table-structure', {
->>>>>>> b8add5ed6d1a309e1996d2d9637d7edd5d241565
+                console.log('Making request to /api/home/upload');
+                const response = await fetch('/api/home/upload', {
                     method: 'POST',
                     body: formData,
                     headers: {
-                        'Authorization': `Bearer ${getToken()}`
+                        'Authorization': `Bearer ${token}`
                     }
                 });
 
-                console.log('Response status:', response.status);
+                console.log('Response received:', response.status, response.statusText);
                 console.log('Response headers:', response.headers);
-
-                updateProgress(50, 'Tablo yapısı oluşturuluyor...');
-
-                if (response.ok) {
-                    updateProgress(75, 'Veriler işleniyor...');
-                    const result = await response.json();
-                    
-                    updateProgress(100, 'Tamamlandı!');
-                    
-                    // Show SQL output
-                    showSqlOutput(result);
-                    
-                    setTimeout(() => {
-                        let message;
-                        if (result.sameNameInsert) {
-                            message = `Aynı isimli tabloya veri eklendi: ${result.tableName} (${result.rowCount} satır)`;
-                        } else if (result.dataInserted) {
-                            message = `Veriler mevcut tabloya başarıyla eklendi: ${result.tableName} (${result.rowCount} satır)`;
-                        } else {
-                            message = `Yeni tablo oluşturuldu: ${result.tableName}`;
-                        }
-                        
-                        showAlert(message, 'success');
-                        stage1Status.textContent = result.dataInserted ? '✓ Veriler Eklendi!' : '✓ Tablo Oluşturuldu!';
-                        stage1Status.style.background = '#d4edda';
-                        stage1Status.style.color = '#155724';
-                        
-                        // Only show stage 2 if data was not already inserted
-                        if (!result.dataInserted) {
-                            stage2Section.style.display = 'block';
-                        } else {
-                            // If data was already inserted, hide the create structure button and show completion message
-                            createStructureBtn.style.display = 'none';
-                            
-                            // Add a completion message
-                            const completionMessage = document.createElement('div');
-                            completionMessage.className = 'alert alert-success mt-3';
-                            completionMessage.innerHTML = `
-                                <i class="fas fa-check-circle"></i>
-                                <strong>İşlem Tamamlandı!</strong> ${result.sameNameInsert ? 'Aynı isimli tabloya veri eklendi.' : 'Veriler mevcut tabloya başarıyla eklendi.'} 
-                                <a href="/tables" class="btn btn-sm btn-outline-success ml-2">
-                                    <i class="fas fa-table"></i> Tabloları Görüntüle
-                                </a>
-                            `;
-                            
-                            // Insert the completion message after the stage1Status
-                            const stage1Status = document.getElementById('stage1Status');
-                            stage1Status.parentNode.insertBefore(completionMessage, stage1Status.nextSibling);
-                        }
-                        
-                        viewTableBtn.style.display = 'inline-block';
-                        createStructureBtn.disabled = false;
-                        window.createdTableId = result.tableId; // Store table ID for stage 2
-                        window.tableExists = result.tableExists === true; // Store table exists status
-                        window.dataInserted = result.dataInserted; // Store data inserted status
-                        
-                        // Update button text if table exists but data wasn't inserted yet
-                        if (result.tableExists === true && !result.dataInserted) {
-                            document.getElementById('insertDataBtn').innerHTML = '<i class="fas fa-plus"></i> Verileri Ekle';
-                            document.getElementById('createStructureBtn').innerHTML = '<i class="fas fa-plus"></i> Verileri Mevcut Tabloya Ekle';
-                        }
-                    }, 1000);
-                } else {
-                    const error = await response.json();
-                    console.error('API Error Response:', error);
-                    console.error('Response Status:', response.status);
-                    console.error('Response Headers:', response.headers);
-                    
-                    let errorMessage = 'Tablo yapısı oluşturulurken hata oluştu';
-                    if (error.error) {
-                        errorMessage = error.error;
-                    } else if (error.message) {
-                        errorMessage = error.message;
-                    } else if (error.details) {
-                        errorMessage = `Hata: ${error.details}`;
-                    } else if (error.errors && Array.isArray(error.errors)) {
-                        errorMessage = `Validation Errors: ${error.errors.map(e => e.Errors?.join(', ') || e).join('; ')}`;
-                    }
-                    
-                    showAlert(errorMessage, 'danger');
-                    createStructureBtn.disabled = false;
-                    stage1Status.textContent = '✗ Hata!';
-                    stage1Status.style.background = '#f8d7da';
-                    stage1Status.style.color = '#721c24';
-                    creationProgress.style.display = 'none';
-                }
-            } catch (error) {
-                console.error('Error creating table structure:', error);
-                showAlert('Tablo yapısı oluşturulurken hata oluştu', 'danger');
-                createStructureBtn.disabled = false;
-                stage1Status.textContent = '✗ Hata!';
-                stage1Status.style.background = '#f8d7da';
-                stage1Status.style.color = '#721c24';
-                creationProgress.style.display = 'none';
-            }
-        }
-
-        // Show SQL output
-        function showSqlOutput(result) {
-            const stage1Status = document.getElementById('stage1Status');
-            
-            // Create SQL output display
-            let sqlOutput = `
-                <div style="margin-top: 1rem; padding: 1rem; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 5px;">
-                    <h6 style="margin-bottom: 0.5rem; color: #495057;"><i class="fas fa-code"></i> SQL Çıktısı:</h6>
-                    <pre style="background: #fff; padding: 1rem; border-radius: 3px; font-size: 0.9rem; overflow-x: auto; margin: 0;">`;
-            
-            if (result.dataInserted) {
-                // Show INSERT statement for existing table
-                const tableName = document.getElementById('tableName').value;
-                const selectedCols = selectedColumns.filter(col => col.selected);
-                const columnNames = selectedCols.map(col => col.name).join(', ');
-                
-                sqlOutput += `INSERT INTO ${tableName} (${columnNames}) VALUES (...);\n`;
-                sqlOutput += `-- ${result.rowCount} satır eklendi`;
-            } else if (result.sqlScript) {
-                sqlOutput += result.sqlScript;
-            } else {
-                // Generate SQL script from selected columns
-                const tableName = document.getElementById('tableName').value;
-                sqlOutput += `CREATE TABLE ${tableName} (\n`;
-                
-                const selectedCols = selectedColumns.filter(col => col.selected);
-                selectedCols.forEach((col, index) => {
-                    const sqlType = getSqlType(col.type);
-                    const comma = index < selectedCols.length - 1 ? ',' : '';
-                    sqlOutput += `    ${col.name} ${sqlType}${comma}\n`;
-                });
-                
-                sqlOutput += `);`;
-            }
-            
-            sqlOutput += `</pre></div>`;
-            
-            stage1Status.innerHTML = '✓ Tamamlandı!' + sqlOutput;
-        }
-
-                 async function insertData() {
-             try {
-                 const insertDataBtn = document.getElementById('insertDataBtn');
-                 const stage2Status = document.getElementById('stage2Status');
-                 const creationProgress = document.getElementById('creationProgress');
-                 
-                 // Check if table ID exists (for new tables) or if we're inserting into existing table
-                 if (!window.createdTableId && !window.tableExists) {
-                     showAlert('Önce tablo yapısını oluşturmanız gerekiyor. Lütfen 1. adımı tamamlayın.', 'warning');
-                     return;
-                 }
-                
-                insertDataBtn.disabled = true;
-                stage2Status.textContent = 'Yükleniyor...';
-                stage2Status.style.background = '#fff3cd';
-                stage2Status.style.color = '#856404';
-                creationProgress.style.display = 'block';
-
-                                 // Prepare data
-                 const formData = new FormData();
-                 formData.append('ExcelFile', excelData.file);
-                 
-                 // Determine the correct endpoint based on table existence
-                 let endpoint;
-                 
-<<<<<<< HEAD
-                 // Artık sadece insert-data endpoint'ini kullanıyoruz
-                 endpoint = '/api/home/insert-data';
-                 
-                 // Add description if available
-                 const description = document.getElementById('tableDescription')?.value;
-                 if (description && description.trim() !== '') {
-                     formData.append('Description', description);
-=======
-                 if (window.tableExists === true) {
-                     // Table already exists - only upload data to existing table
-                     endpoint = '/api/home/create-table-structure';
-                     
-                     // Add table name for existing table
-                     const tableName = document.getElementById('tableName').value;
-                     formData.append('TableName', tableName);
-                     
-                     // Add description if available
-                     const description = document.getElementById('tableDescription')?.value;
-                     if (description && description.trim() !== '') {
-                         formData.append('Description', description);
-                     }
-                     
-                     console.log('Table exists - will only upload data to existing table');
-                 } else {
-                     // Table doesn't exist - use insert-data endpoint for new table
-                     endpoint = '/api/home/insert-data';
-                     formData.append('TableId', window.createdTableId);
-                     
-                     // Add description if available
-                     const description = document.getElementById('tableDescription')?.value;
-                     if (description && description.trim() !== '') {
-                         formData.append('Description', description);
-                     }
-                     
-                     console.log('Table does not exist - will create new table and upload data');
->>>>>>> b8add5ed6d1a309e1996d2d9637d7edd5d241565
-                 }
-                 
-                 console.log('Using insert-data endpoint for all operations');
-                 
-                 // Add database connection ID only if it's not empty
-                 const databaseConnectionId = document.getElementById('databaseConnection').value;
-                 if (databaseConnectionId && databaseConnectionId.trim() !== '') {
-                     formData.append('DatabaseConnectionId', databaseConnectionId);
-                 }
-                 
-                 // Debug: Log form data
-                 console.log('Form data being sent:');
-                 console.log('Endpoint:', endpoint);
-                 console.log('TableExists:', window.tableExists);
-                 console.log('ExcelFile:', excelData.file);
-                 console.log('DatabaseConnectionId:', databaseConnectionId);
-
-                 // Update progress
-                 updateProgress(25, 'Dosya yükleniyor...');
-
-                 const response = await fetch(endpoint, {
-                     method: 'POST',
-                     body: formData,
-                     headers: {
-                         'Authorization': `Bearer ${getToken()}`
-                     }
-                 });
 
                 updateProgress(50, 'Veriler işleniyor...');
 
                 if (response.ok) {
-                    updateProgress(75, 'Veriler yükleniyor...');
+                    updateProgress(75, 'Tablo işlemi tamamlanıyor...');
                     const result = await response.json();
+                    console.log('Success response:', result);
                     
                     updateProgress(100, 'Tamamlandı!');
                     
-                    // Show data insertion summary
-                    showDataInsertionSummary(result);
-                    
-                                         setTimeout(() => {
-                         const message = window.tableExists === true ? 
-                             `Veriler başarıyla eklendi! ${result.insertedRows || 0} satır eklendi.` : 
-                             `Veriler başarıyla yüklendi! ${result.insertedRows || 0} satır eklendi.`;
-                         
-                         showAlert(message, 'success');
-                         stage2Status.textContent = '✓ Tamamlandı!';
-                         stage2Status.style.background = '#d4edda';
-                         stage2Status.style.color = '#155724';
-                         insertDataBtn.disabled = false;
-                     }, 1000);
+                    setTimeout(() => {
+                        let message;
+                        if (result.action === 'data_inserted_into_existing') {
+                            message = `Veriler mevcut tabloya başarıyla eklendi: ${result.tableName} (${result.rowCount} satır)`;
+                        } else {
+                            message = `Yeni tablo oluşturuldu ve veriler eklendi: ${result.tableName} (${result.rowCount} satır)`;
+                        }
+                        
+                        showAlert(message, 'success');
+                        actionStatus.textContent = '✓ Tamamlandı!';
+                        actionStatus.style.background = '#d4edda';
+                        actionStatus.style.color = '#155724';
+                        
+                        viewTableBtn.style.display = 'inline-block';
+                        processButton.disabled = false;
+                        window.createdTableId = result.tableId;
+                        
+                        const actionSummary = document.getElementById('actionSummary');
+                        actionSummary.innerHTML = `
+                            <div class="alert alert-success">
+                                <i class="fas fa-check-circle"></i>
+                                <strong>İşlem Tamamlandı!</strong> ${message}
+                            </div>
+                        `;
+                    }, 1000);
                 } else {
-                    const error = await response.json();
-                    let errorMessage = 'Veriler yüklenirken hata oluştu';
-                    
-                    if (error.error) {
-                        errorMessage = error.error;
-                    } else if (error.errors) {
-                        // Handle validation errors
-                        const validationErrors = Object.values(error.errors).flat();
-                        errorMessage = validationErrors.join(', ');
+                    console.log('Error response status:', response.status);
+                    let errorData;
+                    try {
+                        errorData = await response.json();
+                        console.error('API Error Response:', errorData);
+                    } catch (parseError) {
+                        console.error('Failed to parse error response:', parseError);
+                        errorData = { error: 'Unknown error occurred' };
                     }
                     
+                    let errorMessage = 'Tablo işlemi sırasında hata oluştu';
+                    if (errorData.error) {
+                        errorMessage = errorData.error;
+                    } else if (errorData.message) {
+                        errorMessage = errorData.message;
+                    } else if (errorData.details) {
+                        errorMessage = `Hata: ${errorData.details}`;
+                    } else if (errorData.errors && Array.isArray(errorData.errors)) {
+                        errorMessage = `Validation Errors: ${errorData.errors.map(e => e.Errors?.join(', ') || e).join('; ')}`;
+                    }
+                    
+                    console.error('Final error message:', errorMessage);
                     showAlert(errorMessage, 'danger');
-                    insertDataBtn.disabled = false;
-                    stage2Status.textContent = '✗ Hata!';
-                    stage2Status.style.background = '#f8d7da';
-                    stage2Status.style.color = '#721c24';
+                    processButton.disabled = false;
+                    actionStatus.textContent = '✗ Hata!';
+                    actionStatus.style.background = '#f8d7da';
+                    actionStatus.style.color = '#721c24';
                     creationProgress.style.display = 'none';
                 }
             } catch (error) {
-                console.error('Error inserting data:', error);
-                showAlert('Veriler yüklenirken hata oluştu', 'danger');
-                insertDataBtn.disabled = false;
-                stage2Status.textContent = '✗ Hata!';
-                stage2Status.style.background = '#f8d7da';
-                stage2Status.style.color = '#721c24';
+                console.error('Error processing Excel file:', error);
+                console.error('Error stack:', error.stack);
+                showAlert('Excel dosyası işlenirken hata oluştu', 'danger');
+                processButton.disabled = false;
+                actionStatus.textContent = '✗ Hata!';
+                actionStatus.style.background = '#f8d7da';
+                actionStatus.style.color = '#721c24';
                 creationProgress.style.display = 'none';
             }
-        }
-
-        // Show data insertion summary
-        function showDataInsertionSummary(result) {
-            const stage2Status = document.getElementById('stage2Status');
-            
-            let summary = `
-                <div style="margin-top: 1rem; padding: 1rem; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 5px;">
-                    <h6 style="margin-bottom: 0.5rem; color: #495057;"><i class="fas fa-database"></i> Veri Yükleme Özeti:</h6>
-                    <div style="background: #fff; padding: 1rem; border-radius: 3px; font-size: 0.9rem;">
-                        <p><strong>Tablo Adı:</strong> ${result.tableName || document.getElementById('tableName').value}</p>
-                        <p><strong>Eklenen Satır Sayısı:</strong> ${result.insertedRows || 0}</p>
-                        <p><strong>İşlem Durumu:</strong> <span style="color: #28a745;">✓ Başarılı</span></p>
-                        <p><strong>İşlem Tarihi:</strong> ${new Date().toLocaleString('tr-TR')}</p>
-                    </div>
-                </div>`;
-            
-            stage2Status.innerHTML = '✓ Tamamlandı!' + summary;
         }
 
         async function viewCreatedTable() {
@@ -1460,12 +975,6 @@
                     showAlert('Lütfen tablo adını girin.', 'warning');
                     return;
                 }
-
-                // Database connection is optional for viewing tables
-                // if (!databaseConnectionId) {
-                //     showAlert('Lütfen bir veritabanı bağlantısı seçin.', 'warning');
-                //     return;
-                // }
 
                 viewTableBtn.disabled = true;
                 showAlert(`${tableName} tablosunun verileri görüntüleniyor...`, 'info');
@@ -1484,7 +993,6 @@
                 if (response.ok) {
                     const tableData = await response.json();
                     showAlert(`${tableName} tablosundan ${tableData.rowCount} satır görüntülendi.`, 'success');
-                    // Optionally, display the data in a modal or new tab
                     console.log('Viewed Table Data:', tableData);
                 } else {
                     const error = await response.json();
@@ -1503,32 +1011,23 @@
             document.getElementById('progressText').textContent = text;
         }
 
-        // Step Navigation Functions - Fixed
+        // Step Navigation Functions
         const totalSteps = 6;
 
         function goToStep(stepNumber) {
-            // Validate step number
             if (stepNumber < 1 || stepNumber > totalSteps) {
                 return;
             }
 
-            // Check if we can go to this step (basic validation)
             if (stepNumber > currentStep) {
                 if (!canProceedToStep(stepNumber)) {
                     return;
                 }
             }
 
-            // Update current step
             currentStep = stepNumber;
-
-            // Update step indicators
             updateStepIndicators();
-
-            // Show/hide step content
             showStepContent(stepNumber);
-            
-            // Execute step-specific actions
             executeStepActions(stepNumber);
         }
 
@@ -1541,31 +1040,19 @@
                     break;
                 case 4:
                     if (excelData && excelData.preview) {
-                        setupColumnSelection();
+                        setupTableNaming();
                     }
                     break;
                 case 5:
                     if (excelData && excelData.preview) {
-                        setupTableNaming();
+                        showCreationSummary();
                     }
                     break;
                 case 6:
                     if (excelData && excelData.preview) {
-                        showCreationSummary();
+                        setupActionSummary();
                     }
                     break;
-            }
-        }
-
-        function nextStep() {
-            if (currentStep < totalSteps) {
-                goToStep(currentStep + 1);
-            }
-        }
-
-        function previousStep() {
-            if (currentStep > 1) {
-                goToStep(currentStep - 1);
             }
         }
 
@@ -1582,13 +1069,11 @@
         }
 
         function showStepContent(stepNumber) {
-            // Hide all step content
             const stepContents = document.querySelectorAll('.step-content');
             stepContents.forEach(content => {
                 content.classList.remove('active');
             });
 
-            // Show current step content
             const currentContent = document.getElementById(`step${stepNumber}`);
             if (currentContent) {
                 currentContent.classList.add('active');
@@ -1596,23 +1081,17 @@
         }
 
         function canProceedToStep(stepNumber) {
-            // Add validation logic for each step
             switch (stepNumber) {
                 case 2:
-                    // Step 2: File upload - no validation needed
                     return true;
                 case 3:
-                    // Step 3: Data preview - need file uploaded
                     return excelData && excelData.file;
                 case 4:
-                    // Step 4: Column selection - need data preview
                     return excelData && excelData.preview;
                 case 5:
-                    // Step 5: Table naming - need column selection
-                    return excelData && excelData.preview && selectedColumns.length > 0;
+                    return excelData && excelData.preview;
                 case 6:
-                    // Step 6: Create table - need all previous steps
-                    return excelData && excelData.preview && selectedColumns.length > 0;
+                    return excelData && excelData.preview;
                 default:
                     return true;
             }
@@ -1635,7 +1114,6 @@
         }
 
         function showAlert(message, type) {
-            // Simple alert implementation
             alert(message);
         }
     </script>

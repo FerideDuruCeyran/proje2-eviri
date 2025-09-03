@@ -1,254 +1,166 @@
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using ExcelUploader.Services;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.EntityFrameworkCore;
 using ExcelUploader.Models;
+using ExcelUploader.Services;
 using ExcelUploader.Data;
 
 namespace ExcelUploader.Controllers
 {
+    [ApiController]
+    [Route("api/[controller]")]
     [Authorize]
-    public class DynamicTableController : Controller
+    public class DynamicTableController : ControllerBase
     {
         private readonly IDynamicTableService _dynamicTableService;
+        private readonly ApplicationDbContext _context;
         private readonly ILogger<DynamicTableController> _logger;
 
-        public DynamicTableController(IDynamicTableService dynamicTableService, ILogger<DynamicTableController> logger)
+        public DynamicTableController(
+            IDynamicTableService dynamicTableService,
+            ApplicationDbContext context,
+            ILogger<DynamicTableController> logger)
         {
             _dynamicTableService = dynamicTableService;
+            _context = context;
             _logger = logger;
         }
 
-        public async Task<IActionResult> Index()
-        {
-            try
-            {
-                var tables = await _dynamicTableService.GetAllTablesAsync();
-                var viewModel = new DynamicTableListViewModel
-                {
-                    Tables = tables,
-                    TotalTables = tables.Count,
-                    ProcessedTables = tables.Count(t => t.IsProcessed),
-                    PendingTables = tables.Count(t => !t.IsProcessed)
-                };
-
-                return View(viewModel);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error getting dynamic tables");
-                TempData["Error"] = "Tablolar yüklenirken hata oluştu.";
-                return View(new DynamicTableListViewModel());
-            }
-        }
-
-        public async Task<IActionResult> Details(int id)
-        {
-            try
-            {
-                var table = await _dynamicTableService.GetTableByIdAsync(id);
-                if (table == null)
-                {
-                    TempData["Error"] = "Tablo bulunamadı.";
-                    return RedirectToAction(nameof(Index));
-                }
-
-                var data = await _dynamicTableService.GetTableDataAsync(table.TableName, 1, 50);
-                var totalCount = await _dynamicTableService.GetTableDataCountAsync(table.TableName);
-
-                var viewModel = new DynamicTableDetailsViewModel
-                {
-                    Table = table,
-                    Data = data,
-                    TotalRows = totalCount,
-                    CurrentPage = 1,
-                    PageSize = 50
-                };
-
-                return View(viewModel);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error getting table details: {Id}", id);
-                TempData["Error"] = "Tablo detayları yüklenirken hata oluştu.";
-                return RedirectToAction(nameof(Index));
-            }
-        }
-
-        public async Task<IActionResult> Data(string tableName, int page = 1, int pageSize = 50)
-        {
-            try
-            {
-                var table = await _dynamicTableService.GetTableByNameAsync(tableName);
-                if (table == null)
-                {
-                    TempData["Error"] = "Tablo bulunamadı.";
-                    return RedirectToAction(nameof(Index));
-                }
-
-                var data = await _dynamicTableService.GetTableDataAsync(tableName, page, pageSize);
-                var totalCount = await _dynamicTableService.GetTableDataCountAsync(tableName);
-
-                var viewModel = new DynamicTableDataViewModel
-                {
-                    Table = table,
-                    Data = data,
-                    TotalRows = totalCount,
-                    CurrentPage = page,
-                    PageSize = pageSize,
-                    TotalPages = (int)Math.Ceiling((double)totalCount / pageSize)
-                };
-
-                return View(viewModel);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error getting table data: {TableName}", tableName);
-                TempData["Error"] = "Tablo verisi yüklenirken hata oluştu.";
-                return RedirectToAction(nameof(Index));
-            }
-        }
-
-        [HttpPost]
-        public async Task<IActionResult> UpdateData(string tableName, int rowId, [FromBody] Dictionary<string, object> data)
-        {
-            try
-            {
-                var success = await _dynamicTableService.UpdateTableDataAsync(tableName, rowId, data);
-                if (success)
-                {
-                    return Json(new { success = true, message = "Veri başarıyla güncellendi." });
-                }
-                else
-                {
-                    return Json(new { success = false, message = "Veri güncellenirken hata oluştu." });
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error updating table data: {TableName}, RowId: {RowId}", tableName, rowId);
-                return Json(new { success = false, message = "Veri güncellenirken hata oluştu." });
-            }
-        }
-
-        [HttpPost]
-        public async Task<IActionResult> DeleteData(string tableName, int rowId)
-        {
-            try
-            {
-                var success = await _dynamicTableService.DeleteTableDataAsync(tableName, rowId);
-                if (success)
-                {
-                    TempData["Success"] = "Veri başarıyla silindi.";
-                }
-                else
-                {
-                    TempData["Error"] = "Veri silinirken hata oluştu.";
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error deleting table data: {TableName}, RowId: {RowId}", tableName, rowId);
-                TempData["Error"] = "Veri silinirken hata oluştu.";
-            }
-
-            return RedirectToAction(nameof(Data), new { tableName });
-        }
-
-        public async Task<IActionResult> Export(string tableName, string format = "xlsx")
-        {
-            try
-            {
-                var data = await _dynamicTableService.ExportTableDataAsync(tableName, format);
-                if (data.Length == 0)
-                {
-                    TempData["Error"] = "Dışa aktarılacak veri bulunamadı.";
-                    return RedirectToAction(nameof(Data), new { tableName });
-                }
-
-                var table = await _dynamicTableService.GetTableByNameAsync(tableName);
-                var fileName = $"{table?.FileName ?? tableName}_{DateTime.Now:yyyyMMdd_HHmmss}.{format}";
-
-                return File(data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error exporting table data: {TableName}", tableName);
-                TempData["Error"] = "Veri dışa aktarılırken hata oluştu.";
-                return RedirectToAction(nameof(Data), new { tableName });
-            }
-        }
-
-        [HttpPost]
-        public async Task<IActionResult> Delete(int id)
-        {
-            try
-            {
-                var success = await _dynamicTableService.DeleteTableAsync(id);
-                if (success)
-                {
-                    TempData["Success"] = "Tablo başarıyla silindi.";
-                }
-                else
-                {
-                    TempData["Error"] = "Tablo silinirken hata oluştu.";
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error deleting table: {Id}", id);
-                TempData["Error"] = "Tablo silinirken hata oluştu.";
-            }
-
-            return RedirectToAction(nameof(Index));
-        }
-
-        [HttpPost]
-        public async Task<IActionResult> GetTableData([FromBody] GetTableDataRequest request)
-        {
-            try
-            {
-                var data = await _dynamicTableService.GetTableDataAsync(request.TableName, request.Page, request.PageSize);
-                var totalCount = await _dynamicTableService.GetTableDataCountAsync(request.TableName);
-
-                return Json(new
-                {
-                    success = true,
-                    data = data,
-                    totalCount = totalCount,
-                    currentPage = request.Page,
-                    pageSize = request.PageSize,
-                    totalPages = (int)Math.Ceiling((double)totalCount / request.PageSize)
-                });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error getting table data for AJAX: {TableName}", request.TableName);
-                return Json(new { success = false, message = "Veri yüklenirken hata oluştu." });
-            }
-        }
-
         [HttpGet]
-        public async Task<IActionResult> GetTableDataGet(string tableName, int page = 1, int pageSize = 50)
+        public async Task<IActionResult> GetTables()
         {
             try
             {
-                var data = await _dynamicTableService.GetTableDataAsync(tableName, page, pageSize);
-                var totalCount = await _dynamicTableService.GetTableDataCountAsync(tableName);
+                var tables = await _context.DynamicTables
+                    .OrderByDescending(t => t.UploadDate)
+                    .Select(t => new
+                    {
+                        t.Id,
+                        t.TableName,
+                        t.FileName,
+                        t.Description,
+                        t.UploadDate,
+                        t.RowCount,
+                        t.ColumnCount,
+                        t.IsProcessed,
+                        t.ProcessedDate
+                    })
+                    .ToListAsync();
 
-                return Json(new
+                return Ok(tables);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting tables");
+                return StatusCode(500, new { error = "Tablolar alınırken hata oluştu" });
+            }
+        }
+
+        [HttpGet("{id}")]
+        public async Task<IActionResult> GetTable(int id)
+        {
+            try
+            {
+                var table = await _context.DynamicTables
+                    .Include(t => t.Columns)
+                    .FirstOrDefaultAsync(t => t.Id == id);
+
+                if (table == null)
                 {
-                    success = true,
-                    data = data,
-                    totalCount = totalCount,
-                    currentPage = page,
-                    pageSize = pageSize,
-                    totalPages = (int)Math.Ceiling((double)totalCount / pageSize)
+                    return NotFound(new { error = "Tablo bulunamadı" });
+                }
+
+                return Ok(new
+                {
+                    table.Id,
+                    table.TableName,
+                    table.FileName,
+                    table.Description,
+                    table.UploadDate,
+                    table.RowCount,
+                    table.ColumnCount,
+                    table.IsProcessed,
+                    table.ProcessedDate,
+                    Columns = table.Columns.Select(c => new
+                    {
+                        c.Id,
+                        c.ColumnName,
+                        c.DisplayName,
+                        c.DataType,
+                        c.ColumnOrder,
+                        c.MaxLength,
+                        c.IsRequired,
+                        c.IsUnique
+                    }).OrderBy(c => c.ColumnOrder)
                 });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting table data for AJAX: {TableName}", tableName);
-                return Json(new { success = false, message = "Veri yüklenirken hata oluştu." });
+                _logger.LogError(ex, "Error getting table with ID: {Id}", id);
+                return StatusCode(500, new { error = "Tablo alınırken hata oluştu" });
+            }
+        }
+
+        [HttpGet("{tableName}/data")]
+        public async Task<IActionResult> GetTableData(string tableName, int page = 1, int pageSize = 50)
+        {
+            try
+            {
+                var result = await _dynamicTableService.GetTableDataAsync(tableName);
+                if (!result.IsSuccess)
+                {
+                    return StatusCode(500, new { error = "Tablo verisi alınamadı", details = result.ErrorMessage });
+                }
+
+                var data = result.Data;
+                var totalCount = data.Count;
+                var totalPages = (int)Math.Ceiling((double)totalCount / pageSize);
+                var pagedData = data.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+
+                return Ok(new
+                {
+                    data = pagedData,
+                    pagination = new
+                    {
+                        currentPage = page,
+                        pageSize = pageSize,
+                        totalCount = totalCount,
+                        totalPages = totalPages
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting table data for: {TableName}", tableName);
+                return StatusCode(500, new { error = "Tablo verisi alınırken hata oluştu" });
+            }
+        }
+
+        [HttpDelete("{tableName}")]
+        public async Task<IActionResult> DeleteTable(string tableName)
+        {
+            try
+            {
+                var result = await _dynamicTableService.DeleteTableAsync(tableName);
+                if (!result.IsSuccess)
+                {
+                    return StatusCode(500, new { error = "Tablo silinemedi", details = result.ErrorMessage });
+                }
+
+                // Also delete from tracking table
+                var trackingTable = await _context.DynamicTables.FirstOrDefaultAsync(t => t.TableName == tableName);
+                if (trackingTable != null)
+                {
+                    _context.DynamicTables.Remove(trackingTable);
+                    await _context.SaveChangesAsync();
+                }
+
+                return Ok(new { message = $"Tablo {tableName} başarıyla silindi" });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deleting table: {TableName}", tableName);
+                return StatusCode(500, new { error = "Tablo silinirken hata oluştu" });
             }
         }
     }

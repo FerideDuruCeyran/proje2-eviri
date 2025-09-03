@@ -1,10 +1,9 @@
-using ExcelUploader.Models;
 using OfficeOpenXml;
 using NPOI.SS.UserModel;
 using NPOI.XSSF.UserModel;
 using NPOI.HSSF.UserModel;
-using System.Globalization;
-using System.ComponentModel.DataAnnotations;
+using ExcelUploader.Models;
+using Microsoft.AspNetCore.Http;
 
 namespace ExcelUploader.Services
 {
@@ -15,340 +14,300 @@ namespace ExcelUploader.Services
         public ExcelAnalyzerService(ILogger<ExcelAnalyzerService> logger)
         {
             _logger = logger;
-            ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
         }
 
         public async Task<ExcelAnalysisResult> AnalyzeExcelFileAsync(IFormFile file)
         {
+            return await AnalyzeExcelFileAsync(file, 0);
+        }
+
+        public async Task<ExcelAnalysisResult> AnalyzeExcelFileAsync(IFormFile file, int sheetIndex)
+        {
             try
             {
-                if (file.FileName.EndsWith(".xlsx"))
+                _logger.LogInformation("Starting Excel analysis for file: {FileName}, sheet: {SheetIndex}", file.FileName, sheetIndex);
+
+                using var stream = file.OpenReadStream();
+                var fileExtension = Path.GetExtension(file.FileName).ToLower();
+
+                if (fileExtension == ".xlsx")
                 {
-                    return await AnalyzeXlsxFileAsync(file, 0);
+                    return await AnalyzeXlsxFileAsync(stream, sheetIndex);
                 }
-                else if (file.FileName.EndsWith(".xls"))
+                else if (fileExtension == ".xls")
                 {
-                    return await AnalyzeXlsFileAsync(file, 0);
+                    return await AnalyzeXlsFileAsync(stream, sheetIndex);
                 }
                 else
                 {
-                    throw new ArgumentException("Desteklenmeyen dosya formatı. Sadece .xlsx ve .xls dosyaları desteklenir.");
+                    return ExcelAnalysisResult.Failure("Desteklenmeyen dosya formatı. Sadece .xlsx ve .xls dosyaları desteklenir.");
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Excel dosyası analiz edilirken hata oluştu: {file.FileName}");
-                throw;
+                _logger.LogError(ex, "Error analyzing Excel file: {FileName}", file.FileName);
+                return ExcelAnalysisResult.Failure($"Excel dosyası analiz edilirken hata oluştu: {ex.Message}");
             }
         }
 
-        public async Task<ExcelAnalysisResult> AnalyzeExcelFileAsync(IFormFile file, int sheetIndex = 0)
+        public async Task<List<string>> GetSheetNamesAsync(IFormFile file)
         {
             try
             {
-                if (file.FileName.EndsWith(".xlsx"))
-                {
-                    return await AnalyzeXlsxFileAsync(file, sheetIndex);
-                }
-                else if (file.FileName.EndsWith(".xls"))
-                {
-                    return await AnalyzeXlsFileAsync(file, sheetIndex);
-                }
-                else
-                {
-                    throw new ArgumentException("Desteklenmeyen dosya formatı. Sadece .xlsx ve .xls dosyaları desteklenir.");
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"Excel dosyası analiz edilirken hata oluştu: {file.FileName}");
-                throw;
-            }
-        }
+                using var stream = file.OpenReadStream();
+                var fileExtension = Path.GetExtension(file.FileName).ToLower();
+                var sheetNames = new List<string>();
 
-        public Task<List<string>> GetSheetNamesAsync(IFormFile file)
-        {
-            try
-            {
-                if (file.FileName.EndsWith(".xlsx"))
+                if (fileExtension == ".xlsx")
                 {
-                    using var stream = file.OpenReadStream();
                     using var package = new ExcelPackage(stream);
-                    return Task.FromResult(package.Workbook.Worksheets.Select(ws => ws.Name).ToList());
+                    foreach (var worksheet in package.Workbook.Worksheets)
+                    {
+                        sheetNames.Add(worksheet.Name);
+                    }
                 }
-                else if (file.FileName.EndsWith(".xls"))
+                else if (fileExtension == ".xls")
                 {
-                    using var stream = file.OpenReadStream();
-                    using var workbook = new HSSFWorkbook(stream);
-                    var sheetNames = new List<string>();
+                    IWorkbook workbook;
+                    if (stream.CanSeek)
+                    {
+                        stream.Position = 0;
+                        workbook = new HSSFWorkbook(stream);
+                    }
+                    else
+                    {
+                        using var memoryStream = new MemoryStream();
+                        await stream.CopyToAsync(memoryStream);
+                        memoryStream.Position = 0;
+                        workbook = new HSSFWorkbook(memoryStream);
+                    }
+
                     for (int i = 0; i < workbook.NumberOfSheets; i++)
                     {
                         sheetNames.Add(workbook.GetSheetName(i));
                     }
-                    return Task.FromResult(sheetNames);
                 }
-                else
-                {
-                    throw new ArgumentException("Desteklenmeyen dosya formatı. Sadece .xlsx ve .xls dosyaları desteklenir.");
-                }
+
+                return sheetNames;
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Excel dosyası sayfa adları alınırken hata oluştu: {file.FileName}");
-                throw;
+                _logger.LogError(ex, "Error getting sheet names for file: {FileName}", file.FileName);
+                return new List<string>();
             }
         }
 
-        private Task<ExcelAnalysisResult> AnalyzeXlsxFileAsync(IFormFile file, int sheetIndex = 0)
+        private async Task<ExcelAnalysisResult> AnalyzeXlsxFileAsync(Stream stream, int sheetIndex)
         {
-            using var stream = file.OpenReadStream();
-            using var package = new ExcelPackage(stream);
-            
-            if (package.Workbook.Worksheets.Count == 0)
-                throw new InvalidOperationException("Excel dosyasında çalışma sayfası bulunamadı.");
-
-            if (sheetIndex >= package.Workbook.Worksheets.Count)
-                throw new ArgumentException($"Sayfa indeksi geçersiz. Dosyada {package.Workbook.Worksheets.Count} sayfa var.");
-
-            var worksheet = package.Workbook.Worksheets[sheetIndex];
-
-            if (worksheet == null)
-                throw new InvalidOperationException("Excel dosyasında çalışma sayfası bulunamadı.");
-
-            var rowCount = worksheet.Dimension?.Rows ?? 0;
-            var colCount = worksheet.Dimension?.Columns ?? 0;
-
-            _logger.LogInformation($"Excel file analysis: {file.FileName}, Sheet: {worksheet.Name}, Initial Rows: {rowCount}, Columns: {colCount}");
-
-            // If Dimension is null or shows 0, try to find data by scanning
-            if (rowCount == 0 || colCount == 0)
+            try
             {
-                // Scan for actual data
-                var actualData = ScanForData(worksheet);
-                rowCount = actualData.rowCount;
-                colCount = actualData.colCount;
+                using var package = new ExcelPackage(stream);
+                var worksheet = package.Workbook.Worksheets[sheetIndex];
                 
-                _logger.LogInformation($"After scanning: Rows: {rowCount}, Columns: {colCount}");
-                
-                if (rowCount == 0 || colCount == 0)
+                if (worksheet == null)
                 {
-                    // Return empty result for empty sheets
-                    return Task.FromResult(new ExcelAnalysisResult
+                    return ExcelAnalysisResult.Failure("Excel dosyasında belirtilen çalışma sayfası bulunamadı.");
+                }
+
+                var headers = new List<string>();
+                var rows = new List<List<object>>();
+                var columnDataTypes = new List<ColumnDataTypeAnalysis>();
+
+                // Read headers (first row)
+                var headerRow = worksheet.Cells[1, 1, 1, worksheet.Dimension.End.Column];
+                foreach (var cell in headerRow)
+                {
+                    headers.Add(cell.Text?.Trim() ?? $"Column{cell.Start.Column}");
+                }
+
+                _logger.LogInformation("Found {HeaderCount} headers", headers.Count);
+
+                // Read data rows
+                var dataRows = worksheet.Cells[2, 1, worksheet.Dimension.End.Row, worksheet.Dimension.End.Column];
+                var rowData = new List<List<object>>();
+
+                for (int row = 2; row <= worksheet.Dimension.End.Row; row++)
+                {
+                    var rowValues = new List<object>();
+                    for (int col = 1; col <= worksheet.Dimension.End.Column; col++)
                     {
-                        FileName = file.FileName,
-                        TotalRows = 0,
-                        TotalColumns = 0,
-                        Headers = new List<string>(),
-                        ExcelColumnHeaders = new List<string>(),
-                        DataTypes = new List<string>(),
-                        DataTypeAnalysis = new List<ColumnDataTypeAnalysis>(),
-                        SampleData = new List<Dictionary<string, object>>(),
-                        AnalysisDate = DateTime.UtcNow,
-                        SheetName = worksheet.Name,
-                        SheetIndex = sheetIndex
-                    });
+                        var cell = worksheet.Cells[row, col];
+                        rowValues.Add(GetCellValue(cell));
+                    }
+                    rowData.Add(rowValues);
                 }
-            }
 
-            // Excel sütun başlıklarını oluştur (A, B, C, D, ...)
-            var columnHeaders = GenerateExcelColumnHeaders(colCount);
-            
-            // İlk satırı oku (gerçek başlıklar varsa)
-            var actualHeaders = new List<string>();
-            for (int col = 1; col <= colCount; col++)
-            {
-                var headerValue = GetCellValue(worksheet, 1, col);
-                actualHeaders.Add(string.IsNullOrEmpty(headerValue) ? columnHeaders[col - 1] : headerValue);
-            }
+                _logger.LogInformation("Found {RowCount} data rows", rowData.Count);
 
-            _logger.LogInformation($"Headers found: {string.Join(", ", actualHeaders)}");
-
-            // İlk 10 satırı oku ve veri tiplerini analiz et
-            var sampleData = new List<Dictionary<string, object>>();
-            var dataTypes = new List<string>();
-            var dataTypeAnalysis = new List<ColumnDataTypeAnalysis>();
-
-            // Start from row 2 (after header) and read up to 10 rows
-            for (int row = 2; row <= Math.Min(11, rowCount); row++)
-            {
-                var rowData = new Dictionary<string, object>();
-                for (int col = 1; col <= colCount; col++)
+                // Analyze data types for each column
+                for (int colIndex = 0; colIndex < headers.Count; colIndex++)
                 {
-                    var cellValue = GetCellValueWithType(worksheet, row, col);
-                    rowData[actualHeaders[col - 1]] = cellValue;
+                    var columnValues = rowData.Select(row => row[colIndex]).ToList();
+                    var analysis = AnalyzeColumnDataType(headers[colIndex], columnValues);
+                    columnDataTypes.Add(analysis);
                 }
-                sampleData.Add(rowData);
+
+                return ExcelAnalysisResult.Success(headers, rowData, columnDataTypes);
             }
-
-            _logger.LogInformation($"Sample data rows collected: {sampleData.Count}");
-
-            // Her sütun için veri tipi analizi yap
-            for (int col = 0; col < actualHeaders.Count; col++)
+            catch (Exception ex)
             {
-                var columnValues = sampleData.Select(r => r.Values.ElementAt(col)).ToList();
-                var analysis = AnalyzeColumnDataType(actualHeaders[col], columnValues);
-                dataTypes.Add(analysis.DetectedDataType);
-                dataTypeAnalysis.Add(analysis);
+                _logger.LogError(ex, "Error analyzing XLSX file");
+                return ExcelAnalysisResult.Failure($"XLSX dosyası analiz edilirken hata oluştu: {ex.Message}");
             }
-
-            var result = new ExcelAnalysisResult
-            {
-                FileName = file.FileName,
-                TotalRows = rowCount - 1, // Header satırını çıkar
-                TotalColumns = colCount,
-                Headers = actualHeaders,
-                ExcelColumnHeaders = columnHeaders,
-                DataTypes = dataTypes,
-                DataTypeAnalysis = dataTypeAnalysis,
-                SampleData = sampleData,
-                AnalysisDate = DateTime.UtcNow,
-                SheetName = worksheet.Name,
-                SheetIndex = sheetIndex
-            };
-
-            _logger.LogInformation($"Excel dosyası analiz edildi: {file.FileName}, Sayfa: {worksheet.Name}, {result.TotalRows} satır, {result.TotalColumns} sütun");
-            return Task.FromResult(result);
         }
 
-        private Task<ExcelAnalysisResult> AnalyzeXlsFileAsync(IFormFile file, int sheetIndex = 0)
+        private async Task<ExcelAnalysisResult> AnalyzeXlsFileAsync(Stream stream, int sheetIndex)
         {
-            using var stream = file.OpenReadStream();
-            using var workbook = new HSSFWorkbook(stream);
-            
-            if (workbook.NumberOfSheets == 0)
-                throw new InvalidOperationException("Excel dosyasında çalışma sayfası bulunamadı.");
-
-            if (sheetIndex >= workbook.NumberOfSheets)
-                throw new ArgumentException($"Sayfa indeksi geçersiz. Dosyada {workbook.NumberOfSheets} sayfa var.");
-
-            var sheet = workbook.GetSheetAt(sheetIndex);
-
-            if (sheet == null)
-                throw new InvalidOperationException("Excel dosyasında çalışma sayfası bulunamadı.");
-
-            var rowCount = sheet.LastRowNum + 1; // LastRowNum is 0-based
-            var headerRow = sheet.GetRow(0);
-            int colCount = headerRow?.LastCellNum ?? 0;
-
-            _logger.LogInformation($"Excel file analysis (.xls): {file.FileName}, Sheet: {sheet.SheetName}, Initial Rows: {rowCount}, Columns: {colCount}");
-
-            // If no data detected, try to scan for actual data
-            if (rowCount == 0 || colCount == 0)
+            try
             {
-                var actualData = ScanForDataXls(sheet);
-                rowCount = actualData.rowCount;
-                colCount = actualData.colCount;
-                
-                _logger.LogInformation($"After scanning (.xls): Rows: {rowCount}, Columns: {colCount}");
-                
-                if (rowCount == 0 || colCount == 0)
+                IWorkbook workbook;
+                if (stream.CanSeek)
                 {
-                    // Return empty result for empty sheets
-                    return Task.FromResult(new ExcelAnalysisResult
+                    stream.Position = 0;
+                    workbook = new HSSFWorkbook(stream);
+                }
+                else
+                {
+                    using var memoryStream = new MemoryStream();
+                    await stream.CopyToAsync(memoryStream);
+                    memoryStream.Position = 0;
+                    workbook = new HSSFWorkbook(memoryStream);
+                }
+
+                var sheet = workbook.GetSheetAt(sheetIndex);
+                if (sheet == null)
+                {
+                    return ExcelAnalysisResult.Failure("Excel dosyasında belirtilen çalışma sayfası bulunamadı.");
+                }
+
+                var headers = new List<string>();
+                var rows = new List<List<object>>();
+                var columnDataTypes = new List<ColumnDataTypeAnalysis>();
+
+                // Read headers (first row)
+                var headerRow = sheet.GetRow(0);
+                if (headerRow != null)
+                {
+                    for (int col = 0; col < headerRow.LastCellNum; col++)
                     {
-                        FileName = file.FileName,
-                        TotalRows = 0,
-                        TotalColumns = 0,
-                        Headers = new List<string>(),
-                        ExcelColumnHeaders = new List<string>(),
-                        DataTypes = new List<string>(),
-                        DataTypeAnalysis = new List<ColumnDataTypeAnalysis>(),
-                        SampleData = new List<Dictionary<string, object>>(),
-                        AnalysisDate = DateTime.UtcNow,
-                        SheetName = sheet.SheetName,
-                        SheetIndex = sheetIndex
-                    });
+                        var cell = headerRow.GetCell(col);
+                        headers.Add(GetNpoiCellValue(cell)?.ToString()?.Trim() ?? $"Column{col + 1}");
+                    }
                 }
-            }
 
-            // Excel sütun başlıklarını oluştur (A, B, C, D, ...)
-            var columnHeaders = GenerateExcelColumnHeaders(colCount);
-            
-            // İlk satırı oku (gerçek başlıklar varsa)
-            var actualHeaders = new List<string>();
-            if (headerRow != null)
-            {
-                for (int col = 0; col < colCount; col++)
+                _logger.LogInformation("Found {HeaderCount} headers", headers.Count);
+
+                // Read data rows
+                var rowData = new List<List<object>>();
+                for (int rowIndex = 1; rowIndex <= sheet.LastRowNum; rowIndex++)
                 {
-                    var cell = headerRow.GetCell(col);
-                    var headerValue = GetNpoiCellValue(cell);
-                    actualHeaders.Add(string.IsNullOrEmpty(headerValue) ? columnHeaders[col] : headerValue);
+                    var row = sheet.GetRow(rowIndex);
+                    if (row != null)
+                    {
+                        var rowValues = new List<object>();
+                        for (int colIndex = 0; colIndex < headers.Count; colIndex++)
+                        {
+                            var cell = row.GetCell(colIndex);
+                            rowValues.Add(GetNpoiCellValue(cell));
+                        }
+                        rowData.Add(rowValues);
+                    }
                 }
-            }
 
-            _logger.LogInformation($"Headers found (.xls): {string.Join(", ", actualHeaders)}");
+                _logger.LogInformation("Found {RowCount} data rows", rowData.Count);
 
-            // İlk 10 satırı oku ve veri tiplerini analiz et
-            var sampleData = new List<Dictionary<string, object>>();
-            var dataTypes = new List<string>();
-            var dataTypeAnalysis = new List<ColumnDataTypeAnalysis>();
-
-            // Start from row 1 (after header) and read up to 10 rows
-            for (int row = 1; row <= Math.Min(10, rowCount - 1); row++)
-            {
-                var sheetRow = sheet.GetRow(row);
-                if (sheetRow == null) continue;
-
-                var rowData = new Dictionary<string, object>();
-                for (int col = 0; col < actualHeaders.Count; col++)
+                // Analyze data types for each column
+                for (int colIndex = 0; colIndex < headers.Count; colIndex++)
                 {
-                    var cell = sheetRow.GetCell(col);
-                    var cellValue = GetNpoiCellValueWithType(cell);
-                    rowData[actualHeaders[col]] = cellValue;
+                    var columnValues = rowData.Select(row => row[colIndex]).ToList();
+                    var analysis = AnalyzeColumnDataType(headers[colIndex], columnValues);
+                    columnDataTypes.Add(analysis);
                 }
-                sampleData.Add(rowData);
+
+                return ExcelAnalysisResult.Success(headers, rowData, columnDataTypes);
             }
-
-            _logger.LogInformation($"Sample data rows collected (.xls): {sampleData.Count}");
-
-            // Her sütun için veri tipi analizi yap
-            for (int col = 0; col < actualHeaders.Count; col++)
+            catch (Exception ex)
             {
-                var columnValues = sampleData.Select(r => r.Values.ElementAt(col)).ToList();
-                var analysis = AnalyzeColumnDataType(actualHeaders[col], columnValues);
-                dataTypes.Add(analysis.DetectedDataType);
-                dataTypeAnalysis.Add(analysis);
+                _logger.LogError(ex, "Error analyzing XLS file");
+                return ExcelAnalysisResult.Failure($"XLS dosyası analiz edilirken hata oluştu: {ex.Message}");
             }
+        }
 
-            var result = new ExcelAnalysisResult
+        private object GetCellValue(OfficeOpenXml.ExcelRange cell)
+        {
+            if (cell == null) return null;
+
+            try
             {
-                FileName = file.FileName,
-                TotalRows = rowCount - 1, // Header satırını çıkar
-                TotalColumns = colCount,
-                Headers = actualHeaders,
-                ExcelColumnHeaders = columnHeaders,
-                DataTypes = dataTypes,
-                DataTypeAnalysis = dataTypeAnalysis,
-                SampleData = sampleData,
-                AnalysisDate = DateTime.UtcNow,
-                SheetName = sheet.SheetName,
-                SheetIndex = sheetIndex
+                switch (cell.Value)
+                {
+                    case null:
+                        return null;
+                    case string str:
+                        return str.Trim();
+                    case DateTime dt:
+                        return dt;
+                    case double d:
+                        return d;
+                    case int i:
+                        return i;
+                    case long l:
+                        return l;
+                    case decimal dec:
+                        return dec;
+                    case bool b:
+                        return b;
+                    default:
+                        return cell.Value?.ToString()?.Trim();
+                }
+            }
+            catch
+            {
+                return cell.Text?.Trim();
+            }
+        }
+
+        private object GetNpoiCellValue(ICell cell)
+        {
+            if (cell == null) return null;
+
+            try
+            {
+                switch (cell.CellType)
+                {
+                    case CellType.String:
+                        return cell.StringCellValue?.Trim();
+                    case CellType.Numeric:
+                        if (DateUtil.IsCellDateFormatted(cell))
+                        {
+                            return cell.DateCellValue;
+                        }
+                        return cell.NumericCellValue;
+                    case CellType.Boolean:
+                        return cell.BooleanCellValue;
+                    case CellType.Formula:
+                        return GetNpoiCellValue(cell.CachedFormulaResultType);
+                    case CellType.Blank:
+                        return null;
+                    default:
+                        return cell.ToString()?.Trim();
+                }
+            }
+            catch
+            {
+                return cell.ToString()?.Trim();
+            }
+        }
+
+        private object GetNpoiCellValue(CellType cellType)
+        {
+            return cellType switch
+            {
+                CellType.String => "",
+                CellType.Numeric => 0.0,
+                CellType.Boolean => false,
+                _ => null
             };
-
-            _logger.LogInformation($"Excel dosyası analiz edildi (.xls): {file.FileName}, Sayfa: {sheet.SheetName}, {result.TotalRows} satır, {result.TotalColumns} sütun");
-            return Task.FromResult(result);
-        }
-
-        private List<string> GenerateExcelColumnHeaders(int columnCount)
-        {
-            var headers = new List<string>();
-            for (int i = 0; i < columnCount; i++)
-            {
-                var columnLetter = GetExcelColumnLetter(i);
-                headers.Add(columnLetter); // A, B, C, D, E, F, ...
-            }
-            return headers;
-        }
-
-        private string GetExcelColumnLetter(int columnIndex)
-        {
-            var result = "";
-            while (columnIndex >= 0)
-            {
-                result = (char)('A' + (columnIndex % 26)) + result;
-                columnIndex = columnIndex / 26 - 1;
-            }
-            return result;
         }
 
         private ColumnDataTypeAnalysis AnalyzeColumnDataType(string columnName, List<object> values)
@@ -370,373 +329,142 @@ namespace ExcelUploader.Services
                 return analysis;
             }
 
-            // Veri tipi sayacı
+            // Data type counters
             int intCount = 0, decimalCount = 0, dateCount = 0, boolCount = 0, stringCount = 0;
-            int totalCount = nonNullValues.Count;
+            int maxStringLength = 0;
 
             foreach (var value in nonNullValues)
             {
-                if (value is DateTime)
-                    dateCount++;
-                else if (value is bool)
-                    boolCount++;
-                else if (value is int || value is long)
-                    intCount++;
-                else if (value is decimal || value is double || value is float)
-                    decimalCount++;
-                else if (value is string strValue)
+                var stringValue = value.ToString();
+                
+                // Check for boolean
+                if (bool.TryParse(stringValue, out _))
                 {
-                    // String değerleri parse etmeye çalış
-                    if (DateTime.TryParse(strValue, out _))
-                        dateCount++;
-                    else if (int.TryParse(strValue, out _))
-                        intCount++;
-                    else if (decimal.TryParse(strValue, out _))
-                        decimalCount++;
-                    else if (bool.TryParse(strValue, out _))
-                        boolCount++;
-                    else
-                        stringCount++;
+                    boolCount++;
+                    continue;
                 }
-                else
-                    stringCount++;
+
+                // Check for date
+                if (DateTime.TryParse(stringValue, out _))
+                {
+                    dateCount++;
+                    continue;
+                }
+
+                // Check for integer
+                if (int.TryParse(stringValue, out _))
+                {
+                    intCount++;
+                    continue;
+                }
+
+                // Check for decimal
+                if (decimal.TryParse(stringValue, out _))
+                {
+                    decimalCount++;
+                    continue;
+                }
+
+                // Must be string
+                stringCount++;
+                maxStringLength = Math.Max(maxStringLength, stringValue.Length);
             }
 
-            // En yaygın veri tipini belirle
-            var maxCount = Math.Max(Math.Max(Math.Max(Math.Max(intCount, decimalCount), dateCount), boolCount), stringCount);
-            
-            if (dateCount == maxCount && dateCount > totalCount * 0.3)
-            {
-                analysis.DetectedDataType = "datetime2";
-                analysis.Confidence = (double)dateCount / totalCount;
-            }
-            else if (boolCount == maxCount && boolCount > totalCount * 0.3)
+            // Determine data type based on majority
+            var totalNonNull = nonNullValues.Count;
+            var intRatio = (double)intCount / totalNonNull;
+            var decimalRatio = (double)decimalCount / totalNonNull;
+            var dateRatio = (double)dateCount / totalNonNull;
+            var boolRatio = (double)boolCount / totalNonNull;
+            var stringRatio = (double)stringCount / totalNonNull;
+
+            // Set confidence and data type
+            if (boolRatio > 0.8)
             {
                 analysis.DetectedDataType = "bit";
-                analysis.Confidence = (double)boolCount / totalCount;
+                analysis.Confidence = boolRatio;
             }
-            else if (intCount == maxCount && intCount > totalCount * 0.3)
+            else if (dateRatio > 0.8)
+            {
+                analysis.DetectedDataType = "datetime2";
+                analysis.Confidence = dateRatio;
+            }
+            else if (intRatio > 0.8)
             {
                 analysis.DetectedDataType = "int";
-                analysis.Confidence = (double)intCount / totalCount;
+                analysis.Confidence = intRatio;
             }
-            else if (decimalCount == maxCount && decimalCount > totalCount * 0.3)
+            else if (decimalRatio > 0.8)
             {
                 analysis.DetectedDataType = "decimal(18,2)";
-                analysis.Confidence = (double)decimalCount / totalCount;
-            }
-            else if (stringCount == maxCount)
-            {
-                // String uzunluğunu kontrol et
-                var maxLength = nonNullValues.OfType<string>().Max(s => s?.Length ?? 0);
-                if (maxLength > 255)
-                {
-                    analysis.DetectedDataType = "nvarchar(max)";
-                }
-                else
-                {
-                    analysis.DetectedDataType = $"nvarchar({Math.Max(255, maxLength)})";
-                }
-                analysis.Confidence = (double)stringCount / totalCount;
+                analysis.Confidence = decimalRatio;
             }
             else
             {
-                // Belirgin bir çoğunluk yoksa, sütun adına göre tahmin et
-                analysis.DetectedDataType = DetermineDataTypeByColumnName(columnName, values);
-                analysis.Confidence = 0.5;
+                // String type - determine length
+                var stringLength = maxStringLength;
+                if (stringLength <= 50)
+                {
+                    analysis.DetectedDataType = $"nvarchar({Math.Max(stringLength, 10)})";
+                }
+                else if (stringLength <= 255)
+                {
+                    analysis.DetectedDataType = "nvarchar(255)";
+                }
+                else if (stringLength <= 1000)
+                {
+                    analysis.DetectedDataType = "nvarchar(1000)";
+                }
+                else
+                {
+                    analysis.DetectedDataType = "nvarchar(max)";
+                }
+                analysis.Confidence = stringRatio;
             }
 
-            // İstatistikleri hesapla
-            analysis.IntCount = intCount;
-            analysis.DecimalCount = decimalCount;
-            analysis.DateCount = dateCount;
-            analysis.BoolCount = boolCount;
-            analysis.StringCount = stringCount;
+            _logger.LogInformation("Column {ColumnName}: Type={DataType}, Confidence={Confidence}, Length={Length}", 
+                columnName, analysis.DetectedDataType, analysis.Confidence, maxStringLength);
 
             return analysis;
-        }
-
-        private string DetermineDataTypeByColumnName(string columnName, List<object> values)
-        {
-            if (string.IsNullOrEmpty(columnName)) return "nvarchar(255)";
-
-            var lowerColumnName = columnName.ToLowerInvariant();
-            
-            // Tarih ile ilgili sütun adları
-            if (lowerColumnName.Contains("tarih") || lowerColumnName.Contains("date") || 
-                lowerColumnName.Contains("zaman") || lowerColumnName.Contains("time") ||
-                lowerColumnName.Contains("başlangıç") || lowerColumnName.Contains("bitiş") ||
-                lowerColumnName.Contains("start") || lowerColumnName.Contains("end") ||
-                lowerColumnName.Contains("doğum") || lowerColumnName.Contains("birth") ||
-                lowerColumnName.Contains("ödeme") && lowerColumnName.Contains("tarih"))
-            {
-                return "datetime2";
-            }
-
-            // Para/tutar ile ilgili sütun adları
-            if (lowerColumnName.Contains("tutar") || lowerColumnName.Contains("amount") ||
-                lowerColumnName.Contains("fiyat") || lowerColumnName.Contains("price") ||
-                lowerColumnName.Contains("ücret") || lowerColumnName.Contains("fee") ||
-                lowerColumnName.Contains("maliyet") || lowerColumnName.Contains("cost") ||
-                lowerColumnName.Contains("öde") || lowerColumnName.Contains("pay") ||
-                lowerColumnName.Contains("para") || lowerColumnName.Contains("money") ||
-                lowerColumnName.Contains("oran") || lowerColumnName.Contains("rate") ||
-                lowerColumnName.Contains("yüzde") || lowerColumnName.Contains("percent") ||
-                lowerColumnName.Contains("odenecek") || lowerColumnName.Contains("odendiginde"))
-            {
-                return "decimal(18,2)";
-            }
-
-            // Sayı ile ilgili sütun adları
-            if (lowerColumnName.Contains("numara") || lowerColumnName.Contains("no") ||
-                lowerColumnName.Contains("id") || lowerColumnName.Contains("kod") ||
-                lowerColumnName.Contains("code") || lowerColumnName.Contains("sıra") ||
-                lowerColumnName.Contains("order") || lowerColumnName.Contains("index") ||
-                lowerColumnName.Contains("yıl") || lowerColumnName.Contains("year"))
-            {
-                return "int";
-            }
-
-            // Boolean ile ilgili sütun adları
-            if (lowerColumnName.Contains("aktif") || lowerColumnName.Contains("active") ||
-                lowerColumnName.Contains("pasif") || lowerColumnName.Contains("passive") ||
-                lowerColumnName.Contains("evet") || lowerColumnName.Contains("hayır") ||
-                lowerColumnName.Contains("yes") || lowerColumnName.Contains("no") ||
-                lowerColumnName.Contains("var") || lowerColumnName.Contains("yok") ||
-                lowerColumnName.Contains("true") || lowerColumnName.Contains("false"))
-            {
-                return "bit";
-            }
-
-            // Uzun metin sütun adları
-            if (lowerColumnName.Contains("açıklama") || lowerColumnName.Contains("description") ||
-                lowerColumnName.Contains("detay") || lowerColumnName.Contains("detail") ||
-                lowerColumnName.Contains("not") || lowerColumnName.Contains("comment") ||
-                lowerColumnName.Contains("yorum") || lowerColumnName.Contains("adres") ||
-                lowerColumnName.Contains("address") || lowerColumnName.Contains("içerik") ||
-                lowerColumnName.Contains("content"))
-            {
-                return "nvarchar(max)";
-            }
-
-            return "nvarchar(255)";
-        }
-
-        private string? GetCellValue(ExcelWorksheet worksheet, int row, int col)
-        {
-            try
-            {
-                var cell = worksheet.Cells[row, col];
-                if (cell?.Value == null) return null;
-                
-                var value = cell.Value.ToString();
-                return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, $"Error reading cell at row {row}, col {col}");
-                return null;
-            }
-        }
-
-        private object GetCellValueWithType(ExcelWorksheet worksheet, int row, int col)
-        {
-            try
-            {
-                var cell = worksheet.Cells[row, col];
-                if (cell?.Value == null) return string.Empty;
-                return cell.Value;
-            }
-            catch
-            {
-                return string.Empty;
-            }
-        }
-
-        private string GetNpoiCellValue(ICell? cell)
-        {
-            if (cell == null) return string.Empty;
-            
-            switch (cell.CellType)
-            {
-                case CellType.String:
-                    return cell.StringCellValue ?? string.Empty;
-                case CellType.Numeric:
-                    if (DateUtil.IsCellDateFormatted(cell))
-                        return cell.DateCellValue.ToString();
-                    return cell.NumericCellValue.ToString();
-                case CellType.Boolean:
-                    return cell.BooleanCellValue.ToString();
-                case CellType.Formula:
-                    // For formulas, try to get the calculated value
-                    try
-                    {
-                        switch (cell.CachedFormulaResultType)
-                        {
-                            case CellType.String:
-                                return cell.StringCellValue ?? string.Empty;
-                            case CellType.Numeric:
-                                if (DateUtil.IsCellDateFormatted(cell))
-                                    return cell.DateCellValue.ToString();
-                                return cell.NumericCellValue.ToString();
-                            case CellType.Boolean:
-                                return cell.BooleanCellValue.ToString();
-                            default:
-                                return cell.StringCellValue ?? string.Empty;
-                        }
-                    }
-                    catch
-                    {
-                        return cell.StringCellValue ?? string.Empty;
-                    }
-                default:
-                    return string.Empty;
-            }
-        }
-
-        private object GetNpoiCellValueWithType(ICell? cell)
-        {
-            if (cell == null) return string.Empty;
-            
-            switch (cell.CellType)
-            {
-                case CellType.String:
-                    return cell.StringCellValue ?? string.Empty;
-                case CellType.Numeric:
-                    if (DateUtil.IsCellDateFormatted(cell))
-                        return cell.DateCellValue;
-                    return cell.NumericCellValue;
-                case CellType.Boolean:
-                    return cell.BooleanCellValue;
-                case CellType.Formula:
-                    try
-                    {
-                        switch (cell.CachedFormulaResultType)
-                        {
-                            case CellType.String:
-                                return cell.StringCellValue ?? string.Empty;
-                            case CellType.Numeric:
-                                if (DateUtil.IsCellDateFormatted(cell))
-                                    return cell.DateCellValue;
-                                return cell.NumericCellValue;
-                            case CellType.Boolean:
-                                return cell.BooleanCellValue;
-                            default:
-                                return cell.StringCellValue ?? string.Empty;
-                        }
-                    }
-                    catch
-                    {
-                        return cell.StringCellValue ?? string.Empty;
-                    }
-                default:
-                    return string.Empty;
-            }
-        }
-
-        private (int rowCount, int colCount) ScanForData(ExcelWorksheet worksheet)
-        {
-            // Scan from bottom up to find the last row with data
-            int lastRow = 0;
-            int lastCol = 0;
-            
-            // Scan up to 1000 rows and 100 columns
-            for (int row = 1; row <= 1000; row++)
-            {
-                bool rowHasData = false;
-                for (int col = 1; col <= 100; col++)
-                {
-                    try
-                    {
-                        var cell = worksheet.Cells[row, col];
-                        if (cell?.Value != null && !string.IsNullOrWhiteSpace(cell.Value.ToString()))
-                        {
-                            rowHasData = true;
-                            lastCol = Math.Max(lastCol, col);
-                        }
-                    }
-                    catch
-                    {
-                        // Cell doesn't exist, continue
-                    }
-                }
-                if (rowHasData)
-                {
-                    lastRow = row;
-                }
-                else if (row > 10 && lastRow > 0)
-                {
-                    // If we've found data and then hit empty rows, we can stop
-                    break;
-                }
-            }
-            
-            return (lastRow, lastCol);
-        }
-
-        private (int rowCount, int colCount) ScanForDataXls(ISheet sheet)
-        {
-            int lastRow = 0;
-            int lastCol = 0;
-            
-            // Scan up to 1000 rows and 100 columns
-            for (int row = 0; row <= 1000; row++)
-            {
-                var sheetRow = sheet.GetRow(row);
-                if (sheetRow == null) continue;
-                
-                bool rowHasData = false;
-                for (int col = 0; col < 100; col++)
-                {
-                    var cell = sheetRow.GetCell(col);
-                    if (cell != null && !string.IsNullOrWhiteSpace(cell.ToString()))
-                    {
-                        rowHasData = true;
-                        lastCol = Math.Max(lastCol, (int)(col + 1));
-                    }
-                }
-                if (rowHasData)
-                {
-                    lastRow = row + 1; // Convert to 1-based
-                }
-                else if (row > 10 && lastRow > 0)
-                {
-                    // If we've found data and then hit empty rows, we can stop
-                    break;
-                }
-            }
-            
-            return (lastRow, lastCol);
         }
     }
 
     public class ExcelAnalysisResult
     {
-        public string FileName { get; set; } = string.Empty;
-        public int TotalRows { get; set; }
-        public int TotalColumns { get; set; }
-        public List<string> Headers { get; set; } = new List<string>();
-        public List<string> ExcelColumnHeaders { get; set; } = new List<string>();
-        public List<string> DataTypes { get; set; } = new List<string>();
-        public List<ColumnDataTypeAnalysis> DataTypeAnalysis { get; set; } = new List<ColumnDataTypeAnalysis>();
-        public List<Dictionary<string, object>> SampleData { get; set; } = new List<Dictionary<string, object>>();
-        public DateTime AnalysisDate { get; set; }
-        public string SheetName { get; set; } = string.Empty;
-        public int SheetIndex { get; set; }
+        public bool IsSuccess { get; set; }
+        public string ErrorMessage { get; set; }
+        public List<string> Headers { get; set; }
+        public List<List<object>> Rows { get; set; }
+        public List<ColumnDataTypeAnalysis> ColumnDataTypes { get; set; }
+
+        public static ExcelAnalysisResult Success(List<string> headers, List<List<object>> rows, List<ColumnDataTypeAnalysis> columnDataTypes)
+        {
+            return new ExcelAnalysisResult
+            {
+                IsSuccess = true,
+                Headers = headers,
+                Rows = rows,
+                ColumnDataTypes = columnDataTypes
+            };
+        }
+
+        public static ExcelAnalysisResult Failure(string errorMessage)
+        {
+            return new ExcelAnalysisResult
+            {
+                IsSuccess = false,
+                ErrorMessage = errorMessage
+            };
+        }
     }
 
     public class ColumnDataTypeAnalysis
     {
-        public string ColumnName { get; set; } = string.Empty;
-        public string DetectedDataType { get; set; } = string.Empty;
+        public string ColumnName { get; set; }
+        public string DetectedDataType { get; set; }
         public double Confidence { get; set; }
         public int TotalValues { get; set; }
         public int NonNullValues { get; set; }
         public int NullValues { get; set; }
-        public int IntCount { get; set; }
-        public int DecimalCount { get; set; }
-        public int DateCount { get; set; }
-        public int BoolCount { get; set; }
-        public int StringCount { get; set; }
     }
 }

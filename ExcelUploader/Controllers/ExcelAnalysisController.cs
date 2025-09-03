@@ -1,468 +1,327 @@
 using Microsoft.AspNetCore.Mvc;
-using ExcelUploader.Services;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.EntityFrameworkCore;
 using ExcelUploader.Models;
-using OfficeOpenXml;
-using NPOI.HSSF.UserModel;
+using ExcelUploader.Services;
+using ExcelUploader.Data;
 
 namespace ExcelUploader.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     public class ExcelAnalysisController : ControllerBase
     {
         private readonly IExcelAnalyzerService _excelAnalyzerService;
         private readonly IDynamicTableService _dynamicTableService;
+        private readonly IExcelService _excelService;
+        private readonly ApplicationDbContext _context;
         private readonly ILogger<ExcelAnalysisController> _logger;
 
         public ExcelAnalysisController(
             IExcelAnalyzerService excelAnalyzerService,
             IDynamicTableService dynamicTableService,
+            IExcelService excelService,
+            ApplicationDbContext context,
             ILogger<ExcelAnalysisController> logger)
         {
             _excelAnalyzerService = excelAnalyzerService;
             _dynamicTableService = dynamicTableService;
+            _excelService = excelService;
+            _context = context;
             _logger = logger;
         }
 
         [HttpPost("analyze")]
-        public async Task<IActionResult> AnalyzeExcelFile(IFormFile file, [FromQuery] int? sheetIndex = null)
+        public async Task<IActionResult> AnalyzeExcelFile(IFormFile file)
         {
             try
             {
-                if (file == null || file.Length == 0)
+                if (file == null)
                 {
-                    return BadRequest("Dosya seçilmedi.");
+                    return BadRequest(new { error = "Lütfen bir Excel dosyası seçin" });
                 }
 
-                // Dosya formatını kontrol et
-                if (!file.FileName.EndsWith(".xlsx") && !file.FileName.EndsWith(".xls"))
+                _logger.LogInformation("Analyzing Excel file: {FileName}", file.FileName);
+
+                // Validate file
+                var isValid = await _excelService.ValidateExcelFileAsync(file);
+                if (!isValid)
                 {
-                    return BadRequest("Sadece .xlsx ve .xls dosyaları desteklenir.");
+                    return BadRequest(new { error = "Geçersiz Excel dosyası" });
                 }
 
-                // Excel dosyasını analiz et
-                var analysisResult = sheetIndex.HasValue 
-                    ? await _excelAnalyzerService.AnalyzeExcelFileAsync(file, sheetIndex.Value)
-                    : await _excelAnalyzerService.AnalyzeExcelFileAsync(file);
+                // Get sheet names
+                var sheetNames = await _excelAnalyzerService.GetSheetNamesAsync(file);
+                if (!sheetNames.Any())
+                {
+                    return BadRequest(new { error = "Excel dosyasında çalışma sayfası bulunamadı" });
+                }
+
+                // Analyze first sheet
+                var analysisResult = await _excelAnalyzerService.AnalyzeExcelFileAsync(file, 0);
+                if (!analysisResult.IsSuccess)
+                {
+                    return BadRequest(new { error = "Excel dosyası analiz edilemedi", details = analysisResult.ErrorMessage });
+                }
 
                 return Ok(new
                 {
-                    success = true,
-                    data = analysisResult,
-                    message = "Excel dosyası başarıyla analiz edildi."
+                    fileName = file.FileName,
+                    fileSize = file.Length,
+                    sheetNames = sheetNames,
+                    headers = analysisResult.Headers,
+                    rowCount = analysisResult.Rows.Count,
+                    columnCount = analysisResult.Headers.Count,
+                    columnTypes = analysisResult.ColumnDataTypes.Select(c => new
+                    {
+                        column = c.ColumnName,
+                        type = c.DetectedDataType,
+                        confidence = c.Confidence,
+                        totalValues = c.TotalValues,
+                        nonNullValues = c.NonNullValues,
+                        nullValues = c.NullValues
+                    }).ToList(),
+                    sampleData = analysisResult.Rows.Take(10).ToList()
                 });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Excel dosyası analiz edilirken hata oluştu: {FileName}", file?.FileName);
-                return StatusCode(500, new
-                {
-                    success = false,
-                    message = $"Excel dosyası analiz edilirken hata oluştu: {ex.Message}"
-                });
-            }
-        }
-
-        [HttpPost("get-sheet-names")]
-        public Task<IActionResult> GetSheetNames(IFormFile file)
-        {
-            try
-            {
-                if (file == null || file.Length == 0)
-                {
-                    return Task.FromResult<IActionResult>(BadRequest("Dosya seçilmedi."));
-                }
-
-                // Dosya formatını kontrol et
-                if (!file.FileName.EndsWith(".xlsx") && !file.FileName.EndsWith(".xls"))
-                {
-                    return Task.FromResult<IActionResult>(BadRequest("Sadece .xlsx ve .xls dosyaları desteklenir."));
-                }
-
-                // Excel dosyasının sayfa adlarını al
-                var sheetNames = _excelAnalyzerService.GetSheetNamesAsync(file).Result;
-
-                return Task.FromResult<IActionResult>(Ok(new
-                {
-                    success = true,
-                    data = sheetNames,
-                    message = "Sayfa adları başarıyla alındı."
-                }));
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Sayfa adları alınırken hata oluştu: {FileName}", file?.FileName);
-                return Task.FromResult<IActionResult>(StatusCode(500, new
-                {
-                    success = false,
-                    message = $"Sayfa adları alınırken hata oluştu: {ex.Message}"
-                }));
+                _logger.LogError(ex, "Error analyzing Excel file: {FileName}", file?.FileName);
+                return StatusCode(500, new { error = "Excel dosyası analiz edilirken hata oluştu" });
             }
         }
 
         [HttpPost("create-table")]
-        public async Task<IActionResult> CreateTableFromExcel(IFormFile file, [FromQuery] int? databaseConnectionId = null, [FromQuery] string? description = null, [FromQuery] int? sheetIndex = null)
+        public async Task<IActionResult> CreateTableFromAnalysis([FromForm] CreateTableRequest request)
         {
             try
             {
-                if (file == null || file.Length == 0)
+                if (request.File == null)
                 {
-                    return BadRequest("Dosya seçilmedi.");
+                    return BadRequest(new { error = "Lütfen bir Excel dosyası seçin" });
                 }
 
-                // Dosya formatını kontrol et
-                if (!file.FileName.EndsWith(".xlsx") && !file.FileName.EndsWith(".xls"))
+                _logger.LogInformation("Creating table from analysis: {FileName}", request.File.FileName);
+
+                // Analyze Excel file
+                var analysisResult = await _excelAnalyzerService.AnalyzeExcelFileAsync(request.File, 0);
+                if (!analysisResult.IsSuccess)
                 {
-                    return BadRequest("Sadece .xlsx ve .xls dosyaları desteklenir.");
+                    return BadRequest(new { error = "Excel dosyası analiz edilemedi", details = analysisResult.ErrorMessage });
                 }
 
-                // Önce Excel dosyasını analiz et
-                var analysisResult = sheetIndex.HasValue 
-                    ? await _excelAnalyzerService.AnalyzeExcelFileAsync(file, sheetIndex.Value)
-                    : await _excelAnalyzerService.AnalyzeExcelFileAsync(file);
+                // Generate unique table name
+                var baseTableName = GenerateTableNameFromFileName(request.File.FileName);
+                var tableName = await GenerateUniqueTableNameAsync(baseTableName);
 
-                // Tablo oluştur
-                var dynamicTable = await _dynamicTableService.CreateTableFromExcelAsync(file, "System", databaseConnectionId, description);
+                // Create table
+                var createResult = await _dynamicTableService.CreateTableFromExcelAsync(
+                    tableName,
+                    analysisResult.Headers,
+                    analysisResult.Rows,
+                    analysisResult.ColumnDataTypes);
+
+                if (!createResult.IsSuccess)
+                {
+                    return StatusCode(500, new { error = "Tablo oluşturulamadı", details = createResult.ErrorMessage });
+                }
+
+                // Save table metadata
+                var dynamicTable = new DynamicTable
+                {
+                    TableName = tableName,
+                    FileName = request.File.FileName,
+                    Description = request.Description ?? "",
+                    UploadDate = DateTime.UtcNow,
+                    RowCount = analysisResult.Rows.Count,
+                    ColumnCount = analysisResult.Headers.Count,
+                    IsProcessed = true,
+                    ProcessedDate = DateTime.UtcNow
+                };
+
+                _context.DynamicTables.Add(dynamicTable);
+                await _context.SaveChangesAsync();
 
                 return Ok(new
                 {
-                    success = true,
-                    data = new
-                    {
-                        table = dynamicTable,
-                        analysis = analysisResult
-                    },
-                    message = "Tablo başarıyla oluşturuldu ve veriler eklendi."
+                    message = $"Tablo başarıyla oluşturuldu: {tableName}",
+                    tableName = tableName,
+                    tableId = dynamicTable.Id,
+                    rowCount = analysisResult.Rows.Count,
+                    columnCount = analysisResult.Headers.Count
                 });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Tablo oluşturulurken hata oluştu: {FileName}", file?.FileName);
-                return StatusCode(500, new
-                {
-                    success = false,
-                    message = $"Tablo oluşturulurken hata oluştu: {ex.Message}"
-                });
+                _logger.LogError(ex, "Error creating table from analysis: {FileName}", request.File?.FileName);
+                return StatusCode(500, new { error = "Tablo oluşturulurken hata oluştu" });
             }
         }
 
-        [HttpPost("create-table-structure")]
-        public async Task<IActionResult> CreateTableStructure(IFormFile file, [FromQuery] int? databaseConnectionId = null, [FromQuery] string? description = null, [FromQuery] int? sheetIndex = null)
+        [HttpPost("insert-data")]
+        public async Task<IActionResult> InsertDataIntoTable([FromForm] InsertDataRequest request)
         {
             try
             {
-                if (file == null || file.Length == 0)
+                if (request.File == null)
                 {
-                    return BadRequest("Dosya seçilmedi.");
+                    return BadRequest(new { error = "Lütfen bir Excel dosyası seçin" });
                 }
 
-                // Dosya formatını kontrol et
-                if (!file.FileName.EndsWith(".xlsx") && !file.FileName.EndsWith(".xls"))
+                if (string.IsNullOrEmpty(request.TableName))
                 {
-                    return BadRequest("Sadece .xlsx ve .xls dosyaları desteklenir.");
+                    return BadRequest(new { error = "Tablo adı belirtilmelidir" });
                 }
 
-                // Önce Excel dosyasını analiz et
-                var analysisResult = sheetIndex.HasValue 
-                    ? await _excelAnalyzerService.AnalyzeExcelFileAsync(file, sheetIndex.Value)
-                    : await _excelAnalyzerService.AnalyzeExcelFileAsync(file);
+                _logger.LogInformation("Inserting data into table: {TableName}", request.TableName);
 
-                // Sadece tablo yapısını oluştur
-                var dynamicTable = await _dynamicTableService.CreateTableStructureAsync(file, "System", databaseConnectionId, description);
-
-                return Ok(new
+                // Analyze Excel file
+                var analysisResult = await _excelAnalyzerService.AnalyzeExcelFileAsync(request.File, 0);
+                if (!analysisResult.IsSuccess)
                 {
-                    success = true,
-                    data = new
-                    {
-                        table = dynamicTable,
-                        analysis = analysisResult
-                    },
-                    message = "Tablo yapısı başarıyla oluşturuldu."
-                });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Tablo yapısı oluşturulurken hata oluştu: {FileName}", file?.FileName);
-                return StatusCode(500, new
-                {
-                    success = false,
-                    message = $"Tablo yapısı oluşturulurken hata oluştu: {ex.Message}"
-                });
-            }
-        }
-
-        [HttpPost("insert-data/{tableId}")]
-        public async Task<IActionResult> InsertDataIntoTable(int tableId, IFormFile file, [FromQuery] int? databaseConnectionId = null, [FromQuery] int? sheetIndex = null)
-        {
-            try
-            {
-                if (file == null || file.Length == 0)
-                {
-                    return BadRequest("Dosya seçilmedi.");
+                    return BadRequest(new { error = "Excel dosyası analiz edilemedi", details = analysisResult.ErrorMessage });
                 }
 
-                // Dosya formatını kontrol et
-                if (!file.FileName.EndsWith(".xlsx") && !file.FileName.EndsWith(".xls"))
+                // Create table if it doesn't exist
+                var createResult = await _dynamicTableService.CreateTableFromExcelAsync(
+                    request.TableName,
+                    analysisResult.Headers,
+                    analysisResult.Rows,
+                    analysisResult.ColumnDataTypes);
+
+                if (!createResult.IsSuccess)
                 {
-                    return BadRequest("Sadece .xlsx ve .xls dosyaları desteklenir.");
+                    return StatusCode(500, new { error = "Veri eklenemedi", details = createResult.ErrorMessage });
                 }
 
-                // Verileri tabloya ekle
-                var success = await _dynamicTableService.InsertDataIntoTableAsync(tableId, file, databaseConnectionId);
-
-                if (success)
+                // Update tracking table
+                var existingTable = await _context.DynamicTables.FirstOrDefaultAsync(t => t.TableName == request.TableName);
+                if (existingTable != null)
                 {
-                    return Ok(new
-                    {
-                        success = true,
-                        message = "Veriler başarıyla tabloya eklendi."
-                    });
+                    existingTable.RowCount = analysisResult.Rows.Count;
+                    existingTable.IsProcessed = true;
+                    existingTable.ProcessedDate = DateTime.UtcNow;
                 }
                 else
                 {
-                    return BadRequest(new
+                    var newTable = new DynamicTable
                     {
-                        success = false,
-                        message = "Veriler tabloya eklenirken hata oluştu."
-                    });
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Veriler tabloya eklenirken hata oluştu: TableId={TableId}, FileName={FileName}", tableId, file?.FileName);
-                return StatusCode(500, new
-                {
-                    success = false,
-                    message = $"Veriler tabloya eklenirken hata oluştu: {ex.Message}"
-                });
-            }
-        }
-
-        [HttpGet("preview/{tableId}")]
-        public async Task<IActionResult> GetTablePreview(int tableId, [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
-        {
-            try
-            {
-                var table = await _dynamicTableService.GetTableByIdAsync(tableId);
-                if (table == null)
-                {
-                    return NotFound("Tablo bulunamadı.");
+                        TableName = request.TableName,
+                        FileName = request.File.FileName,
+                        Description = request.Description ?? "",
+                        UploadDate = DateTime.UtcNow,
+                        RowCount = analysisResult.Rows.Count,
+                        ColumnCount = analysisResult.Headers.Count,
+                        IsProcessed = true,
+                        ProcessedDate = DateTime.UtcNow
+                    };
+                    _context.DynamicTables.Add(newTable);
                 }
 
-                var data = await _dynamicTableService.GetTableDataAsync(table.TableName, page, pageSize);
+                await _context.SaveChangesAsync();
 
                 return Ok(new
                 {
-                    success = true,
-                    data = new
-                    {
-                        table = table,
-                        data = data,
-                        page = page,
-                        pageSize = pageSize
-                    }
+                    message = $"Veri başarıyla eklendi: {request.TableName}",
+                    tableName = request.TableName,
+                    rowCount = analysisResult.Rows.Count
                 });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Tablo önizlemesi alınırken hata oluştu: TableId={TableId}", tableId);
-                return StatusCode(500, new
-                {
-                    success = false,
-                    message = $"Tablo önizlemesi alınırken hata oluştu: {ex.Message}"
-                });
+                _logger.LogError(ex, "Error inserting data into table: {TableName}", request.TableName);
+                return StatusCode(500, new { error = "Veri eklenirken hata oluştu" });
             }
         }
 
-        [HttpPost("debug")]
-        public async Task<IActionResult> DebugExcelFile(IFormFile file, [FromQuery] int? sheetIndex = null)
+        [HttpGet("table/{id}/analysis")]
+        public async Task<IActionResult> GetTableAnalysis(int id)
         {
             try
             {
-                if (file == null || file.Length == 0)
+                var table = await _context.DynamicTables
+                    .Include(t => t.Columns)
+                    .FirstOrDefaultAsync(t => t.Id == id);
+
+                if (table == null)
                 {
-                    return BadRequest("Dosya seçilmedi.");
+                    return NotFound(new { error = "Tablo bulunamadı" });
                 }
 
-                // Dosya formatını kontrol et
-                if (!file.FileName.EndsWith(".xlsx") && !file.FileName.EndsWith(".xls"))
+                return Ok(new
                 {
-                    return BadRequest("Sadece .xlsx ve .xls dosyaları desteklenir.");
-                }
-
-                var debugInfo = new
-                {
-                    fileName = file.FileName,
-                    fileSize = file.Length,
-                    contentType = file.ContentType,
-                    sheetIndex = sheetIndex ?? 0
-                };
-
-                if (file.FileName.EndsWith(".xlsx"))
-                {
-                    using var stream = file.OpenReadStream();
-                    using var package = new ExcelPackage(stream);
-                    
-                    var sheetNames = package.Workbook.Worksheets.Select(ws => ws.Name).ToList();
-                    var selectedSheetIndex = sheetIndex ?? 0;
-                    
-                    if (selectedSheetIndex >= package.Workbook.Worksheets.Count)
+                    table.Id,
+                    table.TableName,
+                    table.FileName,
+                    table.Description,
+                    table.UploadDate,
+                    table.RowCount,
+                    table.ColumnCount,
+                    table.IsProcessed,
+                    table.ProcessedDate,
+                    columns = table.Columns.Select(c => new
                     {
-                        return BadRequest($"Sayfa indeksi geçersiz. Dosyada {package.Workbook.Worksheets.Count} sayfa var.");
-                    }
-
-                    var worksheet = package.Workbook.Worksheets[selectedSheetIndex];
-                    var dimension = worksheet.Dimension;
-                    
-                    var sheetInfo = new
-                    {
-                        sheetName = worksheet.Name,
-                        sheetIndex = selectedSheetIndex,
-                        dimension = dimension != null ? new
-                        {
-                            startRow = dimension.Start.Row,
-                            startColumn = dimension.Start.Column,
-                            endRow = dimension.End.Row,
-                            endColumn = dimension.End.Column,
-                            rows = dimension.Rows,
-                            columns = dimension.Columns
-                        } : null,
-                        hasData = dimension != null && dimension.Rows > 0 && dimension.Columns > 0
-                    };
-
-                    // Try to read first few cells
-                    var sampleCells = new List<object>();
-                    if (dimension != null)
-                    {
-                        for (int row = 1; row <= Math.Min(5, dimension.Rows); row++)
-                        {
-                            for (int col = 1; col <= Math.Min(5, dimension.Columns); col++)
-                            {
-                                try
-                                {
-                                    var cell = worksheet.Cells[row, col];
-                                    sampleCells.Add(new
-                                    {
-                                        row = row,
-                                        col = col,
-                                        address = cell.Address,
-                                        value = cell.Value,
-                                        valueType = cell.Value?.GetType().Name,
-                                        hasValue = cell.Value != null
-                                    });
-                                }
-                                catch (Exception ex)
-                                {
-                                    sampleCells.Add(new
-                                    {
-                                        row = row,
-                                        col = col,
-                                        error = ex.Message
-                                    });
-                                }
-                            }
-                        }
-                    }
-
-                    return Ok(new
-                    {
-                        success = true,
-                        debugInfo = debugInfo,
-                        sheetNames = sheetNames,
-                        selectedSheet = sheetInfo,
-                        sampleCells = sampleCells,
-                        message = "Debug bilgileri başarıyla alındı."
-                    });
-                }
-                else if (file.FileName.EndsWith(".xls"))
-                {
-                    using var stream = file.OpenReadStream();
-                    using var workbook = new HSSFWorkbook(stream);
-                    
-                    var sheetNames = new List<string>();
-                    for (int i = 0; i < workbook.NumberOfSheets; i++)
-                    {
-                        sheetNames.Add(workbook.GetSheetName(i));
-                    }
-                    
-                    var selectedSheetIndex = sheetIndex ?? 0;
-                    if (selectedSheetIndex >= workbook.NumberOfSheets)
-                    {
-                        return BadRequest($"Sayfa indeksi geçersiz. Dosyada {workbook.NumberOfSheets} sayfa var.");
-                    }
-
-                    var sheet = workbook.GetSheetAt(selectedSheetIndex);
-                    var lastRowNum = sheet.LastRowNum;
-                    var headerRow = sheet.GetRow(0);
-                    var lastCellNum = headerRow?.LastCellNum ?? 0;
-                    
-                    var sheetInfo = new
-                    {
-                        sheetName = sheet.SheetName,
-                        sheetIndex = selectedSheetIndex,
-                        lastRowNum = lastRowNum,
-                        lastCellNum = lastCellNum,
-                        hasData = lastRowNum > 0 && lastCellNum > 0
-                    };
-
-                    // Try to read first few cells
-                    var sampleCells = new List<object>();
-                    for (int row = 0; row <= Math.Min(4, (int)lastRowNum); row++)
-                    {
-                        var sheetRow = sheet.GetRow(row);
-                        if (sheetRow != null)
-                        {
-                            for (int col = 0; col < Math.Min(5, (int)lastCellNum); col++)
-                            {
-                                try
-                                {
-                                    var cell = sheetRow.GetCell(col);
-                                    sampleCells.Add(new
-                                    {
-                                        row = row,
-                                        col = col,
-                                        value = cell?.ToString(),
-                                        cellType = cell?.CellType.ToString(),
-                                        hasValue = cell != null
-                                    });
-                                }
-                                catch (Exception ex)
-                                {
-                                    sampleCells.Add(new
-                                    {
-                                        row = row,
-                                        col = col,
-                                        error = ex.Message
-                                    });
-                                }
-                            }
-                        }
-                    }
-
-                    return Ok(new
-                    {
-                        success = true,
-                        debugInfo = debugInfo,
-                        sheetNames = sheetNames,
-                        selectedSheet = sheetInfo,
-                        sampleCells = sampleCells,
-                        message = "Debug bilgileri başarıyla alındı."
-                    });
-                }
-
-                return BadRequest("Desteklenmeyen dosya formatı.");
+                        c.ColumnName,
+                        c.DisplayName,
+                        c.DataType,
+                        c.ColumnOrder,
+                        c.MaxLength,
+                        c.IsRequired,
+                        c.IsUnique
+                    }).OrderBy(c => c.ColumnOrder).ToList()
+                });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Debug Excel dosyası sırasında hata oluştu: {FileName}", file?.FileName);
-                return StatusCode(500, new
-                {
-                    success = false,
-                    message = $"Debug sırasında hata oluştu: {ex.Message}",
-                    stackTrace = ex.StackTrace
-                });
+                _logger.LogError(ex, "Error getting table analysis for ID: {Id}", id);
+                return StatusCode(500, new { error = "Tablo analizi alınırken hata oluştu" });
             }
         }
+
+        private string GenerateTableNameFromFileName(string fileName)
+        {
+            var nameWithoutExt = Path.GetFileNameWithoutExtension(fileName);
+            var cleanName = System.Text.RegularExpressions.Regex.Replace(nameWithoutExt, @"[^a-zA-Z0-9_]", "_");
+            
+            if (!char.IsLetter(cleanName[0]))
+            {
+                cleanName = "Table_" + cleanName;
+            }
+            
+            if (cleanName.Length > 50)
+            {
+                cleanName = cleanName.Substring(0, 50);
+            }
+            
+            return cleanName;
+        }
+
+        private async Task<string> GenerateUniqueTableNameAsync(string baseName)
+        {
+            var tableName = baseName;
+            var counter = 1;
+            
+            while (await _context.DynamicTables.AnyAsync(t => t.TableName == tableName))
+            {
+                tableName = $"{baseName}_{counter}";
+                counter++;
+            }
+            
+            return tableName;
+        }
+    }
+
+    public class CreateTableRequest
+    {
+        public IFormFile File { get; set; }
+        public string Description { get; set; }
+    }
+
+    public class InsertDataRequest
+    {
+        public IFormFile File { get; set; }
+        public string TableName { get; set; }
+        public string Description { get; set; }
     }
 }
