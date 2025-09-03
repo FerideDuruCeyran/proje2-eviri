@@ -16,13 +16,15 @@ namespace ExcelUploader.Services
         private readonly IConfiguration _configuration;
         private readonly ILogger<DynamicTableService> _logger;
         private readonly IExcelAnalyzerService _excelAnalyzerService;
+        private readonly ITranslationService _translationService;
 
-        public DynamicTableService(ApplicationDbContext context, IConfiguration configuration, ILogger<DynamicTableService> logger, IExcelAnalyzerService excelAnalyzerService)
+        public DynamicTableService(ApplicationDbContext context, IConfiguration configuration, ILogger<DynamicTableService> logger, IExcelAnalyzerService excelAnalyzerService, ITranslationService translationService)
         {
             _context = context;
             _configuration = configuration;
             _logger = logger;
             _excelAnalyzerService = excelAnalyzerService;
+            _translationService = translationService;
         }
 
         public async Task<DynamicTable> CreateTableFromExcelAsync(IFormFile file, string uploadedBy, int? databaseConnectionId = null, string? description = null)
@@ -1280,28 +1282,30 @@ namespace ExcelUploader.Services
         private string GenerateTableName(string fileName)
         {
             var baseName = Path.GetFileNameWithoutExtension(fileName);
-            var sanitizedName = SanitizeTableName(baseName);
+            
+            // Use simple sanitization instead of translation service
+            var translatedName = SanitizeTableName(baseName);
             
             // Limit table name length to 50 characters to avoid SQL Server limitations
-            if (sanitizedName.Length > 50)
+            if (translatedName.Length > 50)
             {
-                sanitizedName = sanitizedName.Substring(0, 50);
+                translatedName = translatedName.Substring(0, 50);
             }
             
             // Remove timestamp patterns more aggressively
-            sanitizedName = System.Text.RegularExpressions.Regex.Replace(sanitizedName, @"_\d{8}_\d{6}$", "");
-            sanitizedName = System.Text.RegularExpressions.Regex.Replace(sanitizedName, @"_\d{8}_\d{4}$", "");
-            sanitizedName = System.Text.RegularExpressions.Regex.Replace(sanitizedName, @"_\d{8}$", "");
-            sanitizedName = System.Text.RegularExpressions.Regex.Replace(sanitizedName, @"_\d{6}$", "");
-            sanitizedName = System.Text.RegularExpressions.Regex.Replace(sanitizedName, @"_\d{4}$", "");
+            translatedName = System.Text.RegularExpressions.Regex.Replace(translatedName, @"_\d{8}_\d{6}$", "");
+            translatedName = System.Text.RegularExpressions.Regex.Replace(translatedName, @"_\d{8}_\d{4}$", "");
+            translatedName = System.Text.RegularExpressions.Regex.Replace(translatedName, @"_\d{8}$", "");
+            translatedName = System.Text.RegularExpressions.Regex.Replace(translatedName, @"_\d{6}$", "");
+            translatedName = System.Text.RegularExpressions.Regex.Replace(translatedName, @"_\d{4}$", "");
             
             // Remove Excel_ prefix if it exists
-            if (sanitizedName.StartsWith("Excel_"))
+            if (translatedName.StartsWith("Excel_"))
             {
-                sanitizedName = sanitizedName.Substring(6);
+                translatedName = translatedName.Substring(6);
             }
             
-            return sanitizedName;
+            return translatedName;
         }
 
         private string SanitizeTableName(string name)
@@ -1357,55 +1361,8 @@ namespace ExcelUploader.Services
             if (string.IsNullOrEmpty(name))
                 return "Column_" + Guid.NewGuid().ToString("N").Substring(0, 8);
 
-            // Türkçe karakterleri İngilizce karşılıklarına çevir
-            var turkishToEnglish = new Dictionary<char, char>
-            {
-                {'ç', 'c'}, {'Ç', 'C'},
-                {'ğ', 'g'}, {'Ğ', 'G'},
-                {'ı', 'i'}, {'I', 'I'},
-                {'ö', 'o'}, {'Ö', 'O'},
-                {'ş', 's'}, {'Ş', 'S'},
-                {'ü', 'u'}, {'Ü', 'U'},
-                {'İ', 'I'}, {'i', 'i'}
-            };
-
-            var sanitized = name;
-            
-            // Türkçe karakterleri değiştir
-            foreach (var kvp in turkishToEnglish)
-            {
-                sanitized = sanitized.Replace(kvp.Key, kvp.Value);
-            }
-
-            // Boşlukları alt çizgi ile değiştir
-            sanitized = sanitized.Replace(" ", "_");
-            
-            // Geçersiz karakterleri alt çizgi ile değiştir (sadece harf, rakam ve alt çizgi bırak)
-            sanitized = System.Text.RegularExpressions.Regex.Replace(sanitized, @"[^a-zA-Z0-9_]", "_");
-            
-            // Birden fazla alt çizgiyi tek alt çizgiye çevir
-            sanitized = System.Text.RegularExpressions.Regex.Replace(sanitized, @"_+", "_");
-            
-            // Başındaki ve sonundaki alt çizgileri kaldır
-            sanitized = sanitized.Trim('_');
-            
-            // İlk karakter rakam ise başına "Col_" ekle
-            if (sanitized.Length > 0 && char.IsDigit(sanitized[0]))
-                sanitized = "Col_" + sanitized;
-            
-            // 128 karakter sınırını kontrol et (SQL Server column name limit)
-            if (sanitized.Length > 128)
-            {
-                sanitized = sanitized.Substring(0, 128);
-                // Alt çizgi ile bitiyorsa kaldır
-                sanitized = sanitized.TrimEnd('_');
-            }
-            
-            // Boşsa varsayılan isim ver
-            if (string.IsNullOrEmpty(sanitized))
-                sanitized = "Column_" + Guid.NewGuid().ToString("N").Substring(0, 8);
-                
-            return sanitized;
+            // Use the translation service with intelligent strategy
+            return _translationService.TranslateColumnName(name, TranslationStrategy.Intelligent);
         }
 
         private string? GetCellValue(ExcelWorksheet worksheet, int row, int col)

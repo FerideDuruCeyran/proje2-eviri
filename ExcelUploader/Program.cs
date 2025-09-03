@@ -74,6 +74,7 @@ builder.Services.AddScoped<IUserLoginLogService, UserLoginLogService>();
 builder.Services.AddScoped<ILoginLogService, LoginLogService>();
 builder.Services.AddScoped<IJwtService, JwtService>();
 builder.Services.AddScoped<IExcelAnalyzerService, ExcelAnalyzerService>();
+builder.Services.AddScoped<ITranslationService, TranslationService>();
 
 var app = builder.Build();
 
@@ -110,6 +111,7 @@ app.MapGet("/connections", () => Results.File("connections.html", "text/html"));
 app.MapGet("/login-logs", () => Results.File("login-logs.html", "text/html"));
 app.MapGet("/profile", () => Results.File("profile.html", "text/html"));
 app.MapGet("/excel-analysis", () => Results.File("excel-analysis.html", "text/html"));
+app.MapGet("/test-auth", () => Results.File("test-auth.html", "text/html"));
 
 // Map controllers
 app.MapControllers();

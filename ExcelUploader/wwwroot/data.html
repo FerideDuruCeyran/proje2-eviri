@@ -236,14 +236,27 @@
     <!-- Scripts -->
     <script src="js/site.js"></script>
     <script>
+        // Quick authentication check before page loads
+        (function() {
+            const token = localStorage.getItem('authToken');
+            if (!token) {
+                window.location.href = '/login';
+                return;
+            }
+        })();
+
         let currentTableData = [];
         let currentPage = 1;
         let itemsPerPage = 50;
         let filteredData = [];
 
         // Initialize page
-        document.addEventListener('DOMContentLoaded', function() {
-            checkAuthentication();
+        document.addEventListener('DOMContentLoaded', async function() {
+            await checkAuthentication();
+            if (!isAuthenticated) {
+                window.location.href = '/login';
+                return;
+            }
             loadOverviewData();
             loadTablesList();
         });

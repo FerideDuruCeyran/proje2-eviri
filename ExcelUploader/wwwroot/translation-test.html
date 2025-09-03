@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel to SQL Translation Service Test</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .strategy-card {
+            transition: all 0.3s ease;
+        }
+        .strategy-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .translation-result {
+            background-color: #f8f9fa;
+            border-left: 4px solid #007bff;
+            padding: 10px;
+            margin: 5px 0;
+        }
+        .validation-error {
+            border-left-color: #dc3545;
+            background-color: #f8d7da;
+        }
+        .validation-warning {
+            border-left-color: #ffc107;
+            background-color: #fff3cd;
+        }
+        .validation-success {
+            border-left-color: #28a745;
+            background-color: #d4edda;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-12">
+                <h1 class="text-center mb-4">
+                    <i class="bi bi-translate"></i>
+                    Excel to SQL Translation Service
+                </h1>
+                <p class="text-center text-muted mb-4">
+                    Test different translation strategies for Excel column and table names
+                </p>
+            </div>
+        </div>
+
+        <!-- Translation Preview Section -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="bi bi-eye"></i> Translation Preview</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <input type="text" id="previewInput" class="form-control" 
+                                       placeholder="Enter Excel column name (e.g., 'Öğrenci Adı', 'Ödeme Tutarı', 'TC Kimlik No')">
+                            </div>
+                            <div class="col-md-4">
+                                <button class="btn btn-primary w-100" onclick="getTranslationPreview()">
+                                    <i class="bi bi-search"></i> Preview Translations
+                                </button>
+                            </div>
+                        </div>
+                        <div id="previewResults" class="mt-3"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Single Translation Section -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="bi bi-arrow-right"></i> Single Translation</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <input type="text" id="singleInput" class="form-control mb-2" 
+                                       placeholder="Enter Excel column name">
+                            </div>
+                            <div class="col-md-4">
+                                <select id="strategySelect" class="form-select mb-2">
+                                    <option value="Intelligent">Intelligent</option>
+                                    <option value="Simple">Simple</option>
+                                    <option value="EnglishTranslation">English Translation</option>
+                                    <option value="Abbreviated">Abbreviated</option>
+                                    <option value="Technical">Technical</option>
+                                    <option value="Preserve">Preserve</option>
+                                </select>
+                            </div>
+                            <div class="col-md-2">
+                                <button class="btn btn-success w-100" onclick="translateSingle()">
+                                    <i class="bi bi-arrow-right"></i> Translate
+                                </button>
+                            </div>
+                        </div>
+                        <div id="singleResult" class="mt-3"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Batch Translation Section -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="bi bi-list-ul"></i> Batch Translation</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <textarea id="batchInput" class="form-control" rows="4" 
+                                          placeholder="Enter Excel column names, one per line&#10;Example:&#10;Öğrenci Adı&#10;TC Kimlik No&#10;Ödeme Tutarı&#10;Doğum Tarihi"></textarea>
+                            </div>
+                            <div class="col-md-4">
+                                <select id="batchStrategySelect" class="form-select mb-2">
+                                    <option value="Intelligent">Intelligent</option>
+                                    <option value="Simple">Simple</option>
+                                    <option value="EnglishTranslation">English Translation</option>
+                                    <option value="Abbreviated">Abbreviated</option>
+                                    <option value="Technical">Technical</option>
+                                    <option value="Preserve">Preserve</option>
+                                </select>
+                                <button class="btn btn-info w-100" onclick="batchTranslate()">
+                                    <i class="bi bi-list-ul"></i> Batch Translate
+                                </button>
+                            </div>
+                        </div>
+                        <div id="batchResults" class="mt-3"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Strategy Comparison Section -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="bi bi-bar-chart"></i> Strategy Comparison</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-8">
+                                <textarea id="compareInput" class="form-control" rows="3" 
+                                          placeholder="Enter Excel column names to compare strategies&#10;Example:&#10;Öğrenci Adı, TC Kimlik No, Ödeme Tutarı"></textarea>
+                            </div>
+                            <div class="col-md-4">
+                                <button class="btn btn-warning w-100" onclick="compareStrategies()">
+                                    <i class="bi bi-bar-chart"></i> Compare Strategies
+                                </button>
+                            </div>
+                        </div>
+                        <div id="compareResults" class="mt-3"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Available Strategies Section -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5><i class="bi bi-info-circle"></i> Available Translation Strategies</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row" id="strategiesInfo">
+                            <!-- Will be populated by JavaScript -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Load strategies on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadStrategies();
+        });
+
+        async function loadStrategies() {
+            try {
+                const response = await fetch('/api/translation/strategies');
+                const data = await response.json();
+                
+                const strategiesContainer = document.getElementById('strategiesInfo');
+                strategiesContainer.innerHTML = '';
+                
+                data.strategies.forEach(strategy => {
+                    const description = data.descriptions[strategy];
+                    const card = document.createElement('div');
+                    card.className = 'col-md-6 col-lg-4 mb-3';
+                    card.innerHTML = `
+                        <div class="card strategy-card h-100">
+                            <div class="card-body">
+                                <h6 class="card-title">${strategy}</h6>
+                                <p class="card-text small text-muted">${description}</p>
+                            </div>
+                        </div>
+                    `;
+                    strategiesContainer.appendChild(card);
+                });
+            } catch (error) {
+                console.error('Error loading strategies:', error);
+            }
+        }
+
+        async function getTranslationPreview() {
+            const columnName = document.getElementById('previewInput').value.trim();
+            if (!columnName) {
+                alert('Please enter a column name');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/translation/preview?columnName=${encodeURIComponent(columnName)}`);
+                const data = await response.json();
+                
+                displayPreviewResults(data);
+            } catch (error) {
+                console.error('Error getting preview:', error);
+                document.getElementById('previewResults').innerHTML = 
+                    '<div class="alert alert-danger">Error getting translation preview</div>';
+            }
+        }
+
+        function displayPreviewResults(data) {
+            const container = document.getElementById('previewResults');
+            let html = `
+                <h6>Translation Preview for: <strong>${data.originalName}</strong></h6>
+                <div class="row">
+            `;
+            
+            Object.entries(data.translations).forEach(([strategy, translatedName]) => {
+                const validation = data.validations[strategy];
+                const validationClass = validation.isValid ? 'validation-success' : 
+                                      validation.errors.length > 0 ? 'validation-error' : 'validation-warning';
+                
+                html += `
+                    <div class="col-md-6 col-lg-4 mb-3">
+                        <div class="card strategy-card">
+                            <div class="card-header">
+                                <strong>${strategy}</strong>
+                            </div>
+                            <div class="card-body">
+                                <div class="translation-result ${validationClass}">
+                                    <strong>Result:</strong> ${translatedName}
+                                </div>
+                                ${displayValidation(validation)}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        function displayValidation(validation) {
+            let html = '';
+            
+            if (validation.errors.length > 0) {
+                html += '<div class="mt-2"><strong class="text-danger">Errors:</strong><ul class="small">';
+                validation.errors.forEach(error => {
+                    html += `<li>${error}</li>`;
+                });
+                html += '</ul></div>';
+            }
+            
+            if (validation.warnings.length > 0) {
+                html += '<div class="mt-2"><strong class="text-warning">Warnings:</strong><ul class="small">';
+                validation.warnings.forEach(warning => {
+                    html += `<li>${warning}</li>`;
+                });
+                html += '</ul></div>';
+            }
+            
+            if (validation.suggestedName) {
+                html += `<div class="mt-2"><strong class="text-info">Suggested:</strong> ${validation.suggestedName}</div>`;
+            }
+            
+            return html;
+        }
+
+        async function translateSingle() {
+            const columnName = document.getElementById('singleInput').value.trim();
+            const strategy = document.getElementById('strategySelect').value;
+            
+            if (!columnName) {
+                alert('Please enter a column name');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/translation/translate-column', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        columnName: columnName,
+                        strategy: strategy
+                    })
+                });
+                
+                const data = await response.json();
+                displaySingleResult(data);
+            } catch (error) {
+                console.error('Error translating:', error);
+                document.getElementById('singleResult').innerHTML = 
+                    '<div class="alert alert-danger">Error translating column name</div>';
+            }
+        }
+
+        function displaySingleResult(data) {
+            const container = document.getElementById('singleResult');
+            const validationClass = data.validation.isValid ? 'validation-success' : 
+                                  data.validation.errors.length > 0 ? 'validation-error' : 'validation-warning';
+            
+            container.innerHTML = `
+                <div class="card">
+                    <div class="card-body">
+                        <h6>Translation Result</h6>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <strong>Original:</strong> ${data.originalName}
+                            </div>
+                            <div class="col-md-6">
+                                <strong>Strategy:</strong> ${data.strategy}
+                            </div>
+                        </div>
+                        <div class="translation-result ${validationClass} mt-2">
+                            <strong>Translated:</strong> ${data.translatedName}
+                        </div>
+                        ${displayValidation(data.validation)}
+                    </div>
+                </div>
+            `;
+        }
+
+        async function batchTranslate() {
+            const columnNamesText = document.getElementById('batchInput').value.trim();
+            const strategy = document.getElementById('batchStrategySelect').value;
+            
+            if (!columnNamesText) {
+                alert('Please enter column names');
+                return;
+            }
+
+            const columnNames = columnNamesText.split('\n').filter(name => name.trim());
+            
+            try {
+                const response = await fetch('/api/translation/batch-translate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        columnNames: columnNames,
+                        strategy: strategy
+                    })
+                });
+                
+                const data = await response.json();
+                displayBatchResults(data);
+            } catch (error) {
+                console.error('Error batch translating:', error);
+                document.getElementById('batchResults').innerHTML = 
+                    '<div class="alert alert-danger">Error batch translating column names</div>';
+            }
+        }
+
+        function displayBatchResults(data) {
+            const container = document.getElementById('batchResults');
+            let html = `
+                <h6>Batch Translation Results (${data.successCount}/${data.totalCount} successful)</h6>
+                <div class="table-responsive">
+                    <table class="table table-striped">
+                        <thead>
+                            <tr>
+                                <th>Original Name</th>
+                                <th>Translated Name</th>
+                                <th>Validation</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            
+            data.results.forEach(result => {
+                const validationClass = result.validation?.isValid ? 'text-success' : 
+                                      result.validation?.errors?.length > 0 ? 'text-danger' : 'text-warning';
+                
+                html += `
+                    <tr>
+                        <td>${result.originalName}</td>
+                        <td>${result.translatedName}</td>
+                        <td class="${validationClass}">
+                            ${result.validation?.isValid ? 'Valid' : 
+                              result.validation?.errors?.length > 0 ? 'Invalid' : 'Warning'}
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            html += '</tbody></table></div>';
+            container.innerHTML = html;
+        }
+
+        async function compareStrategies() {
+            const columnNamesText = document.getElementById('compareInput').value.trim();
+            
+            if (!columnNamesText) {
+                alert('Please enter column names');
+                return;
+            }
+
+            const columnNames = columnNamesText.split(',').map(name => name.trim()).filter(name => name);
+            
+            try {
+                const response = await fetch('/api/translation/compare-strategies', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        columnNames: columnNames
+                    })
+                });
+                
+                const data = await response.json();
+                displayCompareResults(data);
+            } catch (error) {
+                console.error('Error comparing strategies:', error);
+                document.getElementById('compareResults').innerHTML = 
+                    '<div class="alert alert-danger">Error comparing translation strategies</div>';
+            }
+        }
+
+        function displayCompareResults(data) {
+            const container = document.getElementById('compareResults');
+            let html = `
+                <h6>Strategy Comparison Results</h6>
+                <div class="table-responsive">
+                    <table class="table table-bordered">
+                        <thead>
+                            <tr>
+                                <th>Original Name</th>
+                                ${data.strategies.map(strategy => `<th>${strategy}</th>`).join('')}
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            
+            data.columnNames.forEach(columnName => {
+                html += '<tr>';
+                html += `<td><strong>${columnName}</strong></td>`;
+                
+                data.strategies.forEach(strategy => {
+                    const translatedName = data.comparison[columnName][strategy];
+                    html += `<td>${translatedName}</td>`;
+                });
+                
+                html += '</tr>';
+            });
+            
+            html += '</tbody></table></div>';
+            container.innerHTML = html;
+        }
+
+        // Add some example data for quick testing
+        document.getElementById('previewInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                getTranslationPreview();
+            }
+        });
+
+        // Add example data buttons
+        const examples = [
+            'Öğrenci Adı',
+            'TC Kimlik No',
+            'Ödeme Tutarı',
+            'Doğum Tarihi',
+            'Müşteri Bilgileri',
+            'Sipariş Detayları'
+        ];
+
+        examples.forEach(example => {
+            const button = document.createElement('button');
+            button.className = 'btn btn-outline-secondary btn-sm me-2 mb-2';
+            button.textContent = example;
+            button.onclick = () => {
+                document.getElementById('previewInput').value = example;
+                getTranslationPreview();
+            };
+            document.querySelector('.card-body').appendChild(button);
+        });
+    </script>
+</body>
+</html>

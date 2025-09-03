@@ -126,8 +126,16 @@ namespace ExcelUploader.Controllers
             {
                 // Test database connection
                 var connectionString = _configuration.GetConnectionString("DefaultConnection");
+                
+                // Log connection string (without password for security)
+                var logConnectionString = connectionString?.Replace("Password=duru123.;", "Password=***;");
+                _logger.LogInformation("Testing database connection with: {ConnectionString}", logConnectionString);
+                
                 using var connection = new SqlConnection(connectionString);
+                
+                _logger.LogInformation("Attempting to open database connection...");
                 await connection.OpenAsync();
+                _logger.LogInformation("Database connection opened successfully");
 
                 // Get database info
                 var databaseInfo = new
@@ -137,6 +145,9 @@ namespace ExcelUploader.Controllers
                     State = connection.State.ToString()
                 };
 
+                _logger.LogInformation("Database connection test successful. Database: {Database}, Server: {Server}, State: {State}", 
+                    databaseInfo.Database, databaseInfo.Server, databaseInfo.State);
+
                 return Ok(new
                 {
                     isConnected = true,
@@ -144,9 +155,20 @@ namespace ExcelUploader.Controllers
                     message = "Veritabanı bağlantısı başarılı"
                 });
             }
-            catch (Exception ex)
+            catch (SqlException sqlEx)
             {
-                _logger.LogError(ex, "Database connection test failed");
+                _logger.LogError(sqlEx, "SQL Server connection error. Error Number: {ErrorNumber}, Message: {Message}", 
+                    sqlEx.Number, sqlEx.Message);
+                
+                var errorMessage = sqlEx.Number switch
+                {
+                    -2 => "Bağlantı zaman aşımına uğradı",
+                    18456 => "Kullanıcı adı veya şifre hatalı",
+                    4060 => "Veritabanı bulunamadı",
+                    40615 => "Sunucuya bağlanılamıyor",
+                    _ => $"SQL Server Hatası: {sqlEx.Message}"
+                };
+                
                 return Ok(new
                 {
                     isConnected = false,
@@ -156,14 +178,128 @@ namespace ExcelUploader.Controllers
                         Server = "Unknown",
                         State = "Disconnected"
                     },
-                    message = "Veritabanı bağlantısı başarısız"
+                    message = errorMessage,
+                    errorDetails = sqlEx.Message
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Database connection test failed. Exception type: {ExceptionType}, Message: {Message}", 
+                    ex.GetType().Name, ex.Message);
+                
+                return Ok(new
+                {
+                    isConnected = false,
+                    databaseInfo = new
+                    {
+                        Database = "Unknown",
+                        Server = "Unknown",
+                        State = "Disconnected"
+                    },
+                    message = "Veritabanı bağlantısı başarısız",
+                    errorDetails = ex.Message
+                });
+            }
+        }
+
+        [HttpGet]
+        [Route("test-connection-simple")]
+        [AllowAnonymous]
+        public async Task<IActionResult> TestConnectionSimple()
+        {
+            try
+            {
+                var connectionString = _configuration.GetConnectionString("DefaultConnection");
+                _logger.LogInformation("Simple connection test - attempting to connect to database");
+                
+                // Log connection string details (without password)
+                var connectionStringWithoutPassword = connectionString?.Replace("Password=duru123.;", "Password=***;");
+                _logger.LogInformation("Connection string: {ConnectionString}", connectionStringWithoutPassword);
+                
+                using var connection = new SqlConnection(connectionString);
+                await connection.OpenAsync();
+                
+                var result = new
+                {
+                    success = true,
+                    server = connection.DataSource,
+                    database = connection.Database,
+                    state = connection.State.ToString(),
+                    message = "Bağlantı başarılı"
+                };
+                
+                _logger.LogInformation("Simple connection test successful: {Server} -> {Database}", 
+                    result.server, result.database);
+                
+                return Ok(result);
+            }
+            catch (SqlException sqlEx)
+            {
+                _logger.LogError(sqlEx, "Simple connection test failed - SQL Error {Number}: {Message}", 
+                    sqlEx.Number, sqlEx.Message);
+                
+                return Ok(new
+                {
+                    success = false,
+                    error = $"SQL Server Hatası ({sqlEx.Number}): {sqlEx.Message}",
+                    details = sqlEx.ToString()
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Simple connection test failed - General error: {Message}", ex.Message);
+                
+                return Ok(new
+                {
+                    success = false,
+                    error = $"Genel Hata: {ex.Message}",
+                    details = ex.ToString()
+                });
+            }
+        }
+
+        [HttpGet]
+        [Route("diagnose-connection")]
+        [AllowAnonymous]
+        public IActionResult DiagnoseConnection()
+        {
+            try
+            {
+                var connectionString = _configuration.GetConnectionString("DefaultConnection");
+                var connectionStringWithoutPassword = connectionString?.Replace("Password=duru123.;", "Password=***;");
+                
+                var diagnosis = new
+                {
+                    hasConnectionString = !string.IsNullOrEmpty(connectionString),
+                    connectionStringPreview = connectionStringWithoutPassword,
+                    connectionStringLength = connectionString?.Length ?? 0,
+                    containsServer = connectionString?.Contains("Server=") ?? false,
+                    containsDatabase = connectionString?.Contains("Database=") ?? false,
+                    containsUser = connectionString?.Contains("User Id=") ?? false,
+                    containsPassword = connectionString?.Contains("Password=") ?? false,
+                    containsTrustServerCertificate = connectionString?.Contains("TrustServerCertificate=") ?? false,
+                    message = "Bağlantı dizesi analizi tamamlandı"
+                };
+                
+                _logger.LogInformation("Connection diagnosis: {Diagnosis}", diagnosis);
+                
+                return Ok(diagnosis);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Connection diagnosis failed: {Message}", ex.Message);
+                
+                return Ok(new
+                {
+                    error = $"Tanılama hatası: {ex.Message}",
+                    details = ex.ToString()
                 });
             }
         }
 
         [HttpPost]
         [Route("preview")]
-        [Authorize]
+        [AllowAnonymous]
         public async Task<IActionResult> Preview([FromForm] IFormFile file)
         {
             if (file == null)
@@ -743,22 +879,9 @@ namespace ExcelUploader.Controllers
         private string GenerateTableNameFromFileName(string fileName)
         {
             var nameWithoutExtension = Path.GetFileNameWithoutExtension(fileName);
-            var tableName = nameWithoutExtension.ToLower()
-                .Replace(" ", "_")
-                .Replace("-", "_")
-                .Replace(".", "_")
-                .Replace("ç", "c")
-                .Replace("ğ", "g")
-                .Replace("ı", "i")
-                .Replace("ö", "o")
-                .Replace("ş", "s")
-                .Replace("ü", "u")
-                .Replace("Ç", "C")
-                .Replace("Ğ", "G")
-                .Replace("İ", "I")
-                .Replace("Ö", "O")
-                .Replace("Ş", "S")
-                .Replace("Ü", "U");
+            
+            // Use simple sanitization instead of translation service
+            var tableName = SanitizeTableName(nameWithoutExtension);
             
             // Remove timestamp patterns from the table name
             tableName = Regex.Replace(tableName, @"_\d{8}_\d{6}$", "");
@@ -766,6 +889,54 @@ namespace ExcelUploader.Controllers
             tableName = Regex.Replace(tableName, @"_\d{8}$", "");
             
             return tableName;
+        }
+
+        private string SanitizeTableName(string name)
+        {
+            if (string.IsNullOrEmpty(name))
+                return "Table_" + Guid.NewGuid().ToString("N").Substring(0, 8);
+
+            // Türkçe karakterleri İngilizce karşılıklarına çevir
+            var turkishToEnglish = new Dictionary<char, char>
+            {
+                {'ç', 'c'}, {'Ç', 'C'},
+                {'ğ', 'g'}, {'Ğ', 'G'},
+                {'ı', 'i'}, {'I', 'I'},
+                {'ö', 'o'}, {'Ö', 'O'},
+                {'ş', 's'}, {'Ş', 'S'},
+                {'ü', 'u'}, {'Ü', 'U'},
+                {'İ', 'I'}, {'i', 'i'}
+            };
+
+            var sanitized = name;
+            
+            // Türkçe karakterleri değiştir
+            foreach (var kvp in turkishToEnglish)
+            {
+                sanitized = sanitized.Replace(kvp.Key, kvp.Value);
+            }
+
+            // Boşlukları alt çizgi ile değiştir
+            sanitized = sanitized.Replace(" ", "_");
+            
+            // Geçersiz karakterleri alt çizgi ile değiştir (sadece harf, rakam ve alt çizgi bırak)
+            sanitized = Regex.Replace(sanitized, @"[^a-zA-Z0-9_]", "_");
+            
+            // Birden fazla alt çizgiyi tek alt çizgiye çevir
+            sanitized = Regex.Replace(sanitized, @"_+", "_");
+            
+            // Başındaki ve sonundaki alt çizgileri kaldır
+            sanitized = sanitized.Trim('_');
+            
+            // İlk karakter rakam ise başına alt çizgi ekle (SQL Server requirement)
+            if (sanitized.Length > 0 && char.IsDigit(sanitized[0]))
+                sanitized = "_" + sanitized;
+            
+            // Boşsa varsayılan isim ver
+            if (string.IsNullOrEmpty(sanitized))
+                sanitized = "Table_" + Guid.NewGuid().ToString("N").Substring(0, 8);
+                
+            return sanitized;
         }
 
 

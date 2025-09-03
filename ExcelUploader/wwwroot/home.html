@@ -217,25 +217,43 @@
     <!-- Scripts -->
     <script src="js/site.js"></script>
     <script>
+        // Quick authentication check before page loads
+        (function() {
+            const token = localStorage.getItem('authToken');
+            if (!token) {
+                window.location.href = '/login';
+                return;
+            }
+        })();
         // Initialize page
-        document.addEventListener('DOMContentLoaded', function() {
-            checkAuthentication();
+        document.addEventListener('DOMContentLoaded', async function() {
+            await checkAuthentication();
             if (isAuthenticated) {
                 loadDashboardData();
                 checkDatabaseStatus();
                 
                 // Refresh database status every 30 seconds
                 setInterval(checkDatabaseStatus, 30000);
+            } else {
+                // Redirect to login if not authenticated
+                window.location.href = '/login';
             }
         });
 
         // Load dashboard data
         async function loadDashboardData() {
             try {
+                const token = localStorage.getItem('authToken');
+                if (!token) {
+                    console.log('No auth token found, redirecting to login');
+                    window.location.href = '/login';
+                    return;
+                }
+
                 // Load stats
                 const statsResponse = await fetch('/api/home/stats', {
                     headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                        'Authorization': `Bearer ${token}`
                     }
                 });
                 
@@ -244,12 +262,17 @@
                     document.getElementById('totalFiles').textContent = stats.totalFiles || 0;
                     document.getElementById('totalRecords').textContent = stats.totalRecords || 0;
                     document.getElementById('totalTables').textContent = stats.totalTables || 0;
+                } else if (statsResponse.status === 401 || statsResponse.status === 403) {
+                    console.log('Unauthorized access, redirecting to login');
+                    localStorage.removeItem('authToken');
+                    window.location.href = '/login';
+                    return;
                 }
 
                 // Load recent activities
                 const activitiesResponse = await fetch('/api/home/recent-activities', {
                     headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                        'Authorization': `Bearer ${token}`
                     }
                 });
                 
@@ -265,6 +288,11 @@
                     } else {
                         displayRecentActivities([]);
                     }
+                } else if (activitiesResponse.status === 401 || activitiesResponse.status === 403) {
+                    console.log('Unauthorized access, redirecting to login');
+                    localStorage.removeItem('authToken');
+                    window.location.href = '/login';
+                    return;
                 } else {
                     console.error('Failed to load activities:', activitiesResponse.status);
                     displayRecentActivities([]);
@@ -273,16 +301,24 @@
                 // Load user profile for last login
                 const profileResponse = await fetch('/api/account/profile', {
                     headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                        'Authorization': `Bearer ${token}`
                     }
                 });
                 
                 if (profileResponse.ok) {
                     const profile = await profileResponse.json();
                     document.getElementById('lastLogin').textContent = formatDate(profile.createdAt);
+                } else if (profileResponse.status === 401 || profileResponse.status === 403) {
+                    console.log('Unauthorized access, redirecting to login');
+                    localStorage.removeItem('authToken');
+                    window.location.href = '/login';
+                    return;
                 }
             } catch (error) {
                 console.error('Error loading dashboard data:', error);
+                // If there's a network error, it might be due to authentication
+                localStorage.removeItem('authToken');
+                window.location.href = '/login';
             }
         }
 
