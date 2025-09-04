@@ -282,11 +282,48 @@ namespace ExcelUploader.Controllers
         private string GenerateTableNameFromFileName(string fileName)
         {
             var nameWithoutExt = Path.GetFileNameWithoutExtension(fileName);
-            var cleanName = System.Text.RegularExpressions.Regex.Replace(nameWithoutExt, @"[^a-zA-Z0-9_]", "_");
             
-            if (!char.IsLetter(cleanName[0]))
+            // Convert Turkish characters to English equivalents
+            var turkishToEnglish = new Dictionary<char, char>
+            {
+                {'ç', 'c'}, {'Ç', 'C'},
+                {'ğ', 'g'}, {'Ğ', 'G'},
+                {'ı', 'i'}, {'I', 'I'},
+                {'ö', 'o'}, {'Ö', 'O'},
+                {'ş', 's'}, {'Ş', 'S'},
+                {'ü', 'u'}, {'Ü', 'U'},
+                {'İ', 'I'}
+            };
+
+            var cleanName = nameWithoutExt;
+            
+            // Replace Turkish characters
+            foreach (var kvp in turkishToEnglish)
+            {
+                cleanName = cleanName.Replace(kvp.Key, kvp.Value);
+            }
+
+            // Replace whitespace with underscore
+            cleanName = cleanName.Replace(' ', '_');
+            
+            // Remove or replace other special characters that are not valid in SQL identifiers
+            cleanName = System.Text.RegularExpressions.Regex.Replace(cleanName, @"[^a-zA-Z0-9_]", "_");
+            
+            // Remove consecutive underscores
+            cleanName = System.Text.RegularExpressions.Regex.Replace(cleanName, @"_+", "_");
+            
+            // Remove leading and trailing underscores
+            cleanName = cleanName.Trim('_');
+            
+            if (cleanName.Length > 0 && !char.IsLetter(cleanName[0]))
             {
                 cleanName = "Table_" + cleanName;
+            }
+            
+            // If empty after cleaning, provide a default name
+            if (string.IsNullOrEmpty(cleanName))
+            {
+                cleanName = "Table_1";
             }
             
             if (cleanName.Length > 50)

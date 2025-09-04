@@ -344,8 +344,8 @@ namespace ExcelUploader.Services
                     continue;
                 }
 
-                // Check for date
-                if (DateTime.TryParse(stringValue, out _))
+                // Check for date - be more strict about date detection
+                if (IsLikelyDate(stringValue))
                 {
                     dateCount++;
                     continue;
@@ -378,23 +378,23 @@ namespace ExcelUploader.Services
             var boolRatio = (double)boolCount / totalNonNull;
             var stringRatio = (double)stringCount / totalNonNull;
 
-            // Set confidence and data type
-            if (boolRatio > 0.8)
+            // Set confidence and data type - be very conservative, prefer string types
+            if (boolRatio > 0.98 && boolCount > 3)
             {
                 analysis.DetectedDataType = "bit";
                 analysis.Confidence = boolRatio;
             }
-            else if (dateRatio > 0.8)
+            else if (dateRatio > 0.98 && dateCount > 10) // Very strict for dates
             {
                 analysis.DetectedDataType = "datetime2";
                 analysis.Confidence = dateRatio;
             }
-            else if (intRatio > 0.8)
+            else if (intRatio > 0.95 && intCount > 3)
             {
                 analysis.DetectedDataType = "int";
                 analysis.Confidence = intRatio;
             }
-            else if (decimalRatio > 0.8)
+            else if (decimalRatio > 0.95 && decimalCount > 3)
             {
                 analysis.DetectedDataType = "decimal(18,2)";
                 analysis.Confidence = decimalRatio;
@@ -426,6 +426,39 @@ namespace ExcelUploader.Services
                 columnName, analysis.DetectedDataType, analysis.Confidence, maxStringLength);
 
             return analysis;
+        }
+
+        private bool IsLikelyDate(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return false;
+            
+            // Don't consider pure numbers as dates
+            if (double.TryParse(value, out _) && !value.Contains("/") && !value.Contains("-") && !value.Contains(".")) 
+                return false;
+            
+            // Don't consider very short strings as dates
+            if (value.Trim().Length < 6) return false;
+            
+            // Try to parse as DateTime
+            if (DateTime.TryParse(value, out var result))
+            {
+                // Additional validation - must be a reasonable date
+                if (result.Year < 1900 || result.Year > 2100) return false;
+                
+                // Must contain date separators or be a recognizable date format
+                if (value.Contains("/") || value.Contains("-") || value.Contains(".") || 
+                    value.ToLower().Contains("jan") || value.ToLower().Contains("feb") ||
+                    value.ToLower().Contains("mar") || value.ToLower().Contains("apr") ||
+                    value.ToLower().Contains("may") || value.ToLower().Contains("jun") ||
+                    value.ToLower().Contains("jul") || value.ToLower().Contains("aug") ||
+                    value.ToLower().Contains("sep") || value.ToLower().Contains("oct") ||
+                    value.ToLower().Contains("nov") || value.ToLower().Contains("dec"))
+                {
+                    return true;
+                }
+            }
+            
+            return false;
         }
     }
 

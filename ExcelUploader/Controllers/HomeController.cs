@@ -161,12 +161,49 @@ namespace ExcelUploader.Controllers
         {
             // Remove extension and special characters
             var nameWithoutExt = Path.GetFileNameWithoutExtension(fileName);
-            var cleanName = Regex.Replace(nameWithoutExt, @"[^a-zA-Z0-9_]", "_");
+            
+            // Convert Turkish characters to English equivalents
+            var turkishToEnglish = new Dictionary<char, char>
+            {
+                {'ç', 'c'}, {'Ç', 'C'},
+                {'ğ', 'g'}, {'Ğ', 'G'},
+                {'ı', 'i'}, {'I', 'I'},
+                {'ö', 'o'}, {'Ö', 'O'},
+                {'ş', 's'}, {'Ş', 'S'},
+                {'ü', 'u'}, {'Ü', 'U'},
+                {'İ', 'I'}
+            };
+
+            var cleanName = nameWithoutExt;
+            
+            // Replace Turkish characters
+            foreach (var kvp in turkishToEnglish)
+            {
+                cleanName = cleanName.Replace(kvp.Key, kvp.Value);
+            }
+
+            // Replace whitespace with underscore
+            cleanName = cleanName.Replace(' ', '_');
+            
+            // Remove or replace other special characters that are not valid in SQL identifiers
+            cleanName = Regex.Replace(cleanName, @"[^a-zA-Z0-9_]", "_");
+            
+            // Remove consecutive underscores
+            cleanName = Regex.Replace(cleanName, @"_+", "_");
+            
+            // Remove leading and trailing underscores
+            cleanName = cleanName.Trim('_');
             
             // Ensure it starts with a letter
-            if (!char.IsLetter(cleanName[0]))
+            if (cleanName.Length > 0 && !char.IsLetter(cleanName[0]))
             {
                 cleanName = "Table_" + cleanName;
+            }
+            
+            // If empty after cleaning, provide a default name
+            if (string.IsNullOrEmpty(cleanName))
+            {
+                cleanName = "Table_1";
             }
             
             // Limit length
@@ -328,8 +365,9 @@ namespace ExcelUploader.Controllers
         {
             try
             {
-                var totalTables = await _context.DynamicTables.CountAsync();
-                var totalRows = await _context.DynamicTables.SumAsync(t => t.RowCount);
+                var totalFiles = await _context.DynamicTables.CountAsync();
+                var totalRecords = await _context.DynamicTables.SumAsync(t => t.RowCount);
+                var totalTables = totalFiles; // For backward compatibility
                 var processedTables = await _context.DynamicTables.CountAsync(t => t.IsProcessed);
                 var recentUploads = await _context.DynamicTables
                     .OrderByDescending(t => t.UploadDate)
@@ -346,8 +384,10 @@ namespace ExcelUploader.Controllers
 
                 return Ok(new
                 {
+                    totalFiles = totalFiles,
+                    totalRecords = totalRecords,
                     totalTables = totalTables,
-                    totalRows = totalRows,
+                    totalRows = totalRecords, // For backward compatibility
                     processedTables = processedTables,
                     pendingTables = totalTables - processedTables,
                     recentUploads = recentUploads,
@@ -367,34 +407,50 @@ namespace ExcelUploader.Controllers
         {
             try
             {
+                _logger.LogInformation("Testing database connection...");
+                
                 // Test database connection
                 var canConnect = await _context.Database.CanConnectAsync();
+                _logger.LogInformation("Database connection test result: {CanConnect}", canConnect);
+                
                 if (!canConnect)
                 {
-                    return StatusCode(500, new { 
-                        success = false, 
-                        message = "Veritabanı bağlantısı başarısız",
-                        error = "Veritabanına bağlanılamıyor"
+                    _logger.LogWarning("Database connection failed");
+                    return Ok(new { 
+                        isConnected = false,
+                        databaseInfo = new { Database = "Unknown", Server = "Unknown" }
                     });
                 }
 
                 // Test basic query
                 var tableCount = await _context.DynamicTables.CountAsync();
+                _logger.LogInformation("Successfully queried DynamicTables, count: {TableCount}", tableCount);
+
+                // Get database information
+                var connection = _context.Database.GetDbConnection();
+                var databaseName = connection.Database ?? "Unknown";
+                var serverName = connection.DataSource ?? "Unknown";
+                
+                _logger.LogInformation("Database info - Name: {DatabaseName}, Server: {ServerName}", databaseName, serverName);
 
                 return Ok(new
                 {
-                    success = true,
-                    message = "Veritabanı bağlantısı başarılı",
+                    isConnected = true,
+                    databaseInfo = new
+                    {
+                        Database = databaseName,
+                        Server = serverName
+                    },
                     tableCount = tableCount,
                     timestamp = DateTime.UtcNow
                 });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Database test failed");
-                return StatusCode(500, new { 
-                    success = false, 
-                    message = "Veritabanı testi başarısız",
+                _logger.LogError(ex, "Database test failed with exception");
+                return Ok(new { 
+                    isConnected = false,
+                    databaseInfo = new { Database = "Error", Server = "Error" },
                     error = ex.Message
                 });
             }
@@ -518,6 +574,135 @@ namespace ExcelUploader.Controllers
             {
                 _logger.LogError(ex, "Error viewing table {TableName}", tableName);
                 return StatusCode(500, new { error = "Tablo görüntülenirken hata oluştu" });
+            }
+        }
+
+        [HttpGet("last-login")]
+        [Authorize]
+        public async Task<IActionResult> GetLastLogin()
+        {
+            try
+            {
+                var userId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(userId))
+                {
+                    return Unauthorized(new { error = "Kullanıcı kimliği bulunamadı" });
+                }
+
+                // Get the last successful login for the current user
+                var lastLogin = await _context.LoginLogs
+                    .Where(l => l.UserId == userId && l.IsSuccess)
+                    .OrderByDescending(l => l.LoginTime)
+                    .FirstOrDefaultAsync();
+
+                if (lastLogin != null)
+                {
+                    return Ok(new { lastLogin = lastLogin.LoginTime });
+                }
+                else
+                {
+                    return Ok(new { lastLogin = (DateTime?)null });
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting last login");
+                return StatusCode(500, new { error = "Son giriş bilgisi alınırken hata oluştu" });
+            }
+        }
+
+        [HttpGet("test-connection")]
+        [AllowAnonymous]
+        public async Task<IActionResult> TestConnection()
+        {
+            try
+            {
+                _logger.LogInformation("Testing database connection without authentication...");
+                
+                // Test database connection
+                var canConnect = await _context.Database.CanConnectAsync();
+                _logger.LogInformation("Database connection test result: {CanConnect}", canConnect);
+                
+                if (!canConnect)
+                {
+                    _logger.LogWarning("Database connection failed");
+                    return Ok(new { 
+                        isConnected = false,
+                        message = "Database connection failed",
+                        timestamp = DateTime.UtcNow
+                    });
+                }
+
+                // Get database information
+                var connection = _context.Database.GetDbConnection();
+                var databaseName = connection.Database ?? "Unknown";
+                var serverName = connection.DataSource ?? "Unknown";
+                
+                _logger.LogInformation("Database info - Name: {DatabaseName}, Server: {ServerName}", databaseName, serverName);
+
+                return Ok(new
+                {
+                    isConnected = true,
+                    message = "Database connection successful",
+                    databaseInfo = new
+                    {
+                        Database = databaseName,
+                        Server = serverName
+                    },
+                    timestamp = DateTime.UtcNow
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Database connection test failed with exception");
+                return Ok(new { 
+                    isConnected = false,
+                    message = $"Database connection test failed: {ex.Message}",
+                    timestamp = DateTime.UtcNow
+                });
+            }
+        }
+
+        [HttpGet("test-database-creation")]
+        [AllowAnonymous]
+        public async Task<IActionResult> TestDatabaseCreation()
+        {
+            try
+            {
+                _logger.LogInformation("Testing database creation...");
+                
+                // Try to create the database if it doesn't exist
+                var created = await _context.Database.EnsureCreatedAsync();
+                _logger.LogInformation("Database creation result: {Created}", created);
+                
+                // Test connection after creation
+                var canConnect = await _context.Database.CanConnectAsync();
+                _logger.LogInformation("Database connection after creation: {CanConnect}", canConnect);
+                
+                if (!canConnect)
+                {
+                    return Ok(new { 
+                        success = false,
+                        message = "Database creation failed or connection still not working",
+                        timestamp = DateTime.UtcNow
+                    });
+                }
+
+                return Ok(new
+                {
+                    success = true,
+                    message = "Database created/connected successfully",
+                    timestamp = DateTime.UtcNow
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Database creation test failed with exception");
+                return Ok(new { 
+                    success = false,
+                    message = $"Database creation test failed: {ex.Message}",
+                    timestamp = DateTime.UtcNow
+                });
             }
         }
     }
