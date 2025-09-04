@@ -131,4 +131,38 @@ app.MapGet("/test-auth", () => Results.File("test-auth.html", "text/html"));
 // Map controllers
 app.MapControllers();
 
+// Add a simple database test endpoint
+app.MapGet("/api/test-db", async (ApplicationDbContext context) =>
+{
+    try
+    {
+        var canConnect = await context.Database.CanConnectAsync();
+        if (canConnect)
+        {
+            return Results.Ok(new { 
+                success = true, 
+                message = "Database connection successful",
+                timestamp = DateTime.UtcNow
+            });
+        }
+        else
+        {
+            return Results.Json(new { 
+                success = false, 
+                message = "Database connection failed",
+                timestamp = DateTime.UtcNow
+            }, statusCode: 500);
+        }
+    }
+    catch (Exception ex)
+    {
+        return Results.Json(new { 
+            success = false, 
+            message = "Database test failed",
+            error = ex.Message,
+            timestamp = DateTime.UtcNow
+        }, statusCode: 500);
+    }
+});
+
 app.Run();
