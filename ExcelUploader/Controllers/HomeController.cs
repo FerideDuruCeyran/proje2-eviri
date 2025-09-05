@@ -427,6 +427,56 @@ namespace ExcelUploader.Controllers
             }
         }
 
+        [HttpGet("data")]
+        [Authorize]
+        public async Task<IActionResult> GetData([FromQuery] int? tableId = null)
+        {
+            try
+            {
+                if (tableId.HasValue)
+                {
+                    // Get specific table data
+                    var table = await _context.DynamicTables.FindAsync(tableId.Value);
+                    if (table == null)
+                    {
+                        return NotFound(new { error = "Tablo bulunamadı" });
+                    }
+
+                    var data = await _dynamicTableService.GetTableDataAsync(table.TableName);
+                    if (!data.IsSuccess)
+                    {
+                        return StatusCode(500, new { error = "Tablo verisi alınamadı", details = data.ErrorMessage });
+                    }
+
+                    return Ok(data.Data);
+                }
+                else
+                {
+                    // Get all tables list for dropdown
+                    var tables = await _context.DynamicTables
+                        .OrderByDescending(t => t.UploadDate)
+                        .Select(t => new
+                        {
+                            id = t.Id,
+                            tableName = t.TableName,
+                            fileName = t.FileName,
+                            description = t.Description,
+                            uploadDate = t.UploadDate,
+                            rowCount = t.RowCount,
+                            columnCount = t.ColumnCount
+                        })
+                        .ToListAsync();
+
+                    return Ok(tables);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting data");
+                return StatusCode(500, new { error = "Veriler alınırken hata oluştu" });
+            }
+        }
+
         [HttpGet("test-database")]
         [Authorize]
         public async Task<IActionResult> TestDatabase()
