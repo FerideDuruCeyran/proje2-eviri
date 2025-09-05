@@ -217,27 +217,27 @@
     <!-- Scripts -->
     <script src="js/site.js"></script>
     <script>
-        // Quick authentication check before page loads
-        (function() {
-            const token = localStorage.getItem('authToken');
-            if (!token) {
-                window.location.href = '/login';
-                return;
-            }
-        })();
+
         // Initialize page
         document.addEventListener('DOMContentLoaded', async function() {
-            await checkAuthentication();
-            if (isAuthenticated) {
-                loadDashboardData();
-                checkDatabaseStatus();
+            console.log('Home page DOMContentLoaded event fired');
+            
+            // Wait a bit for the main authentication check to complete
+            setTimeout(() => {
+                console.log('Checking authentication status on home page, isAuthenticated:', isAuthenticated);
                 
-                // Refresh database status every 30 seconds
-                setInterval(checkDatabaseStatus, 30000);
-            } else {
-                // Redirect to login if not authenticated
-                window.location.href = '/login';
-            }
+                if (isAuthenticated) {
+                    console.log('User is authenticated, loading dashboard data');
+                    loadDashboardData();
+                    checkDatabaseStatus();
+                    
+                    // Refresh database status every 30 seconds
+                    setInterval(checkDatabaseStatus, 30000);
+                } else {
+                    console.log('User is not authenticated, showing welcome section');
+                    showWelcomeSection();
+                }
+            }, 500);
         });
 
         // Load dashboard data
@@ -245,11 +245,72 @@
             try {
                 const token = localStorage.getItem('authToken');
                 if (!token) {
-                    console.log('No auth token found, redirecting to login');
-                    window.location.href = '/login';
+                    console.log('No auth token found, showing welcome section');
+                    showWelcomeSection();
                     return;
                 }
 
+                // Load comprehensive dashboard data
+                const dashboardResponse = await fetch('/api/home/dashboard-data', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (dashboardResponse.ok) {
+                    const dashboard = await dashboardResponse.json();
+                    console.log('Dashboard data:', dashboard);
+                    
+                    // Update statistics
+                    if (dashboard.stats) {
+                        document.getElementById('totalFiles').textContent = dashboard.stats.totalFiles || 0;
+                        document.getElementById('totalRecords').textContent = dashboard.stats.totalRecords || 0;
+                        document.getElementById('totalTables').textContent = dashboard.stats.totalTables || 0;
+                    }
+                    
+                    // Update activities
+                    if (dashboard.activities && Array.isArray(dashboard.activities)) {
+                        displayRecentActivities(dashboard.activities);
+                    } else {
+                        displayRecentActivities([]);
+                    }
+                } else if (dashboardResponse.status === 401 || dashboardResponse.status === 403) {
+                    console.log('Unauthorized access, but keeping user logged in');
+                    // Don't remove token, just show empty dashboard
+                    showEmptyDashboard();
+                    return;
+                } else {
+                    console.error('Failed to load dashboard data:', dashboardResponse.status);
+                    // Fallback to individual endpoints
+                    await loadFallbackData(token);
+                }
+
+                // Load user profile for last login
+                const profileResponse = await fetch('/api/account/profile', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (profileResponse.ok) {
+                    const profile = await profileResponse.json();
+                    document.getElementById('lastLogin').textContent = formatDate(profile.user.lastLogin);
+                } else if (profileResponse.status === 401 || profileResponse.status === 403) {
+                    console.log('Profile unauthorized, but keeping user logged in');
+                    // Don't remove token, just show empty dashboard
+                    showEmptyDashboard();
+                    return;
+                }
+            } catch (error) {
+                console.error('Error loading dashboard data:', error);
+                // If there's a network error, show empty dashboard instead of logging out
+                showEmptyDashboard();
+            }
+        }
+
+        // Fallback function to load data from individual endpoints
+        async function loadFallbackData(token) {
+            try {
                 // Load stats
                 const statsResponse = await fetch('/api/home/stats', {
                     headers: {
@@ -262,11 +323,11 @@
                     document.getElementById('totalFiles').textContent = stats.totalFiles || 0;
                     document.getElementById('totalRecords').textContent = stats.totalRecords || 0;
                     document.getElementById('totalTables').textContent = stats.totalTables || 0;
-                } else if (statsResponse.status === 401 || statsResponse.status === 403) {
-                    console.log('Unauthorized access, redirecting to login');
-                    localStorage.removeItem('authToken');
-                    window.location.href = '/login';
-                    return;
+                } else {
+                    console.log('Stats endpoint failed, using default values');
+                    document.getElementById('totalFiles').textContent = '0';
+                    document.getElementById('totalRecords').textContent = '0';
+                    document.getElementById('totalTables').textContent = '0';
                 }
 
                 // Load recent activities
@@ -278,9 +339,6 @@
                 
                 if (activitiesResponse.ok) {
                     const response = await activitiesResponse.json();
-                    console.log('Activities response:', response); // Debug log
-                    
-                    // Handle both array and object responses
                     if (Array.isArray(response)) {
                         displayRecentActivities(response);
                     } else if (response && response.activities && Array.isArray(response.activities)) {
@@ -288,37 +346,17 @@
                     } else {
                         displayRecentActivities([]);
                     }
-                } else if (activitiesResponse.status === 401 || activitiesResponse.status === 403) {
-                    console.log('Unauthorized access, redirecting to login');
-                    localStorage.removeItem('authToken');
-                    window.location.href = '/login';
-                    return;
                 } else {
-                    console.error('Failed to load activities:', activitiesResponse.status);
+                    console.log('Activities endpoint failed, showing empty activities');
                     displayRecentActivities([]);
                 }
-
-                // Load user profile for last login
-                const profileResponse = await fetch('/api/account/profile', {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
-                
-                if (profileResponse.ok) {
-                    const profile = await profileResponse.json();
-                    document.getElementById('lastLogin').textContent = formatDate(profile.createdAt);
-                } else if (profileResponse.status === 401 || profileResponse.status === 403) {
-                    console.log('Unauthorized access, redirecting to login');
-                    localStorage.removeItem('authToken');
-                    window.location.href = '/login';
-                    return;
-                }
             } catch (error) {
-                console.error('Error loading dashboard data:', error);
-                // If there's a network error, it might be due to authentication
-                localStorage.removeItem('authToken');
-                window.location.href = '/login';
+                console.error('Error loading fallback data:', error);
+                // Don't log out user, just show empty data
+                document.getElementById('totalFiles').textContent = '0';
+                document.getElementById('totalRecords').textContent = '0';
+                document.getElementById('totalTables').textContent = '0';
+                displayRecentActivities([]);
             }
         }
 
@@ -445,6 +483,44 @@
             }
         }
 
+        // Show welcome section for unauthenticated users
+        function showWelcomeSection() {
+            const welcomeSection = document.querySelector('.welcome-section');
+            const dashboardSection = document.querySelector('.dashboard-section');
+            
+            if (welcomeSection) {
+                welcomeSection.style.display = 'block';
+            }
+            if (dashboardSection) {
+                dashboardSection.style.display = 'none';
+            }
+        }
+
+        // Show empty dashboard for authenticated users when data can't be loaded
+        function showEmptyDashboard() {
+            const welcomeSection = document.querySelector('.welcome-section');
+            const dashboardSection = document.querySelector('.dashboard-section');
+            
+            if (welcomeSection) {
+                welcomeSection.style.display = 'none';
+            }
+            if (dashboardSection) {
+                dashboardSection.style.display = 'block';
+            }
+            
+            // Set default values
+            document.getElementById('totalFiles').textContent = '0';
+            document.getElementById('totalRecords').textContent = '0';
+            document.getElementById('totalTables').textContent = '0';
+            document.getElementById('lastLogin').textContent = '-';
+            
+            // Show empty activities
+            const activitiesList = document.getElementById('activitiesList');
+            if (activitiesList) {
+                activitiesList.innerHTML = '<p class="no-data">Henüz aktivite bulunmuyor.</p>';
+            }
+        }
+
         // Logout function
         function logout() {
             localStorage.removeItem('authToken');
@@ -453,7 +529,7 @@
             
             showAlert('Başarıyla çıkış yapıldı', 'success');
             setTimeout(() => {
-                window.location.href = '/';
+                window.location.href = '/login';
             }, 1000);
         }
     </script>

@@ -252,13 +252,16 @@
 
         // Initialize page
         document.addEventListener('DOMContentLoaded', async function() {
-            await checkAuthentication();
-            if (!isAuthenticated) {
-                window.location.href = '/login';
-                return;
-            }
-            loadOverviewData();
-            loadTablesList();
+            // Wait for authentication check to complete
+            setTimeout(() => {
+                if (isAuthenticated) {
+                    loadOverviewData();
+                    loadTablesList();
+                } else {
+                    // Show login required message instead of redirecting
+                    showLoginRequiredMessage();
+                }
+            }, 500);
         });
 
         // Load overview data
@@ -280,6 +283,23 @@
             } catch (error) {
                 console.error('Error loading overview data:', error);
             }
+        }
+
+        // Show login required message
+        function showLoginRequiredMessage() {
+            const mainContent = document.querySelector('.main-content .container');
+            mainContent.innerHTML = `
+                <div class="login-required-message">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Giriş Gerekli:</strong> Bu sayfayı görüntülemek için lütfen önce giriş yapın.
+                        <br><br>
+                        <a href="/login" class="btn btn-primary">
+                            <i class="fas fa-sign-in-alt"></i> Giriş Yap
+                        </a>
+                    </div>
+                </div>
+            `;
         }
 
         // Load tables list

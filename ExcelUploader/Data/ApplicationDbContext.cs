@@ -11,13 +11,8 @@ namespace ExcelUploader.Data
         {
         }
 
-        public DbSet<ExcelData> ExcelData { get; set; }
         public DbSet<DynamicTable> DynamicTables { get; set; }
-        public DbSet<TableColumn> TableColumns { get; set; }
-        public DbSet<TableData> TableData { get; set; }
-        public DbSet<UserLoginLog> UserLoginLogs { get; set; }
         public DbSet<LoginLog> LoginLogs { get; set; }
-        public DbSet<DatabaseConnection> DatabaseConnections { get; set; }
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {
@@ -30,150 +25,32 @@ namespace ExcelUploader.Data
         {
             base.OnModelCreating(builder);
 
-            // Configure ExcelData table
-            builder.Entity<ExcelData>(entity =>
+            // Configure DynamicTable
+            builder.Entity<DynamicTable>(entity =>
             {
                 entity.HasKey(e => e.Id);
                 entity.Property(e => e.Id).ValueGeneratedOnAdd();
-                
-                // Configure string properties to handle large text
-                entity.Property(e => e.Aciklama).HasMaxLength(2000);
-                entity.Property(e => e.BasvuruAciklama).HasMaxLength(2000);
-                entity.Property(e => e.UniversitedeToplamCalismaSuresi).HasMaxLength(500);
-                
-                // Configure decimal properties
-                entity.Property(e => e.Odenecek).HasColumnType("decimal(18,2)");
-                entity.Property(e => e.Odendiginde).HasColumnType("decimal(18,2)");
-                entity.Property(e => e.OdemeOrani).HasColumnType("decimal(5,2)");
-                entity.Property(e => e.AkademikOrtalama).HasColumnType("decimal(5,2)");
-                entity.Property(e => e.HibeOdemeOrani).HasColumnType("decimal(5,2)");
-                entity.Property(e => e.HibeOdeneceklerToplami).HasColumnType("decimal(18,2)");
-                entity.Property(e => e.HibeOdenenlerToplami).HasColumnType("decimal(18,2)");
-                entity.Property(e => e.SinavPuani).HasColumnType("decimal(5,2)");
-                
-                // Configure date properties
-                entity.Property(e => e.OdemeTarihi).HasColumnType("date");
-                entity.Property(e => e.DogumTarihi).HasColumnType("date");
-                entity.Property(e => e.BasvuruTarihi).HasColumnType("date");
-                entity.Property(e => e.HareketlilikBaslangicTarihi).HasColumnType("date");
-                entity.Property(e => e.HareketlilikBitisTarihi).HasColumnType("date");
-                entity.Property(e => e.SinavTarihi).HasColumnType("date");
-                
-                // Configure indexes for better performance
-                entity.HasIndex(e => e.FileName);
+                entity.Property(e => e.TableName).HasMaxLength(100).IsRequired();
+                entity.Property(e => e.FileName).HasMaxLength(255).IsRequired();
+                entity.Property(e => e.Description).HasMaxLength(500);
+                entity.HasIndex(e => e.TableName).IsUnique();
                 entity.HasIndex(e => e.UploadDate);
-                entity.HasIndex(e => e.IsProcessed);
-                entity.HasIndex(e => e.BasvuruYili);
-                entity.HasIndex(e => e.HareketlilikTipi);
-                entity.HasIndex(e => e.OdemeTipi);
-                entity.HasIndex(e => e.Ad);
-                entity.HasIndex(e => e.Soyad);
-                entity.HasIndex(e => e.TCKimlikNo);
-                                    entity.HasIndex(e => e.OgrenciNo);
-                });
+            });
 
-                // Configure DynamicTable
-                builder.Entity<DynamicTable>(entity =>
-                {
-                    entity.HasKey(e => e.Id);
-                    entity.Property(e => e.Id).ValueGeneratedOnAdd();
-                    entity.Property(e => e.TableName).HasMaxLength(128).IsRequired();
-                    entity.Property(e => e.FileName).HasMaxLength(255).IsRequired();
-                    entity.Property(e => e.Description).HasMaxLength(1000);
-                    entity.HasIndex(e => e.TableName).IsUnique();
-                    entity.HasIndex(e => e.FileName);
-                    entity.HasIndex(e => e.UploadDate);
-                });
+            // Configure LoginLog
+            builder.Entity<LoginLog>(entity =>
+            {
+                entity.HasKey(e => e.Id);
+                entity.Property(e => e.Id).ValueGeneratedOnAdd();
+                entity.Property(e => e.UserId).HasMaxLength(450).IsRequired();
+                entity.Property(e => e.Message).HasMaxLength(500);
+                entity.Property(e => e.IpAddress).HasMaxLength(45);
+                entity.HasIndex(e => e.UserId);
+                entity.HasIndex(e => e.LoginTime);
+            });
 
-                // Configure TableColumn
-                builder.Entity<TableColumn>(entity =>
-                {
-                    entity.HasKey(e => e.Id);
-                    entity.Property(e => e.Id).ValueGeneratedOnAdd();
-                    entity.Property(e => e.ColumnName).HasMaxLength(128).IsRequired();
-                    entity.Property(e => e.DisplayName).HasMaxLength(255).IsRequired();
-                    entity.Property(e => e.DataType).HasMaxLength(50).IsRequired();
-                    entity.HasIndex(e => new { e.DynamicTableId, e.ColumnOrder });
-                    entity.HasOne(e => e.DynamicTable)
-                          .WithMany(e => e.Columns)
-                          .HasForeignKey(e => e.DynamicTableId)
-                          .OnDelete(DeleteBehavior.Cascade);
-                });
-
-                // Configure TableData
-                builder.Entity<TableData>(entity =>
-                {
-                    entity.HasKey(e => e.Id);
-                    entity.Property(e => e.Id).ValueGeneratedOnAdd();
-                    entity.Property(e => e.Data).HasMaxLength(4000);
-                    entity.HasIndex(e => new { e.DynamicTableId, e.RowNumber });
-                    entity.HasOne(e => e.DynamicTable)
-                          .WithMany(e => e.Data)
-                          .HasForeignKey(e => e.DynamicTableId)
-                          .OnDelete(DeleteBehavior.Cascade);
-                    entity.HasOne(e => e.Column)
-                          .WithMany()
-                          .HasForeignKey(e => e.ColumnId)
-                          .OnDelete(DeleteBehavior.NoAction);
-                });
-
-                // Configure UserLoginLog
-                builder.Entity<UserLoginLog>(entity =>
-                {
-                    entity.HasKey(e => e.Id);
-                    entity.Property(e => e.Id).ValueGeneratedOnAdd();
-                    entity.Property(e => e.Timestamp).HasColumnType("datetime2");
-                    entity.HasIndex(e => e.UserId);
-                    entity.HasIndex(e => e.Timestamp);
-                    entity.HasIndex(e => e.Action);
-                    entity.HasIndex(e => e.IsSuccessful);
-                    entity.HasOne(e => e.User)
-                          .WithMany()
-                          .HasForeignKey(e => e.UserId)
-                          .OnDelete(DeleteBehavior.Cascade);
-                });
-
-                // Configure DatabaseConnection
-                builder.Entity<DatabaseConnection>(entity =>
-                {
-                    entity.HasKey(e => e.Id);
-                    entity.Property(e => e.Id).ValueGeneratedOnAdd();
-                    entity.Property(e => e.Name).HasMaxLength(100).IsRequired();
-                    entity.Property(e => e.ServerName).HasMaxLength(255).IsRequired();
-                    entity.Property(e => e.DatabaseName).HasMaxLength(128).IsRequired();
-                    entity.Property(e => e.Username).HasMaxLength(100).IsRequired();
-                    entity.Property(e => e.Password).HasMaxLength(255).IsRequired();
-                    entity.Property(e => e.Description).HasMaxLength(1000);
-                    entity.HasIndex(e => e.Name).IsUnique();
-                    entity.HasIndex(e => e.IsActive);
-                });
-
-                // Configure LoginLog
-                builder.Entity<LoginLog>(entity =>
-                {
-                    entity.HasKey(e => e.Id);
-                    entity.Property(e => e.Id).ValueGeneratedOnAdd();
-                    entity.Property(e => e.UserId).HasMaxLength(450).IsRequired();
-                    entity.Property(e => e.UserName).HasMaxLength(256).IsRequired();
-                    entity.Property(e => e.Email).HasMaxLength(256).IsRequired();
-                    entity.Property(e => e.IpAddress).HasMaxLength(45);
-                    entity.Property(e => e.UserAgent).HasMaxLength(500);
-                    entity.Property(e => e.FailureReason).HasMaxLength(500);
-                    entity.Property(e => e.SessionId).HasMaxLength(100);
-                    entity.Property(e => e.LoginTime).HasColumnType("datetime2");
-                    entity.Property(e => e.LogoutTime).HasColumnType("datetime2");
-                    entity.HasIndex(e => e.UserId);
-                    entity.HasIndex(e => e.LoginTime);
-                    entity.HasIndex(e => e.IsSuccess);
-                    entity.HasIndex(e => e.SessionId);
-                    entity.HasOne(e => e.User)
-                          .WithMany()
-                          .HasForeignKey(e => e.UserId)
-                          .OnDelete(DeleteBehavior.Cascade);
-                });
-
-                // Seed default admin user
-                SeedDefaultUser(builder);
+            // Seed default admin user
+            SeedDefaultUser(builder);
         }
 
         private void SeedDefaultUser(ModelBuilder builder)
@@ -194,7 +71,7 @@ namespace ExcelUploader.Data
                 IsActive = true
             };
 
-            adminUser.PasswordHash = hasher.HashPassword(adminUser, "Admin123!");
+            adminUser.PasswordHash = hasher.HashPassword(adminUser, "admin");
 
             builder.Entity<ApplicationUser>().HasData(adminUser);
         }

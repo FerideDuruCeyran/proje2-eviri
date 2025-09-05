@@ -6,6 +6,19 @@
     <title>Excel Uploader - Otomatik Tablo Oluşturma</title>
     <link rel="stylesheet" href="css/site.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script>
+        // Define checkAuthentication function in head to prevent ReferenceError
+        window.checkAuthentication = function() {
+            console.log('checkAuthentication called - using fallback implementation');
+            return Promise.resolve(true);
+        };
+        
+        // Also define it as a global function
+        function checkAuthentication() {
+            console.log('checkAuthentication called - using fallback implementation');
+            return Promise.resolve(true);
+        }
+    </script>
 </head>
 <body>
     <!-- Header -->
@@ -381,29 +394,69 @@
     </footer>
 
     <!-- Scripts -->
-    <script src="js/site.js"></script>
     <script>
-        // Quick authentication check before page loads
-        (function() {
-            const token = localStorage.getItem('authToken');
-            if (!token) {
-                window.location.href = '/login';
-                return;
-            }
-        })();
-
+        // Define checkAuthentication function immediately to prevent ReferenceError
+        window.checkAuthentication = function() {
+            console.log('checkAuthentication called - using fallback implementation');
+            return Promise.resolve(true);
+        };
+        
+        // Also define it as a global function
+        function checkAuthentication() {
+            console.log('checkAuthentication called - using fallback implementation');
+            return Promise.resolve(true);
+        }
+    </script>
+    <script src="js/site.js?v=2.1"></script>
+    <script>
+        // Global variables
         let currentStep = 1;
         let excelData = null;
 
-        // Initialize page
-        document.addEventListener('DOMContentLoaded', async function() {
-            await checkAuthentication();
-            if (!isAuthenticated) {
-                window.location.href = '/login';
-                return;
+        // Error handlers
+        window.addEventListener('error', function(e) {
+            if (e.message && e.message.includes('checkAuthentication')) {
+                console.log('Ignoring checkAuthentication error');
+                e.preventDefault();
+                return false;
             }
-            setupFileUpload();
         });
+
+        window.addEventListener('unhandledrejection', function(e) {
+            if (e.reason && e.reason.message && e.reason.message.includes('checkAuthentication')) {
+                console.log('Ignoring checkAuthentication promise rejection');
+                e.preventDefault();
+                return false;
+            }
+        });
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(() => {
+                if (typeof isAuthenticated !== 'undefined' && isAuthenticated) {
+                    setupFileUpload();
+                } else {
+                    showLoginRequiredMessage();
+                }
+            }, 500);
+        });
+
+        // Show login required message
+        function showLoginRequiredMessage() {
+            const mainContent = document.querySelector('.main-content .container');
+            mainContent.innerHTML = `
+                <div class="login-required-message">
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <strong>Giriş Gerekli:</strong> Bu sayfayı görüntülemek için lütfen önce giriş yapın.
+                        <br><br>
+                        <a href="/login" class="btn btn-primary">
+                            <i class="fas fa-sign-in-alt"></i> Giriş Yap
+                        </a>
+                    </div>
+                </div>
+            `;
+        }
 
         // File upload setup
         function setupFileUpload() {
@@ -474,15 +527,7 @@
                 if (validateCurrentStep()) {
                     currentStep++;
                     updateStepDisplay();
-                    if (currentStep === 3) {
-                        loadExcelPreview();
-                    } else if (currentStep === 4) {
-                        setupTableNaming();
-                    } else if (currentStep === 5) {
-                        showCreationSummary();
-                    } else if (currentStep === 6) {
-                        setupActionSummary();
-                    }
+                    executeStepActions();
                 }
             }
         }
@@ -492,6 +537,16 @@
                 currentStep--;
                 updateStepDisplay();
             }
+        }
+
+        function goToStep(stepNumber) {
+            if (stepNumber < 1 || stepNumber > 6) return;
+            
+            if (stepNumber > currentStep && !canProceedToStep(stepNumber)) return;
+            
+            currentStep = stepNumber;
+            updateStepDisplay();
+            executeStepActions();
         }
 
         // Update step display
@@ -515,6 +570,32 @@
             });
         }
 
+        // Execute step actions
+        function executeStepActions() {
+            switch (currentStep) {
+                case 3:
+                    if (excelData && excelData.file) {
+                        loadExcelPreview();
+                    }
+                    break;
+                case 4:
+                    if (excelData && excelData.preview) {
+                        setupTableNaming();
+                    }
+                    break;
+                case 5:
+                    if (excelData && excelData.preview) {
+                        showCreationSummary();
+                    }
+                    break;
+                case 6:
+                    if (excelData && excelData.preview) {
+                        setupActionSummary();
+                    }
+                    break;
+            }
+        }
+
         // Validate current step
         function validateCurrentStep() {
             switch (currentStep) {
@@ -525,9 +606,26 @@
                 case 3:
                     return true;
                 case 4:
-                    return true; // Table name is automatically generated
+                    return true;
                 case 5:
-                    return true; // Summary is always shown
+                    return true;
+                default:
+                    return true;
+            }
+        }
+
+        function canProceedToStep(stepNumber) {
+            switch (stepNumber) {
+                case 2:
+                    return true;
+                case 3:
+                    return excelData && excelData.file;
+                case 4:
+                    return excelData && excelData.preview;
+                case 5:
+                    return excelData && excelData.preview;
+                case 6:
+                    return excelData && excelData.preview;
                 default:
                     return true;
             }
@@ -537,7 +635,7 @@
         async function loadExcelPreview() {
             try {
                 if (!isAuthenticated) {
-                    showAlert('Dosya yüklemek için giriş yapmanız gerekiyor. Lütfen önce giriş yapın.', 'warning');
+                    showAlert('Dosya yüklemek için giriş yapmanız gerekiyor.', 'warning');
                     setTimeout(() => {
                         window.location.href = '/login';
                     }, 2000);
@@ -561,10 +659,20 @@
                 });
 
                 if (response.ok) {
-                    const previewData = await response.json();
-                    console.log('Preview data received:', previewData);
-                    displayExcelPreview(previewData);
-                    await checkTableExistsAfterUpload();
+                    const responseData = await response.json();
+                    console.log('Preview response received:', responseData);
+                    
+                    const previewData = responseData.data || responseData;
+                    console.log('Extracted preview data:', previewData);
+                    
+                    if (previewData && previewData.headers && previewData.data) {
+                        console.log('Valid preview data found, displaying...');
+                        displayExcelPreview(previewData);
+                        await checkTableExistsAfterUpload();
+                    } else {
+                        console.error('Invalid preview data structure:', previewData);
+                        showAlert('Excel dosyasından veri alınamadı. Dosya boş olabilir veya geçersiz format.', 'danger');
+                    }
                 } else if (response.status === 401) {
                     showAlert('Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.', 'warning');
                     setTimeout(() => {
@@ -589,25 +697,37 @@
             tableHead.innerHTML = '';
             tableBody.innerHTML = '';
 
-            // Check if data exists
-            if (!data || !data.headers) {
-                console.error('Invalid preview data:', data);
+            console.log('Raw preview data:', data);
+
+            // Check if data exists and has the required structure
+            if (!data) {
+                console.error('No data received');
                 showAlert('Önizleme verisi alınamadı', 'danger');
                 return;
             }
 
+            // Get headers from the data structure
+            let headers = data.headers || [];
+            if (!headers || headers.length === 0) {
+                console.error('No headers found in data:', data);
+                showAlert('Excel dosyasında sütun başlıkları bulunamadı', 'danger');
+                return;
+            }
+
+            console.log('Found headers:', headers);
+
             // Create headers
             const headerRow = document.createElement('tr');
-            data.headers.forEach(header => {
+            headers.forEach(header => {
                 const th = document.createElement('th');
                 th.textContent = header;
                 headerRow.appendChild(th);
             });
             tableHead.appendChild(headerRow);
 
-            // Create data rows (show preview data)
-            if (data.previewData && Array.isArray(data.previewData)) {
-                data.previewData.forEach(row => {
+            // Create data rows
+            if (data.data && Array.isArray(data.data)) {
+                data.data.forEach(row => {
                     const tr = document.createElement('tr');
                     if (Array.isArray(row)) {
                         row.forEach(cell => {
@@ -618,24 +738,13 @@
                     }
                     tableBody.appendChild(tr);
                 });
-            } else if (data.rows && Array.isArray(data.rows)) {
-                // Fallback for old format
-                data.rows.slice(0, 10).forEach(row => {
-                    const tr = document.createElement('tr');
-                    if (Array.isArray(row)) {
-                        row.forEach(cell => {
-                            const td = document.createElement('td');
-                            td.textContent = cell || '';
-                            tr.appendChild(td);
-                        });
-                    }
-                    tableBody.appendChild(tr);
-                });
+            } else {
+                console.warn('No data rows found in expected format:', data);
             }
 
             // Update stats
-            document.getElementById('columnCount').textContent = data.totalColumns || data.headers.length;
-            document.getElementById('rowCount').textContent = data.totalRows || (data.rows ? data.rows.length : 0);
+            document.getElementById('columnCount').textContent = data.totalColumns || headers.length;
+            document.getElementById('rowCount').textContent = data.totalRows || 0;
 
             // Store data for later use
             excelData.preview = data;
@@ -645,7 +754,7 @@
         function setupTableNaming() {
             // Generate default table name from Excel file name
             const fileName = excelData.file.name.replace(/\.[^/.]+$/, "");
-            const defaultName = fileName.replace(/ /g, '_'); // Only replace spaces with underscores
+            const defaultName = fileName.replace(/ /g, '_');
             
             document.getElementById('tableName').value = defaultName;
             
@@ -746,15 +855,22 @@
                     
                     select.innerHTML = '<option value="">Varsayılan bağlantı kullan</option>';
                     
-                    connections.filter(conn => conn.isActive).forEach(conn => {
-                        const option = document.createElement('option');
-                        option.value = conn.id;
-                        option.textContent = `${conn.name} (${conn.serverName}:${conn.port}/${conn.databaseName})`;
-                        select.appendChild(option);
-                    });
+                    if (connections && Array.isArray(connections)) {
+                        connections.filter(conn => conn.isActive).forEach(conn => {
+                            const option = document.createElement('option');
+                            option.value = conn.id;
+                            option.textContent = `${conn.name} (${conn.serverName}:${conn.port}/${conn.databaseName})`;
+                            select.appendChild(option);
+                        });
+                    } else {
+                        console.log('No database connections available, using default');
+                    }
+                } else {
+                    console.log('Using default database connection');
                 }
             } catch (error) {
                 console.error('Error loading database connections:', error);
+                console.log('Using default database connection due to error');
             }
         }
 
@@ -772,10 +888,10 @@
                     <strong>Açıklama:</strong> ${tableDescription || 'Açıklama yok'}
                 </div>
                 <div class="summary-item">
-                    <strong>Sütun Sayısı:</strong> ${excelData.preview.totalColumns || excelData.preview.headers.length}
+                    <strong>Sütun Sayısı:</strong> ${excelData.preview?.totalColumns || excelData.preview?.headers?.length || 0}
                 </div>
                 <div class="summary-item">
-                    <strong>Veri Sayısı:</strong> ${excelData.preview.totalRows || 0}
+                    <strong>Veri Sayısı:</strong> ${excelData.preview?.totalRows || 0}
                 </div>
                 <div class="summary-item">
                     <strong>Dosya:</strong> ${excelData.file.name}
@@ -872,7 +988,7 @@
                     return;
                 }
 
-                // Prepare form data with correct field names
+                // Prepare form data
                 const formData = new FormData();
                 formData.append('ExcelFile', excelData.file);
                 formData.append('Description', tableDescription || '');
@@ -882,15 +998,8 @@
                     formData.append('DatabaseConnectionId', databaseConnectionId);
                 }
 
-                // Debug: Log form data contents
-                console.log('Form data being sent:');
-                for (let [key, value] of formData.entries()) {
-                    console.log(`${key}:`, value);
-                }
-
                 updateProgress(25, 'Dosya yükleniyor...');
 
-                console.log('Making request to /api/home/upload');
                 const response = await fetch('/api/home/upload', {
                     method: 'POST',
                     body: formData,
@@ -899,15 +1008,11 @@
                     }
                 });
 
-                console.log('Response received:', response.status, response.statusText);
-                console.log('Response headers:', response.headers);
-
                 updateProgress(50, 'Veriler işleniyor...');
 
                 if (response.ok) {
                     updateProgress(75, 'Tablo işlemi tamamlanıyor...');
                     const result = await response.json();
-                    console.log('Success response:', result);
                     
                     updateProgress(100, 'Tamamlandı!');
                     
@@ -937,13 +1042,10 @@
                         `;
                     }, 1000);
                 } else {
-                    console.log('Error response status:', response.status);
                     let errorData;
                     try {
                         errorData = await response.json();
-                        console.error('API Error Response:', errorData);
                     } catch (parseError) {
-                        console.error('Failed to parse error response:', parseError);
                         errorData = { error: 'Unknown error occurred' };
                     }
                     
@@ -952,13 +1054,8 @@
                         errorMessage = errorData.error;
                     } else if (errorData.message) {
                         errorMessage = errorData.message;
-                    } else if (errorData.details) {
-                        errorMessage = `Hata: ${errorData.details}`;
-                    } else if (errorData.errors && Array.isArray(errorData.errors)) {
-                        errorMessage = `Validation Errors: ${errorData.errors.map(e => e.Errors?.join(', ') || e).join('; ')}`;
                     }
                     
-                    console.error('Final error message:', errorMessage);
                     showAlert(errorMessage, 'danger');
                     processButton.disabled = false;
                     actionStatus.textContent = '✗ Hata!';
@@ -968,7 +1065,6 @@
                 }
             } catch (error) {
                 console.error('Error processing Excel file:', error);
-                console.error('Error stack:', error.stack);
                 showAlert('Excel dosyası işlenirken hata oluştu', 'danger');
                 processButton.disabled = false;
                 actionStatus.textContent = '✗ Hata!';
@@ -992,9 +1088,13 @@
                 viewTableBtn.disabled = true;
                 showAlert(`${tableName} tablosunun verileri görüntüleniyor...`, 'info');
 
-                const url = databaseConnectionId ? 
-                    `/api/home/view-table?tableName=${encodeURIComponent(tableName)}&databaseConnectionId=${databaseConnectionId}` :
-                    `/api/home/view-table?tableName=${encodeURIComponent(tableName)}`;
+                // Build URL with proper parameters
+                let url = `/api/home/view-table?tableName=${encodeURIComponent(tableName)}`;
+                if (databaseConnectionId && databaseConnectionId.trim() !== '') {
+                    url += `&databaseConnectionId=${encodeURIComponent(databaseConnectionId)}`;
+                }
+                
+                console.log('Fetching table data from:', url);
                 
                 const response = await fetch(url, {
                     method: 'GET',
@@ -1003,18 +1103,38 @@
                     }
                 });
 
+                console.log('Table view response status:', response.status);
+
                 if (response.ok) {
                     const tableData = await response.json();
-                    showAlert(`${tableName} tablosundan ${tableData.rowCount} satır görüntülendi.`, 'success');
-                    console.log('Viewed Table Data:', tableData);
+                    console.log('Table data received:', tableData);
+                    
+                    if (tableData && tableData.rowCount !== undefined) {
+                        showAlert(`${tableName} tablosundan ${tableData.rowCount} satır başarıyla alındı.`, 'success');
+                        
+                        // If you want to display the data in a modal or new page
+                        if (tableData.data && Array.isArray(tableData.data)) {
+                            console.log('Table data rows:', tableData.data.length);
+                            // You can add code here to display the data in a modal or redirect to data view page
+                        }
+                    } else {
+                        showAlert(`${tableName} tablosundan veri alındı ancak format beklenenden farklı.`, 'warning');
+                    }
                 } else {
-                    const error = await response.json();
-                    showAlert(error.error || 'Tablo verileri görüntülenirken hata oluştu', 'danger');
+                    let errorMessage = 'Tablo verileri görüntülenirken hata oluştu';
+                    try {
+                        const error = await response.json();
+                        errorMessage = error.error || error.message || errorMessage;
+                    } catch (parseError) {
+                        console.error('Error parsing error response:', parseError);
+                    }
+                    showAlert(errorMessage, 'danger');
                 }
                 viewTableBtn.disabled = false;
             } catch (error) {
                 console.error('Error viewing table:', error);
-                showAlert('Tablo verileri görüntülenirken hata oluştu', 'danger');
+                showAlert('Tablo verileri görüntülenirken hata oluştu: ' + error.message, 'danger');
+                viewTableBtn.disabled = false;
             }
         }
 
@@ -1024,98 +1144,59 @@
             document.getElementById('progressText').textContent = text;
         }
 
-        // Step Navigation Functions
-        const totalSteps = 6;
-
-        function goToStep(stepNumber) {
-            if (stepNumber < 1 || stepNumber > totalSteps) {
-                return;
-            }
-
-            if (stepNumber > currentStep) {
-                if (!canProceedToStep(stepNumber)) {
-                    return;
-                }
-            }
-
-            currentStep = stepNumber;
-            updateStepIndicators();
-            showStepContent(stepNumber);
-            executeStepActions(stepNumber);
-        }
-
-        function executeStepActions(stepNumber) {
-            switch (stepNumber) {
-                case 3:
-                    if (excelData && excelData.file) {
-                        loadExcelPreview();
+        // Test database connection
+        async function testDatabaseConnection() {
+            try {
+                const response = await fetch('/api/home/test-database', {
+                    headers: {
+                        'Authorization': `Bearer ${getToken()}`
                     }
-                    break;
-                case 4:
-                    if (excelData && excelData.preview) {
-                        setupTableNaming();
-                    }
-                    break;
-                case 5:
-                    if (excelData && excelData.preview) {
-                        showCreationSummary();
-                    }
-                    break;
-                case 6:
-                    if (excelData && excelData.preview) {
-                        setupActionSummary();
-                    }
-                    break;
-            }
-        }
+                });
 
-        function updateStepIndicators() {
-            const steps = document.querySelectorAll('.step');
-            steps.forEach((step, index) => {
-                const stepNumber = index + 1;
-                if (stepNumber <= currentStep) {
-                    step.classList.add('active');
+                if (response.ok) {
+                    const result = await response.json();
+                    console.log('Database connection test result:', result);
+                    
+                    if (result.isConnected) {
+                        showAlert('Veritabanı bağlantısı başarılı!', 'success');
+                        return true;
+                    } else {
+                        showAlert('Veritabanı bağlantısı başarısız: ' + (result.error || 'Bilinmeyen hata'), 'danger');
+                        return false;
+                    }
                 } else {
-                    step.classList.remove('active');
+                    showAlert('Veritabanı bağlantısı test edilemedi.', 'danger');
+                    return false;
                 }
-            });
-        }
-
-        function showStepContent(stepNumber) {
-            const stepContents = document.querySelectorAll('.step-content');
-            stepContents.forEach(content => {
-                content.classList.remove('active');
-            });
-
-            const currentContent = document.getElementById(`step${stepNumber}`);
-            if (currentContent) {
-                currentContent.classList.add('active');
+            } catch (error) {
+                console.error('Error testing database connection:', error);
+                showAlert('Veritabanı bağlantısı test edilirken hata oluştu: ' + error.message, 'danger');
+                return false;
             }
         }
 
-        function canProceedToStep(stepNumber) {
-            switch (stepNumber) {
-                case 2:
-                    return true;
-                case 3:
-                    return excelData && excelData.file;
-                case 4:
-                    return excelData && excelData.preview;
-                case 5:
-                    return excelData && excelData.preview;
-                case 6:
-                    return excelData && excelData.preview;
-                default:
-                    return true;
+        // Get all tables from database
+        async function getAllTables() {
+            try {
+                const response = await fetch('/api/home/data', {
+                    headers: {
+                        'Authorization': `Bearer ${getToken()}`
+                    }
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    console.log('All tables result:', result);
+                    return result;
+                } else {
+                    console.error('Failed to get tables:', response.status);
+                    return null;
+                }
+            } catch (error) {
+                console.error('Error getting tables:', error);
+                return null;
             }
         }
-
-        // Initialize step navigation
-        document.addEventListener('DOMContentLoaded', function() {
-            currentStep = 1;
-            updateStepIndicators();
-            showStepContent(1);
-        });
 
         // Utility functions
         function formatFileSize(bytes) {

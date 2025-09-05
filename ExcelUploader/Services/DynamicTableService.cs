@@ -2,8 +2,8 @@ using Microsoft.EntityFrameworkCore;
 using ExcelUploader.Data;
 using ExcelUploader.Models;
 using System.Data;
-using System.Data.SqlClient;
 using Microsoft.Data.SqlClient;
+using OfficeOpenXml;
 
 namespace ExcelUploader.Services
 {
@@ -18,148 +18,64 @@ namespace ExcelUploader.Services
             _logger = logger;
             _context = context;
             _connectionString = configuration.GetConnectionString("DefaultConnection");
+            ExcelPackage.LicenseContext = LicenseContext.NonCommercial;
         }
 
-        public async Task<ServiceResult> CreateTableFromExcelAsync(string tableName, List<string> headers, List<List<object>> rows, List<ColumnDataTypeAnalysis> columnDataTypes)
+        public async Task<ServiceResult> CreateTableFromExcelAsync(string tableName, IFormFile file, string description)
         {
             try
             {
-                _logger.LogInformation("Creating table {TableName} with {ColumnCount} columns and {RowCount} rows", 
-                    tableName, headers.Count, rows.Count);
+                // Read Excel file
+                var (headers, rows) = await ReadExcelFileAsync(file);
+                
+                if (headers == null || !headers.Any())
+                {
+                    return ServiceResult.Failure("Excel dosyasından veri okunamadı. Dosya boş olabilir veya sütun başlıkları bulunamadı.");
+                }
 
-                // Create table SQL
-                var createTableSql = GenerateCreateTableSql(tableName, headers, columnDataTypes);
-                _logger.LogInformation("Create table SQL: {Sql}", createTableSql);
+                if (rows == null || !rows.Any())
+                {
+                    return ServiceResult.Failure("Excel dosyasında veri satırı bulunamadı. Dosya boş olabilir.");
+                }
 
-                // Execute create table
-                using var connection = new SqlConnection(_connectionString);
-                await connection.OpenAsync();
+                // Create table in database
+                var createResult = await CreateTableAsync(tableName, headers);
+                if (!createResult.IsSuccess)
+                {
+                    return ServiceResult.Failure(createResult.ErrorMessage);
+                }
 
-                using var command = new SqlCommand(createTableSql, connection);
-                await command.ExecuteNonQueryAsync();
-
-                _logger.LogInformation("Table {TableName} created successfully", tableName);
-
-                // Insert data if rows exist
+                // Insert data
                 if (rows.Any())
                 {
-                    var insertResult = await InsertDataAsync(connection, tableName, headers, rows);
+                    var insertResult = await InsertDataAsync(tableName, headers, rows);
                     if (!insertResult.IsSuccess)
                     {
-                        return ServiceResult.Failure($"Veri eklenirken hata oluştu: {insertResult.ErrorMessage}");
+                        return ServiceResult.Failure(insertResult.ErrorMessage);
                     }
                 }
 
-                return ServiceResult.Success();
+                // Save table metadata
+                var dynamicTable = new DynamicTable
+                {
+                    TableName = tableName,
+                    FileName = file.FileName,
+                    Description = description,
+                    UploadDate = DateTime.UtcNow,
+                    RowCount = rows.Count,
+                    ColumnCount = headers.Count,
+                    IsProcessed = true
+                };
+
+                _context.DynamicTables.Add(dynamicTable);
+                await _context.SaveChangesAsync();
+
+                return TableCreationResult.Success(rows.Count, headers.Count);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error creating table {TableName}", tableName);
-                return ServiceResult.Failure($"Tablo oluşturulurken hata oluştu: {ex.Message}");
-            }
-        }
-
-        private string GenerateCreateTableSql(string tableName, List<string> headers, List<ColumnDataTypeAnalysis> columnDataTypes)
-        {
-            var columns = new List<string>();
-            
-            for (int i = 0; i < headers.Count; i++)
-            {
-                var header = headers[i];
-                var dataType = i < columnDataTypes.Count ? columnDataTypes[i].DetectedDataType : "nvarchar(255)";
-                
-                // Clean column name
-                var cleanColumnName = CleanColumnName(header);
-                
-                columns.Add($"[{cleanColumnName}] {dataType}");
-            }
-
-            var sql = $@"
-                IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[{tableName}]') AND type in (N'U'))
-                BEGIN
-                    CREATE TABLE [dbo].[{tableName}] (
-                        [Id] int IDENTITY(1,1) PRIMARY KEY,
-                        {string.Join(",\n                        ", columns)}
-                    )
-                END";
-
-            return sql;
-        }
-
-        private string CleanColumnName(string columnName)
-        {
-            // Remove special characters and ensure valid SQL identifier
-            var clean = System.Text.RegularExpressions.Regex.Replace(columnName, @"[^a-zA-Z0-9_]", "_");
-            
-            // Ensure it doesn't start with a number
-            if (char.IsDigit(clean[0]))
-            {
-                clean = "Col_" + clean;
-            }
-            
-            // Limit length
-            if (clean.Length > 128)
-            {
-                clean = clean.Substring(0, 128);
-            }
-            
-            return clean;
-        }
-
-        private async Task<ServiceResult> InsertDataAsync(SqlConnection connection, string tableName, List<string> headers, List<List<object>> rows)
-        {
-            try
-            {
-                if (!rows.Any()) return ServiceResult.Success();
-
-                // Prepare column names
-                var columnNames = headers.Select(h => $"[{CleanColumnName(h)}]").ToList();
-                var columnsSql = string.Join(", ", columnNames);
-                var parametersSql = string.Join(", ", columnNames.Select(c => "@" + c.Trim('[', ']')));
-
-                var insertSql = $"INSERT INTO [{tableName}] ({columnsSql}) VALUES ({parametersSql})";
-                
-                _logger.LogInformation("Inserting {RowCount} rows into {TableName}", rows.Count, tableName);
-
-                using var command = new SqlCommand(insertSql, connection);
-                
-                // Add parameters
-                foreach (var header in headers)
-                {
-                    var cleanName = CleanColumnName(header);
-                    command.Parameters.Add($"@{cleanName}", SqlDbType.NVarChar);
-                }
-
-                // Insert rows in batches
-                const int batchSize = 1000;
-                for (int i = 0; i < rows.Count; i += batchSize)
-                {
-                    var batch = rows.Skip(i).Take(batchSize);
-                    
-                    foreach (var row in batch)
-                    {
-                        // Set parameter values
-                        for (int j = 0; j < headers.Count; j++)
-                        {
-                            var cleanName = CleanColumnName(headers[j]);
-                            var value = j < row.Count ? row[j] : null;
-                            command.Parameters[$"@{cleanName}"].Value = value ?? DBNull.Value;
-                        }
-                        
-                        await command.ExecuteNonQueryAsync();
-                    }
-                    
-                    _logger.LogInformation("Inserted batch {BatchNumber} ({ProcessedRows} rows processed)", 
-                        (i / batchSize) + 1, Math.Min(i + batchSize, rows.Count));
-                }
-
-                _logger.LogInformation("Successfully inserted {RowCount} rows into {TableName}", rows.Count, tableName);
-                return ServiceResult.Success();
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error inserting data into table {TableName}", tableName);
-                return ServiceResult.Failure($"Veri eklenirken hata oluştu: {ex.Message}");
+                _logger.LogError(ex, "Error creating table from Excel: {TableName}", tableName);
+                return ServiceResult.Failure($"Tablo oluşturma hatası: {ex.Message}");
             }
         }
 
@@ -175,21 +91,12 @@ namespace ExcelUploader.Services
                 using var reader = await command.ExecuteReaderAsync();
 
                 var data = new List<Dictionary<string, object>>();
-                var columns = new List<string>();
-
-                // Get column names
-                for (int i = 0; i < reader.FieldCount; i++)
-                {
-                    columns.Add(reader.GetName(i));
-                }
-
-                // Read data
                 while (await reader.ReadAsync())
                 {
                     var row = new Dictionary<string, object>();
-                    for (int i = 0; i < columns.Count; i++)
+                    for (int i = 0; i < reader.FieldCount; i++)
                     {
-                        row[columns[i]] = reader.IsDBNull(i) ? null : reader.GetValue(i);
+                        row[reader.GetName(i)] = reader.IsDBNull(i) ? null : reader.GetValue(i);
                     }
                     data.Add(row);
                 }
@@ -198,8 +105,8 @@ namespace ExcelUploader.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting data from table {TableName}", tableName);
-                return ServiceResult<List<Dictionary<string, object>>>.Failure($"Tablo verisi alınırken hata oluştu: {ex.Message}");
+                _logger.LogError(ex, "Error getting table data: {TableName}", tableName);
+                return ServiceResult<List<Dictionary<string, object>>>.Failure($"Veri alma hatası: {ex.Message}");
             }
         }
 
@@ -214,12 +121,115 @@ namespace ExcelUploader.Services
                 using var command = new SqlCommand(sql, connection);
                 await command.ExecuteNonQueryAsync();
 
+                // Remove from metadata
+                var table = await _context.DynamicTables.FirstOrDefaultAsync(t => t.TableName == tableName);
+                if (table != null)
+                {
+                    _context.DynamicTables.Remove(table);
+                    await _context.SaveChangesAsync();
+                }
+
                 return ServiceResult.Success();
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error deleting table {TableName}", tableName);
-                return ServiceResult.Failure($"Tablo silinirken hata oluştu: {ex.Message}");
+                _logger.LogError(ex, "Error deleting table: {TableName}", tableName);
+                return ServiceResult.Failure($"Tablo silme hatası: {ex.Message}");
+            }
+        }
+
+        private Task<(List<string> headers, List<List<object>> rows)> ReadExcelFileAsync(IFormFile file)
+        {
+            using var stream = file.OpenReadStream();
+            using var package = new ExcelPackage(stream);
+            
+            if (package.Workbook.Worksheets.Count == 0)
+            {
+                throw new ArgumentException("Excel dosyası boş veya geçersiz. Hiçbir sayfa bulunamadı.");
+            }
+
+            var worksheet = package.Workbook.Worksheets[0];
+
+            if (worksheet.Dimension == null)
+            {
+                // Return empty data instead of throwing exception
+                return Task.FromResult((new List<string>(), new List<List<object>>()));
+            }
+
+            var headers = new List<string>();
+            var rows = new List<List<object>>();
+
+            // Read headers (first row)
+            for (int col = 1; col <= worksheet.Dimension.End.Column; col++)
+            {
+                var header = worksheet.Cells[1, col].Value?.ToString() ?? $"Column{col}";
+                headers.Add(header);
+            }
+
+            // Read data rows
+            for (int row = 2; row <= worksheet.Dimension.End.Row; row++)
+            {
+                var dataRow = new List<object>();
+                for (int col = 1; col <= worksheet.Dimension.End.Column; col++)
+                {
+                    var value = worksheet.Cells[row, col].Value;
+                    dataRow.Add(value ?? "");
+                }
+                rows.Add(dataRow);
+            }
+
+            return Task.FromResult((headers, rows));
+        }
+
+        private async Task<ServiceResult> CreateTableAsync(string tableName, List<string> headers)
+        {
+            try
+            {
+                using var connection = new SqlConnection(_connectionString);
+                await connection.OpenAsync();
+
+                var columns = string.Join(", ", headers.Select(h => $"[{h}] NVARCHAR(MAX)"));
+                var sql = $"CREATE TABLE [{tableName}] ({columns})";
+
+                using var command = new SqlCommand(sql, connection);
+                await command.ExecuteNonQueryAsync();
+
+                return ServiceResult.Success();
+            }
+            catch (Exception ex)
+            {
+                return ServiceResult.Failure($"Tablo oluşturma hatası: {ex.Message}");
+            }
+        }
+
+        private async Task<ServiceResult> InsertDataAsync(string tableName, List<string> headers, List<List<object>> rows)
+        {
+            try
+            {
+                using var connection = new SqlConnection(_connectionString);
+                await connection.OpenAsync();
+
+                var columns = string.Join(", ", headers.Select(h => $"[{h}]"));
+                var parameters = string.Join(", ", headers.Select(h => $"@{h}"));
+                var sql = $"INSERT INTO [{tableName}] ({columns}) VALUES ({parameters})";
+
+                using var command = new SqlCommand(sql, connection);
+                
+                foreach (var row in rows)
+                {
+                    command.Parameters.Clear();
+                    for (int i = 0; i < headers.Count; i++)
+                    {
+                        command.Parameters.AddWithValue($"@{headers[i]}", row[i] ?? DBNull.Value);
+                    }
+                    await command.ExecuteNonQueryAsync();
+                }
+
+                return ServiceResult.Success();
+            }
+            catch (Exception ex)
+            {
+                return ServiceResult.Failure($"Veri ekleme hatası: {ex.Message}");
             }
         }
     }
@@ -252,6 +262,27 @@ namespace ExcelUploader.Services
         public static new ServiceResult<T> Failure(string errorMessage)
         {
             return new ServiceResult<T> { IsSuccess = false, ErrorMessage = errorMessage };
+        }
+    }
+
+    public class TableCreationResult : ServiceResult
+    {
+        public int RowCount { get; set; }
+        public int ColumnCount { get; set; }
+
+        public static TableCreationResult Success(int rowCount, int columnCount)
+        {
+            return new TableCreationResult 
+            { 
+                IsSuccess = true, 
+                RowCount = rowCount, 
+                ColumnCount = columnCount 
+            };
+        }
+
+        public static new TableCreationResult Failure(string errorMessage)
+        {
+            return new TableCreationResult { IsSuccess = false, ErrorMessage = errorMessage };
         }
     }
 }
