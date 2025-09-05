@@ -162,6 +162,8 @@
 
                 if (response.ok) {
                     const tables = await response.json();
+                    // Store tables in sessionStorage for viewTable function
+                    sessionStorage.setItem('currentTables', JSON.stringify(tables));
                     displayTables(tables);
                 } else {
                     showMessage('Tablolar yüklenirken hata oluştu', 'error');
@@ -248,11 +250,25 @@
 
         // View table
         function viewTable(tableName) {
-            // Open view-table endpoint in a new tab
-            const token = localStorage.getItem('authToken');
-            if (token) {
-                const url = `/api/home/view-table?tableName=${encodeURIComponent(tableName)}`;
-                window.open(url, '_blank');
+            console.log('viewTable called with:', tableName);
+            
+            // Redirect to data page with the specific table selected
+            // We'll need to find the table ID first, then redirect
+            const tables = JSON.parse(sessionStorage.getItem('currentTables') || '[]');
+            console.log('Tables in sessionStorage:', tables);
+            
+            const table = tables.find(t => t.tableName === tableName);
+            console.log('Found table:', table);
+            
+            if (table) {
+                // Redirect to data page with tableId parameter
+                const redirectUrl = `/data.html?tableId=${table.id}`;
+                console.log('Redirecting to:', redirectUrl);
+                window.location.href = redirectUrl;
+            } else {
+                console.log('Table not found, redirecting to data page');
+                // Fallback: redirect to data page and let user select the table
+                window.location.href = '/data.html';
             }
         }
 

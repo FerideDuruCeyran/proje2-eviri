@@ -982,7 +982,6 @@
             try {
                 const viewTableBtn = document.getElementById('viewTableBtn');
                 const tableName = document.getElementById('tableName').value;
-                const databaseConnectionId = document.getElementById('databaseConnection').value;
 
                 if (!tableName) {
                     showAlert('Lütfen tablo adını girin.', 'warning');
@@ -992,29 +991,57 @@
                 viewTableBtn.disabled = true;
                 showAlert(`${tableName} tablosunun verileri görüntüleniyor...`, 'info');
 
-                const url = databaseConnectionId ? 
-                    `/api/home/view-table?tableName=${encodeURIComponent(tableName)}&databaseConnectionId=${databaseConnectionId}` :
-                    `/api/home/view-table?tableName=${encodeURIComponent(tableName)}`;
+                // Get the table ID from the created table
+                const tableId = window.createdTableId;
                 
-                const response = await fetch(url, {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': `Bearer ${getToken()}`
-                    }
-                });
-
-                if (response.ok) {
-                    const tableData = await response.json();
-                    showAlert(`${tableName} tablosundan ${tableData.rowCount} satır görüntülendi.`, 'success');
-                    console.log('Viewed Table Data:', tableData);
+                if (tableId) {
+                    // Redirect to data page with the table ID
+                    const redirectUrl = `/data.html?tableId=${tableId}`;
+                    console.log('Redirecting to:', redirectUrl);
+                    window.location.href = redirectUrl;
                 } else {
-                    const error = await response.json();
-                    showAlert(error.error || 'Tablo verileri görüntülenirken hata oluştu', 'danger');
+                    // Fallback: try to find the table by name
+                    try {
+                        const response = await fetch('/api/home/data', {
+                            headers: {
+                                'Authorization': `Bearer ${getToken()}`
+                            }
+                        });
+
+                        if (response.ok) {
+                            const tables = await response.json();
+                            const table = tables.find(t => t.tableName === tableName);
+                            
+                            if (table) {
+                                const redirectUrl = `/data.html?tableId=${table.id}`;
+                                console.log('Redirecting to:', redirectUrl);
+                                window.location.href = redirectUrl;
+                            } else {
+                                showAlert('Tablo bulunamadı. Veri sayfasına yönlendiriliyorsunuz...', 'warning');
+                                setTimeout(() => {
+                                    window.location.href = '/data.html';
+                                }, 2000);
+                            }
+                        } else {
+                            showAlert('Tablo bilgileri alınamadı. Veri sayfasına yönlendiriliyorsunuz...', 'warning');
+                            setTimeout(() => {
+                                window.location.href = '/data.html';
+                            }, 2000);
+                        }
+                    } catch (error) {
+                        console.error('Error finding table:', error);
+                        showAlert('Tablo bulunamadı. Veri sayfasına yönlendiriliyorsunuz...', 'warning');
+                        setTimeout(() => {
+                            window.location.href = '/data.html';
+                        }, 2000);
+                    }
                 }
+                
                 viewTableBtn.disabled = false;
             } catch (error) {
                 console.error('Error viewing table:', error);
                 showAlert('Tablo verileri görüntülenirken hata oluştu', 'danger');
+                viewTableBtn.disabled = false;
             }
         }
 

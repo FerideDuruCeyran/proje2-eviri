@@ -259,6 +259,25 @@
             }
             loadOverviewData();
             loadTablesList();
+            
+            // Check if we have a tableId parameter from URL
+            const urlParams = new URLSearchParams(window.location.search);
+            const tableId = urlParams.get('tableId');
+            console.log('URL params:', window.location.search);
+            console.log('TableId from URL:', tableId);
+            
+            if (tableId) {
+                console.log('TableId found, will select table after loading');
+                // Wait a bit for tables to load, then select the specific table
+                setTimeout(() => {
+                    console.log('Setting table select value to:', tableId);
+                    document.getElementById('tableSelect').value = tableId;
+                    console.log('Table select value is now:', document.getElementById('tableSelect').value);
+                    loadTableData();
+                }, 1000);
+            } else {
+                console.log('No tableId parameter found');
+            }
         });
 
         // Load overview data
@@ -285,15 +304,21 @@
         // Load tables list
         async function loadTablesList() {
             try {
+                console.log('Loading tables list...');
                 const response = await fetch('/api/home/data', {
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('authToken')}`
                     }
                 });
                 
+                console.log('Tables response status:', response.status);
+                
                 if (response.ok) {
                     const tables = await response.json();
+                    console.log('Tables loaded:', tables);
                     populateTableSelect(tables);
+                } else {
+                    console.error('Failed to load tables:', response.status, response.statusText);
                 }
             } catch (error) {
                 console.error('Error loading tables:', error);
@@ -302,15 +327,19 @@
 
         // Populate table select
         function populateTableSelect(tables) {
+            console.log('Populating table select with:', tables);
             const select = document.getElementById('tableSelect');
             select.innerHTML = '<option value="">Tüm Tablolar</option>';
             
             tables.forEach(table => {
+                console.log('Adding table option:', table);
                 const option = document.createElement('option');
                 option.value = table.id;
                 option.textContent = `${table.tableName} (${table.rowCount} kayıt)`;
                 select.appendChild(option);
             });
+            
+            console.log('Table select populated with', tables.length, 'options');
         }
 
         // Load table data
