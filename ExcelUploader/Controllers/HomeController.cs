@@ -79,9 +79,8 @@ namespace ExcelUploader.Controllers
                     return BadRequest(new { error = "Geçersiz Excel dosyası" });
                 }
 
-                // Generate unique table name
-                var baseTableName = GenerateTableNameFromFileName(model.ExcelFile.FileName);
-                var tableName = await GenerateUniqueTableNameAsync(baseTableName);
+                // Generate table name from file name (without making it unique)
+                var tableName = GenerateTableNameFromFileName(model.ExcelFile.FileName);
                 
                 _logger.LogInformation("Generated table name: {TableName}", tableName);
 
@@ -110,30 +109,57 @@ namespace ExcelUploader.Controllers
                     });
                 }
 
-                // Save table metadata to database
-                var dynamicTable = new DynamicTable
+                // Save or update table metadata to database
+                var existingTable = await _context.DynamicTables.FirstOrDefaultAsync(t => t.TableName == tableName);
+                
+                if (existingTable != null)
                 {
-                    TableName = tableName,
-                    FileName = model.ExcelFile.FileName,
-                    Description = model.Description ?? "",
-                    UploadDate = DateTime.UtcNow,
-                    RowCount = analysisResult.Rows.Count,
-                    ColumnCount = analysisResult.Headers.Count
-                };
+                    // Update existing table metadata
+                    existingTable.RowCount += analysisResult.Rows.Count; // Add new rows to existing count
+                    existingTable.ProcessedDate = DateTime.UtcNow;
+                    existingTable.IsProcessed = true;
+                    
+                    _logger.LogInformation("Updated existing table metadata: {TableName}, ID: {TableId}, New row count: {RowCount}", 
+                        tableName, existingTable.Id, existingTable.RowCount);
+                }
+                else
+                {
+                    // Create new table metadata
+                    var dynamicTable = new DynamicTable
+                    {
+                        TableName = tableName,
+                        FileName = model.ExcelFile.FileName,
+                        Description = model.Description ?? "",
+                        UploadDate = DateTime.UtcNow,
+                        RowCount = analysisResult.Rows.Count,
+                        ColumnCount = analysisResult.Headers.Count,
+                        IsProcessed = true,
+                        ProcessedDate = DateTime.UtcNow
+                    };
 
-                _context.DynamicTables.Add(dynamicTable);
+                    _context.DynamicTables.Add(dynamicTable);
+                    
+                    _logger.LogInformation("Created new table metadata: {TableName}, ID: {TableId}", 
+                        tableName, dynamicTable.Id);
+                }
+
                 await _context.SaveChangesAsync();
 
-                _logger.LogInformation("Table created successfully: {TableName}, ID: {TableId}", 
-                    tableName, dynamicTable.Id);
+                // Get the final table info for response
+                var finalTable = existingTable ?? await _context.DynamicTables.FirstOrDefaultAsync(t => t.TableName == tableName);
+                var isNewTable = existingTable == null;
 
                 return Ok(new { 
-                    message = $"Excel dosyası başarıyla yüklendi ve tablo oluşturuldu: {tableName}", 
+                    message = isNewTable 
+                        ? $"Excel dosyası başarıyla yüklendi ve yeni tablo oluşturuldu: {tableName}" 
+                        : $"Excel dosyası başarıyla yüklendi ve mevcut tabloya eklendi: {tableName}",
                     tableName = tableName,
-                    tableId = dynamicTable.Id,
+                    tableId = finalTable?.Id,
                     rowCount = analysisResult.Rows.Count,
+                    totalRowCount = finalTable?.RowCount ?? analysisResult.Rows.Count,
                     columnCount = analysisResult.Headers.Count,
-                    action = "upload_success",
+                    action = isNewTable ? "table_created" : "data_inserted",
+                    isNewTable = isNewTable,
                     fileName = model.ExcelFile.FileName,
                     fileSize = model.ExcelFile.Length,
                     columnTypes = analysisResult.ColumnDataTypes.Select(c => new 

@@ -28,18 +28,41 @@ namespace ExcelUploader.Services
                 _logger.LogInformation("Creating table {TableName} with {ColumnCount} columns and {RowCount} rows", 
                     tableName, headers.Count, rows.Count);
 
-                // Generate cleaned column names and create table SQL
-                var (createTableSql, cleanedColumnNames) = GenerateCreateTableSqlWithColumnNames(tableName, headers, columnDataTypes);
-                _logger.LogInformation("Create table SQL: {Sql}", createTableSql);
-
-                // Execute create table
+                // Check if table already exists
+                var tableExists = await CheckIfTableExistsAsync(tableName);
+                
                 using var connection = new SqlConnection(_connectionString);
                 await connection.OpenAsync();
 
-                using var command = new SqlCommand(createTableSql, connection);
-                await command.ExecuteNonQueryAsync();
+                List<string> cleanedColumnNames;
 
-                _logger.LogInformation("Table {TableName} created successfully", tableName);
+                if (tableExists)
+                {
+                    _logger.LogInformation("Table {TableName} already exists, will insert data into existing table", tableName);
+                    
+                    // Get existing table column names
+                    cleanedColumnNames = await GetExistingTableColumnsAsync(connection, tableName);
+                    
+                    if (cleanedColumnNames == null || !cleanedColumnNames.Any())
+                    {
+                        return ServiceResult.Failure($"Mevcut tablo {tableName} sütun bilgileri alınamadı");
+                    }
+                }
+                else
+                {
+                    _logger.LogInformation("Table {TableName} does not exist, creating new table", tableName);
+                    
+                    // Generate cleaned column names and create table SQL
+                    var (createTableSql, columnNames) = GenerateCreateTableSqlWithColumnNames(tableName, headers, columnDataTypes);
+                    cleanedColumnNames = columnNames;
+                    
+                    _logger.LogInformation("Create table SQL: {Sql}", createTableSql);
+
+                    using var command = new SqlCommand(createTableSql, connection);
+                    await command.ExecuteNonQueryAsync();
+
+                    _logger.LogInformation("Table {TableName} created successfully", tableName);
+                }
 
                 // Insert data if rows exist
                 if (rows.Any())
@@ -320,6 +343,58 @@ namespace ExcelUploader.Services
             
             // For all other cases, use NVarChar to avoid conversion issues
             return SqlDbType.NVarChar;
+        }
+
+        private async Task<bool> CheckIfTableExistsAsync(string tableName)
+        {
+            try
+            {
+                using var connection = new SqlConnection(_connectionString);
+                await connection.OpenAsync();
+
+                var sql = "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = @TableName AND TABLE_SCHEMA = 'dbo'";
+                using var command = new SqlCommand(sql, connection);
+                command.Parameters.AddWithValue("@TableName", tableName);
+
+                var count = (int)await command.ExecuteScalarAsync();
+                return count > 0;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error checking if table {TableName} exists", tableName);
+                return false;
+            }
+        }
+
+        private async Task<List<string>> GetExistingTableColumnsAsync(SqlConnection connection, string tableName)
+        {
+            try
+            {
+                var sql = @"
+                    SELECT COLUMN_NAME 
+                    FROM INFORMATION_SCHEMA.COLUMNS 
+                    WHERE TABLE_NAME = @TableName AND TABLE_SCHEMA = 'dbo' 
+                    AND COLUMN_NAME != 'Id'
+                    ORDER BY ORDINAL_POSITION";
+
+                using var command = new SqlCommand(sql, connection);
+                command.Parameters.AddWithValue("@TableName", tableName);
+
+                var columns = new List<string>();
+                using var reader = await command.ExecuteReaderAsync();
+                
+                while (await reader.ReadAsync())
+                {
+                    columns.Add(reader.GetString("COLUMN_NAME"));
+                }
+
+                return columns;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting columns for table {TableName}", tableName);
+                return null;
+            }
         }
 
         private object ConvertValueForSql(object value, SqlDbType sqlType)

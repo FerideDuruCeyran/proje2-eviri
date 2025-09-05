@@ -111,9 +111,8 @@ namespace ExcelUploader.Controllers
                     return BadRequest(new { error = "Excel dosyası analiz edilemedi", details = analysisResult.ErrorMessage });
                 }
 
-                // Generate unique table name
-                var baseTableName = GenerateTableNameFromFileName(request.File.FileName);
-                var tableName = await GenerateUniqueTableNameAsync(baseTableName);
+                // Generate table name from file name (without making it unique)
+                var tableName = GenerateTableNameFromFileName(request.File.FileName);
 
                 // Create table
                 var createResult = await _dynamicTableService.CreateTableFromExcelAsync(
@@ -127,29 +126,51 @@ namespace ExcelUploader.Controllers
                     return StatusCode(500, new { error = "Tablo oluşturulamadı", details = createResult.ErrorMessage });
                 }
 
-                // Save table metadata
-                var dynamicTable = new DynamicTable
+                // Save or update table metadata
+                var existingTable = await _context.DynamicTables.FirstOrDefaultAsync(t => t.TableName == tableName);
+                
+                if (existingTable != null)
                 {
-                    TableName = tableName,
-                    FileName = request.File.FileName,
-                    Description = request.Description ?? "",
-                    UploadDate = DateTime.UtcNow,
-                    RowCount = analysisResult.Rows.Count,
-                    ColumnCount = analysisResult.Headers.Count,
-                    IsProcessed = true,
-                    ProcessedDate = DateTime.UtcNow
-                };
+                    // Update existing table metadata
+                    existingTable.RowCount += analysisResult.Rows.Count; // Add new rows to existing count
+                    existingTable.ProcessedDate = DateTime.UtcNow;
+                    existingTable.IsProcessed = true;
+                }
+                else
+                {
+                    // Create new table metadata
+                    var dynamicTable = new DynamicTable
+                    {
+                        TableName = tableName,
+                        FileName = request.File.FileName,
+                        Description = request.Description ?? "",
+                        UploadDate = DateTime.UtcNow,
+                        RowCount = analysisResult.Rows.Count,
+                        ColumnCount = analysisResult.Headers.Count,
+                        IsProcessed = true,
+                        ProcessedDate = DateTime.UtcNow
+                    };
 
-                _context.DynamicTables.Add(dynamicTable);
+                    _context.DynamicTables.Add(dynamicTable);
+                }
+
                 await _context.SaveChangesAsync();
+
+                // Get the final table info for response
+                var finalTable = existingTable ?? await _context.DynamicTables.FirstOrDefaultAsync(t => t.TableName == tableName);
+                var isNewTable = existingTable == null;
 
                 return Ok(new
                 {
-                    message = $"Tablo başarıyla oluşturuldu: {tableName}",
+                    message = isNewTable 
+                        ? $"Tablo başarıyla oluşturuldu: {tableName}"
+                        : $"Veri başarıyla mevcut tabloya eklendi: {tableName}",
                     tableName = tableName,
-                    tableId = dynamicTable.Id,
+                    tableId = finalTable?.Id,
                     rowCount = analysisResult.Rows.Count,
-                    columnCount = analysisResult.Headers.Count
+                    totalRowCount = finalTable?.RowCount ?? analysisResult.Rows.Count,
+                    columnCount = analysisResult.Headers.Count,
+                    isNewTable = isNewTable
                 });
             }
             catch (Exception ex)

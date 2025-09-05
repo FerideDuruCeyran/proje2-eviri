@@ -41,6 +41,55 @@ namespace ExcelUploader.Data
                 entity.Property(e => e.BasvuruAciklama).HasMaxLength(2000);
                 entity.Property(e => e.UniversitedeToplamCalismaSuresi).HasMaxLength(500);
                 
+                // Configure address and location fields to 250 characters
+                entity.Property(e => e.AdresIl).HasMaxLength(250);
+                entity.Property(e => e.AdresUlke).HasMaxLength(250);
+                entity.Property(e => e.DogumYeri).HasMaxLength(250);
+                
+                // Configure bank-related fields to 250 characters
+                entity.Property(e => e.BankaHesapSahibi).HasMaxLength(250);
+                entity.Property(e => e.BankaAdi).HasMaxLength(250);
+                entity.Property(e => e.BankaSubeKodu).HasMaxLength(250);
+                entity.Property(e => e.BankaSubeAdi).HasMaxLength(250);
+                entity.Property(e => e.BankaHesapNumarasi).HasMaxLength(250);
+                entity.Property(e => e.BankaIBANNo).HasMaxLength(250);
+                
+                // Configure university and academic fields to 250 characters
+                entity.Property(e => e.FakulteAdi).HasMaxLength(250);
+                entity.Property(e => e.BirimAdi).HasMaxLength(250);
+                entity.Property(e => e.DiplomaDerecesi).HasMaxLength(250);
+                entity.Property(e => e.UniversiteKoordinatoru).HasMaxLength(250);
+                entity.Property(e => e.UniversiteKoordinatoruEmail).HasMaxLength(250);
+                entity.Property(e => e.UniversiteUluslararasiKodu).HasMaxLength(250);
+                entity.Property(e => e.UzmanlikAlani).HasMaxLength(250);
+                entity.Property(e => e.BasvuruSayfasi).HasMaxLength(250);
+                
+                // Configure other fields that might contain longer text to 250 characters
+                entity.Property(e => e.BasvuruTipi).HasMaxLength(250);
+                entity.Property(e => e.Taksit).HasMaxLength(250);
+                entity.Property(e => e.KullaniciAdi).HasMaxLength(250);
+                entity.Property(e => e.PasaportNo).HasMaxLength(250);
+                entity.Property(e => e.Cinsiyet).HasMaxLength(250);
+                entity.Property(e => e.Sinif).HasMaxLength(250);
+                entity.Property(e => e.GaziSehitYakini).HasMaxLength(250);
+                entity.Property(e => e.YurtBasvurusu).HasMaxLength(250);
+                entity.Property(e => e.TercihSirasi).HasMaxLength(250);
+                entity.Property(e => e.TercihDurumu).HasMaxLength(250);
+                entity.Property(e => e.BasvuruDurumu).HasMaxLength(250);
+                entity.Property(e => e.Burs).HasMaxLength(250);
+                entity.Property(e => e.AkademikYil).HasMaxLength(250);
+                entity.Property(e => e.AkademikDonem).HasMaxLength(250);
+                entity.Property(e => e.DegisimProgramiTipi).HasMaxLength(250);
+                entity.Property(e => e.KatilmakIstedigiYabanciDilSinavi).HasMaxLength(250);
+                entity.Property(e => e.SistemDisiGecmisHareketlilik).HasMaxLength(250);
+                entity.Property(e => e.SistemIciGecmisHareketlilikBilgisi).HasMaxLength(250);
+                entity.Property(e => e.Tercihler).HasMaxLength(250);
+                entity.Property(e => e.HibeSozlesmeTipi).HasMaxLength(250);
+                entity.Property(e => e.HibeButceYili).HasMaxLength(250);
+                entity.Property(e => e.SinavTipi).HasMaxLength(250);
+                entity.Property(e => e.SinavDili).HasMaxLength(250);
+                entity.Property(e => e.Unvan).HasMaxLength(250);
+                
                 // Configure decimal properties
                 entity.Property(e => e.Odenecek).HasColumnType("decimal(18,2)");
                 entity.Property(e => e.Odendiginde).HasColumnType("decimal(18,2)");
@@ -69,8 +118,8 @@ namespace ExcelUploader.Data
                 entity.HasIndex(e => e.Ad);
                 entity.HasIndex(e => e.Soyad);
                 entity.HasIndex(e => e.TCKimlikNo);
-                                    entity.HasIndex(e => e.OgrenciNo);
-                });
+                entity.HasIndex(e => e.OgrenciNo);
+            });
 
                 // Configure DynamicTable
                 builder.Entity<DynamicTable>(entity =>
