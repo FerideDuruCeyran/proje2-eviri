@@ -305,6 +305,10 @@ async function handleLogin(e) {
             console.log('Login successful:', result);
             
             localStorage.setItem('authToken', result.token);
+            // Store current login time in local storage
+            const currentTime = new Date().toISOString();
+            localStorage.setItem('lastLoginTime', currentTime);
+            
             isAuthenticated = true;
             currentUser = result.user;
             
@@ -592,6 +596,12 @@ async function verifyToken(token) {
             document.body.classList.add('authenticated');
             updateNavigationForAuthenticated();
             loadUserProfile();
+            
+            // Store current login time if not already stored (for auto-login scenarios)
+            if (!localStorage.getItem('lastLoginTime')) {
+                const currentTime = new Date().toISOString();
+                localStorage.setItem('lastLoginTime', currentTime);
+            }
         } else {
             // Token is invalid, remove it
             localStorage.removeItem('authToken');
@@ -640,6 +650,7 @@ function updateNavigationForUnauthenticated() {
 // Logout
 function logout() {
     localStorage.removeItem('authToken');
+    localStorage.removeItem('lastLoginTime'); // Clear last login time on logout
     isAuthenticated = false;
     currentUser = null;
     

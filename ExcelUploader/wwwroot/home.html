@@ -298,29 +298,8 @@
                     displayRecentActivities([]);
                 }
 
-                // Load last login from LoginLog table
-                const lastLoginResponse = await fetch('/api/home/last-login', {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
-                
-                if (lastLoginResponse.ok) {
-                    const lastLoginData = await lastLoginResponse.json();
-                    if (lastLoginData.lastLogin) {
-                        document.getElementById('lastLogin').textContent = formatDate(lastLoginData.lastLogin);
-                    } else {
-                        document.getElementById('lastLogin').textContent = 'Henüz giriş yapılmamış';
-                    }
-                } else if (lastLoginResponse.status === 401 || lastLoginResponse.status === 403) {
-                    console.log('Unauthorized access, redirecting to login');
-                    localStorage.removeItem('authToken');
-                    window.location.href = '/login';
-                    return;
-                } else {
-                    console.error('Failed to load last login:', lastLoginResponse.status);
-                    document.getElementById('lastLogin').textContent = 'Yüklenemedi';
-                }
+                // Load last login from local storage
+                loadLastLoginFromLocal();
             } catch (error) {
                 console.error('Error loading dashboard data:', error);
                 // If there's a network error, it might be due to authentication
@@ -379,6 +358,24 @@
                 hour: '2-digit',
                 minute: '2-digit'
             });
+        }
+
+        // Load last login from local storage
+        function loadLastLoginFromLocal() {
+            const lastLoginTime = localStorage.getItem('lastLoginTime');
+            const lastLoginElement = document.getElementById('lastLogin');
+            
+            if (lastLoginTime) {
+                lastLoginElement.textContent = formatDate(lastLoginTime);
+            } else {
+                lastLoginElement.textContent = 'Henüz giriş yapılmamış';
+            }
+        }
+
+        // Store current login time in local storage
+        function storeCurrentLoginTime() {
+            const currentTime = new Date().toISOString();
+            localStorage.setItem('lastLoginTime', currentTime);
         }
 
         // Check database status
@@ -455,6 +452,7 @@
         // Logout function
         function logout() {
             localStorage.removeItem('authToken');
+            localStorage.removeItem('lastLoginTime'); // Clear last login time on logout
             isAuthenticated = false;
             currentUser = null;
             
