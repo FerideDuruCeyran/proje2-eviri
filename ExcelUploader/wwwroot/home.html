@@ -350,6 +350,33 @@
                     console.log('Activities endpoint failed, showing empty activities');
                     displayRecentActivities([]);
                 }
+<<<<<<< HEAD
+=======
+
+                // Load last login from LoginLog table
+                const lastLoginResponse = await fetch('/api/home/last-login', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (lastLoginResponse.ok) {
+                    const lastLoginData = await lastLoginResponse.json();
+                    if (lastLoginData.lastLogin) {
+                        document.getElementById('lastLogin').textContent = formatDate(lastLoginData.lastLogin);
+                    } else {
+                        document.getElementById('lastLogin').textContent = 'Henüz giriş yapılmamış';
+                    }
+                } else if (lastLoginResponse.status === 401 || lastLoginResponse.status === 403) {
+                    console.log('Unauthorized access, redirecting to login');
+                    localStorage.removeItem('authToken');
+                    window.location.href = '/login';
+                    return;
+                } else {
+                    console.error('Failed to load last login:', lastLoginResponse.status);
+                    document.getElementById('lastLogin').textContent = 'Yüklenemedi';
+                }
+>>>>>>> fbf1790ad5d630d065f59967cc2c0538e5e773c2
             } catch (error) {
                 console.error('Error loading fallback data:', error);
                 // Don't log out user, just show empty data
