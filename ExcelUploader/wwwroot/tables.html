@@ -161,7 +161,17 @@
                 });
 
                 if (response.ok) {
-                    const tables = await response.json();
+                    const result = await response.json();
+                    // Handle both direct array and paginated response
+                    const tables = Array.isArray(result) ? result : (result.data || []);
+                    
+                    // Ensure tables is an array
+                    if (!Array.isArray(tables)) {
+                        console.error('Tables is not an array:', tables);
+                        showMessage('Tablolar yüklenirken hata oluştu', 'error');
+                        return;
+                    }
+                    
                     // Store tables in sessionStorage for viewTable function
                     sessionStorage.setItem('currentTables', JSON.stringify(tables));
                     displayTables(tables);
@@ -177,6 +187,18 @@
         // Display tables
         function displayTables(tables) {
             const container = document.getElementById('tablesList');
+            
+            // Ensure tables is an array
+            if (!Array.isArray(tables)) {
+                console.error('displayTables: tables is not an array:', tables);
+                container.innerHTML = `
+                    <div style="text-align: center; color: #666; padding: 2rem;">
+                        <i class="fas fa-exclamation-triangle" style="font-size: 2rem; margin-bottom: 1rem;"></i>
+                        <p>Tablolar yüklenirken hata oluştu</p>
+                    </div>
+                `;
+                return;
+            }
             
             if (tables.length === 0) {
                 container.innerHTML = `
@@ -312,6 +334,13 @@
         function formatDate(dateString) {
             return new Date(dateString).toLocaleDateString('tr-TR');
         }
+    </script>
+    
+    <!-- Initialize app -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeApp();
+        });
     </script>
 </body>
 </html>

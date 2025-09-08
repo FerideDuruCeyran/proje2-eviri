@@ -102,20 +102,6 @@
                         </div>
                     </div>
                     
-                    <hr>
-                    
-                    <div class="test-section">
-                        <h4>Detaylı Bağlantı Testi</h4>
-                        <p>Kimlik doğrulama gerektiren detaylı bağlantı testi.</p>
-                        
-                        <button type="button" class="btn btn-info" onclick="testDetailedConnection()">
-                            <i class="fas fa-search"></i> Detaylı Test
-                        </button>
-                        
-                        <div id="detailedConnectionResult" class="mt-3" style="display: none;">
-                            <!-- Results will be displayed here -->
-                        </div>
-                    </div>
                 </div>
             </div>
 
@@ -263,7 +249,11 @@
 
         // Load connections on page load
         document.addEventListener('DOMContentLoaded', async function() {
-            checkAuth();
+            await checkAuthentication();
+            if (!isAuthenticated) {
+                window.location.href = '/login';
+                return;
+            }
             await loadConnections();
             
             // Otomatik olarak varsayılan bağlantı oluştur
@@ -344,10 +334,20 @@
                 return;
             }
 
-            const connectionsHtml = currentConnections.map(conn => `
+            // Sort connections: active first, then inactive
+            const sortedConnections = [...currentConnections].sort((a, b) => {
+                if (a.isActive && !b.isActive) return -1;
+                if (!a.isActive && b.isActive) return 1;
+                return 0;
+            });
+
+            const connectionsHtml = sortedConnections.map(conn => `
                 <div class="connection-card ${conn.isActive ? 'active' : 'inactive'}">
                     <div class="connection-header">
-                        <h3>${conn.name}</h3>
+                        <h3>
+                            ${conn.isActive ? '<i class="fas fa-check-circle" style="color: #28a745; margin-right: 0.5rem;"></i>' : '<i class="fas fa-times-circle" style="color: #dc3545; margin-right: 0.5rem;"></i>'}
+                            ${conn.name}
+                        </h3>
                         <div class="connection-status ${conn.isActive ? 'active' : 'inactive'}">
                             ${conn.isActive ? 'Aktif' : 'Pasif'}
                         </div>
@@ -633,17 +633,19 @@
             `;
             
             try {
-                const response = await fetch('/api/home/test-connection-simple');
+                const response = await fetch('/api/home/test-connection');
                 const result = await response.json();
                 
-                if (result.success) {
+                console.log('Connection test result:', result);
+                console.log('Database info:', result.databaseInfo);
+                
+                if (result.isConnected) {
                     resultDiv.innerHTML = `
                         <div class="alert alert-success">
                             <i class="fas fa-check-circle"></i>
                             <strong>Bağlantı Başarılı!</strong><br>
-                            <strong>Sunucu:</strong> ${result.server}<br>
-                            <strong>Veritabanı:</strong> ${result.database}<br>
-                            <strong>Durum:</strong> ${result.state}<br>
+                            <strong>Sunucu:</strong> ${result.databaseInfo?.Server || 'Bilinmiyor'}<br>
+                            <strong>Veritabanı:</strong> ${result.databaseInfo?.Database || 'Bilinmiyor'}<br>
                             <strong>Mesaj:</strong> ${result.message}
                         </div>
                     `;
@@ -652,11 +654,7 @@
                         <div class="alert alert-danger">
                             <i class="fas fa-times-circle"></i>
                             <strong>Bağlantı Başarısız!</strong><br>
-                            <strong>Hata:</strong> ${result.error}<br>
-                            <details class="mt-2">
-                                <summary>Detaylar</summary>
-                                <pre class="mt-2" style="font-size: 0.8rem; background: #f8f9fa; padding: 10px; border-radius: 5px;">${result.details}</pre>
-                            </details>
+                            <strong>Hata:</strong> ${result.message}
                         </div>
                     `;
                 }
@@ -752,5 +750,94 @@
             }
         }
     </script>
+    
+    <!-- Initialize app -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeApp();
+        });
+    </script>
+    
+    <style>
+        .connection-card {
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            background: white;
+            transition: all 0.3s ease;
+        }
+        
+        .connection-card.active {
+            border-color: #28a745;
+            background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+            box-shadow: 0 4px 8px rgba(40, 167, 69, 0.2);
+        }
+        
+        .connection-card.inactive {
+            border-color: #dc3545;
+            background: linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%);
+            opacity: 0.7;
+        }
+        
+        .connection-status {
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        
+        .connection-status.active {
+            background: #28a745;
+            color: white;
+        }
+        
+        .connection-status.inactive {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .connection-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        
+        .connection-header h3 {
+            margin: 0;
+            color: #333;
+        }
+        
+        .connection-details p {
+            margin: 0.5rem 0;
+            color: #666;
+        }
+        
+        .connection-actions {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 1rem;
+            flex-wrap: wrap;
+        }
+        
+        .connection-actions .btn {
+            flex: 1;
+            min-width: 120px;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: #666;
+        }
+        
+        .empty-state i {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            color: #ccc;
+        }
+    </style>
 </body>
 </html>

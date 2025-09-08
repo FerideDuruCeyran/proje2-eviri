@@ -715,6 +715,7 @@ namespace ExcelUploader.Controllers
                 var serverName = connection.DataSource ?? "Unknown";
                 
                 _logger.LogInformation("Database info - Name: {DatabaseName}, Server: {ServerName}", databaseName, serverName);
+                _logger.LogInformation("Connection string: {ConnectionString}", connection.ConnectionString);
 
                 return Ok(new
                 {

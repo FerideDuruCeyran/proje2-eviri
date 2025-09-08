@@ -299,7 +299,7 @@
                 }
 
                 // Load last login from local storage
-                loadLastLoginFromLocal();
+                loadLastLoginFromServer();
             } catch (error) {
                 console.error('Error loading dashboard data:', error);
                 // If there's a network error, it might be due to authentication
@@ -360,23 +360,35 @@
             });
         }
 
-        // Load last login from local storage
-        function loadLastLoginFromLocal() {
-            const lastLoginTime = localStorage.getItem('lastLoginTime');
-            const lastLoginElement = document.getElementById('lastLogin');
-            
-            if (lastLoginTime) {
-                lastLoginElement.textContent = formatDate(lastLoginTime);
-            } else {
-                lastLoginElement.textContent = 'Henüz giriş yapılmamış';
+        // Load last login from server
+        async function loadLastLoginFromServer() {
+            try {
+                const response = await fetch('/api/home/last-login', {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                    }
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    const lastLoginElement = document.getElementById('lastLogin');
+                    
+                    if (result.lastLogin) {
+                        const loginDate = new Date(result.lastLogin);
+                        lastLoginElement.textContent = formatDate(loginDate.toISOString());
+                    } else {
+                        lastLoginElement.textContent = 'Henüz giriş yapılmamış';
+                    }
+                } else {
+                    console.error('Failed to load last login');
+                    document.getElementById('lastLogin').textContent = 'Yüklenemedi';
+                }
+            } catch (error) {
+                console.error('Error loading last login:', error);
+                document.getElementById('lastLogin').textContent = 'Hata';
             }
         }
 
-        // Store current login time in local storage
-        function storeCurrentLoginTime() {
-            const currentTime = new Date().toISOString();
-            localStorage.setItem('lastLoginTime', currentTime);
-        }
 
         // Check database status
         async function checkDatabaseStatus() {
@@ -452,7 +464,6 @@
         // Logout function
         function logout() {
             localStorage.removeItem('authToken');
-            localStorage.removeItem('lastLoginTime'); // Clear last login time on logout
             isAuthenticated = false;
             currentUser = null;
             
@@ -461,6 +472,13 @@
                 window.location.href = '/';
             }, 1000);
         }
+    </script>
+    
+    <!-- Initialize app -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeApp();
+        });
     </script>
 </body>
 </html>

@@ -6,6 +6,7 @@
     <title>Excel Uploader - Veri Görüntüle</title>
     <link rel="stylesheet" href="css/site.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <!-- Header -->
@@ -208,16 +209,14 @@
                     <div class="analytics-grid">
                         <div class="analytics-item">
                             <h4>Veri Dağılımı</h4>
-                            <div class="chart-placeholder" id="dataDistributionChart">
-                                <i class="fas fa-chart-pie fa-3x"></i>
-                                <p>Veri dağılım grafiği burada görünecek</p>
+                            <div class="chart-container" style="position: relative; height: 300px; width: 100%;">
+                                <canvas id="dataDistributionChart"></canvas>
                             </div>
                         </div>
                         <div class="analytics-item">
                             <h4>Zaman Serisi</h4>
-                            <div class="chart-placeholder" id="timeSeriesChart">
-                                <i class="fas fa-chart-line fa-3x"></i>
-                                <p>Zaman serisi grafiği burada görünecek</p>
+                            <div class="chart-container" style="position: relative; height: 300px; width: 100%;">
+                                <canvas id="timeSeriesChart"></canvas>
                             </div>
                         </div>
                     </div>
@@ -247,8 +246,10 @@
 
         let currentTableData = [];
         let currentPage = 1;
-        let itemsPerPage = 50;
+        let itemsPerPage = 15; // Changed to 15 as requested
         let filteredData = [];
+        let totalPages = 1;
+        let totalItems = 0;
 
         // Initialize page
         document.addEventListener('DOMContentLoaded', async function() {
@@ -259,6 +260,7 @@
             }
             loadOverviewData();
             loadTablesList();
+            loadAllData(); // Load all data by default
             
             // Check if we have a tableId parameter from URL
             const urlParams = new URLSearchParams(window.location.search);
@@ -304,42 +306,93 @@
         // Load tables list
         async function loadTablesList() {
             try {
-                console.log('Loading tables list...');
                 const response = await fetch('/api/home/data', {
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('authToken')}`
                     }
                 });
                 
-                console.log('Tables response status:', response.status);
-                
                 if (response.ok) {
-                    const tables = await response.json();
-                    console.log('Tables loaded:', tables);
-                    populateTableSelect(tables);
+                    const result = await response.json();
+                    console.log('Full response:', result);
+                    
+                    // Always expect the new format with data and pagination
+                    if (result && result.data) {
+                        console.log('Tables data:', result.data);
+                        console.log('Tables data type:', typeof result.data);
+                        console.log('Is array:', Array.isArray(result.data));
+                        
+                        // Force convert to array if needed
+                        let tablesArray = [];
+                        if (Array.isArray(result.data)) {
+                            tablesArray = result.data;
+                        } else if (result.data && typeof result.data === 'object') {
+                            // If it's an object, try to convert to array
+                            tablesArray = Object.values(result.data);
+                        } else {
+                            console.error('Cannot convert to array:', result.data);
+                            tablesArray = [];
+                        }
+                        
+                        console.log('Final tablesArray:', tablesArray);
+                        console.log('Final tablesArray type:', typeof tablesArray);
+                        console.log('Final tablesArray isArray:', Array.isArray(tablesArray));
+                        populateTableSelect(tablesArray);
+                    } else {
+                        console.error('No data property in response:', result);
+                        populateTableSelect([]);
+                    }
                 } else {
-                    console.error('Failed to load tables:', response.status, response.statusText);
+                    console.error('Response not ok:', response.status);
+                    populateTableSelect([]);
                 }
             } catch (error) {
                 console.error('Error loading tables:', error);
+                populateTableSelect([]);
             }
         }
 
         // Populate table select
         function populateTableSelect(tables) {
-            console.log('Populating table select with:', tables);
+            console.log('populateTableSelect called with:', tables);
+            console.log('populateTableSelect type:', typeof tables);
+            console.log('populateTableSelect isArray:', Array.isArray(tables));
+            
             const select = document.getElementById('tableSelect');
+            if (!select) {
+                console.error('tableSelect element not found');
+                return;
+            }
+            
             select.innerHTML = '<option value="">Tüm Tablolar</option>';
             
-            tables.forEach(table => {
-                console.log('Adding table option:', table);
-                const option = document.createElement('option');
-                option.value = table.id;
-                option.textContent = `${table.tableName} (${table.rowCount} kayıt)`;
-                select.appendChild(option);
-            });
+            // Ensure tables is an array
+            if (!Array.isArray(tables)) {
+                console.error('populateTableSelect: tables is not an array:', tables);
+                return;
+            }
             
-            console.log('Table select populated with', tables.length, 'options');
+            // Additional safety check
+            if (tables.length === 0) {
+                console.log('No tables to populate');
+                return;
+            }
+            
+            try {
+                tables.forEach((table, index) => {
+                    console.log(`Processing table ${index}:`, table);
+                    if (table && table.id && table.tableName) {
+                        const option = document.createElement('option');
+                        option.value = table.id;
+                        option.textContent = `${table.tableName} (${table.rowCount || 0} kayıt)`;
+                        select.appendChild(option);
+                    } else {
+                        console.warn('Invalid table object:', table);
+                    }
+                });
+            } catch (error) {
+                console.error('Error in forEach:', error);
+            }
         }
 
         // Load table data
@@ -355,19 +408,41 @@
             }
         }
 
-        // Load all data
-        async function loadAllData() {
+        // Load all data with pagination
+        async function loadAllData(page = 1) {
             try {
                 showLoading();
-                const response = await fetch('/api/home/data', {
+                const response = await fetch(`/api/home/data/all?page=${page}&pageSize=${itemsPerPage}`, {
                     headers: {
                         'Authorization': `Bearer ${localStorage.getItem('authToken')}`
                     }
                 });
                 
                 if (response.ok) {
-                    const data = await response.json();
-                    displayTableData(data);
+                    const result = await response.json();
+                    console.log('loadAllData response:', result);
+                    
+                    // Ensure data is an array
+                    if (result.data && Array.isArray(result.data)) {
+                        currentTableData = result.data;
+                    } else {
+                        console.error('Invalid data format:', result.data);
+                        currentTableData = [];
+                    }
+                    
+                    filteredData = [...currentTableData];
+                    
+                    // Update pagination info
+                    currentPage = result.pagination.currentPage;
+                    totalPages = result.pagination.totalPages;
+                    totalItems = result.pagination.totalItems;
+                    
+                    console.log('currentTableData:', currentTableData);
+                    displayTableData();
+                    updatePagination();
+                } else {
+                    const errorData = await response.json();
+                    showError(errorData.message || 'Veriler yüklenirken hata oluştu');
                 }
             } catch (error) {
                 console.error('Error loading all data:', error);
@@ -386,8 +461,13 @@
                 });
                 
                 if (response.ok) {
-                    const data = await response.json();
-                    displayTableData(data);
+                    const result = await response.json();
+                    currentTableData = result.data || result;
+                    filteredData = [...currentTableData];
+                    displayTableData();
+                } else {
+                    const errorData = await response.json();
+                    showError(errorData.message || 'Tablo verileri yüklenirken hata oluştu');
                 }
             } catch (error) {
                 console.error('Error loading table data:', error);
@@ -396,8 +476,8 @@
         }
 
         // Display table data
-        function displayTableData(data) {
-            currentTableData = Array.isArray(data) ? data : [data];
+        function displayTableData() {
+            // Use global currentTableData
             filteredData = [...currentTableData];
             
             if (currentTableData.length === 0) {
@@ -417,6 +497,9 @@
             
             // Update table info
             updateTableInfo();
+            
+            // Update data analysis charts
+            updateDataAnalysis();
         }
 
         // Create table headers
@@ -474,21 +557,48 @@
             if (value === null || value === undefined) return '-';
             if (value instanceof Date) return value.toLocaleDateString('tr-TR');
             if (typeof value === 'boolean') return value ? 'Evet' : 'Hayır';
-            return value.toString();
+            if (typeof value === 'object') {
+                // For objects, try to extract meaningful information
+                if (Array.isArray(value)) {
+                    return `[${value.length} öğe]`;
+                }
+                if (value.constructor === Object) {
+                    const keys = Object.keys(value);
+                    if (keys.length === 0) return '{}';
+                    if (keys.length <= 3) {
+                        return keys.map(key => `${key}: ${value[key]}`).join(', ');
+                    }
+                    return `{${keys.slice(0, 2).join(', ')}...}`;
+                }
+                // Handle other object types
+                try {
+                    return JSON.stringify(value);
+                } catch (e) {
+                    return '[Object]';
+                }
+            }
+            return String(value);
         }
 
         // Update pagination
         function updatePagination() {
-            const totalPages = Math.ceil(filteredData.length / itemsPerPage);
-            const pagination = document.getElementById('pagination');
+            const paginationDiv = document.getElementById('pagination');
+            const pageInfo = document.getElementById('pageInfo');
             
             if (totalPages <= 1) {
-                pagination.style.display = 'none';
+                paginationDiv.style.display = 'none';
                 return;
             }
             
-            pagination.style.display = 'flex';
-            document.getElementById('pageInfo').textContent = `Sayfa ${currentPage} / ${totalPages}`;
+            paginationDiv.style.display = 'flex';
+            pageInfo.textContent = `Sayfa ${currentPage} / ${totalPages} (Toplam ${totalItems} kayıt)`;
+            
+            // Update button states
+            const prevBtn = paginationDiv.querySelector('button:first-child');
+            const nextBtn = paginationDiv.querySelector('button:last-child');
+            
+            prevBtn.disabled = currentPage <= 1;
+            nextBtn.disabled = currentPage >= totalPages;
         }
 
         // Update table info
@@ -504,20 +614,13 @@
         // Pagination functions
         function previousPage() {
             if (currentPage > 1) {
-                currentPage--;
-                displayCurrentPage();
-                updatePagination();
-                updateTableInfo();
+                loadAllData(currentPage - 1);
             }
         }
 
         function nextPage() {
-            const totalPages = Math.ceil(filteredData.length / itemsPerPage);
             if (currentPage < totalPages) {
-                currentPage++;
-                displayCurrentPage();
-                updatePagination();
-                updateTableInfo();
+                loadAllData(currentPage + 1);
             }
         }
 
@@ -613,6 +716,223 @@
             loadTableData();
         }
 
+        // Data Analysis Functions
+        let dataDistributionChart = null;
+        let timeSeriesChart = null;
+
+        function updateDataAnalysis() {
+            if (currentTableData.length === 0) {
+                clearCharts();
+                return;
+            }
+
+            // Check if Chart.js is loaded
+            if (typeof Chart === 'undefined') {
+                console.log('Chart.js not loaded');
+                return;
+            }
+
+            console.log('Creating charts with', currentTableData.length, 'rows');
+            createDataDistributionChart();
+            createTimeSeriesChart();
+        }
+
+        function createDataDistributionChart() {
+            const ctx = document.getElementById('dataDistributionChart');
+            if (!ctx) {
+                console.log('dataDistributionChart canvas not found');
+                return;
+            }
+
+            console.log('Creating data distribution chart');
+
+            // Destroy existing chart
+            if (dataDistributionChart) {
+                dataDistributionChart.destroy();
+            }
+
+            // Analyze data distribution
+            const distribution = analyzeDataDistribution();
+            console.log('Distribution:', distribution);
+            
+            dataDistributionChart = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: distribution.labels,
+                    datasets: [{
+                        data: distribution.data,
+                        backgroundColor: [
+                            '#667eea',
+                            '#764ba2',
+                            '#f093fb',
+                            '#f5576c',
+                            '#4facfe',
+                            '#00f2fe',
+                            '#43e97b',
+                            '#38f9d7'
+                        ],
+                        borderWidth: 2,
+                        borderColor: '#fff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                padding: 20,
+                                usePointStyle: true
+                            }
+                        },
+                        title: {
+                            display: true,
+                            text: 'Veri Dağılımı',
+                            font: {
+                                size: 16,
+                                weight: 'bold'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function createTimeSeriesChart() {
+            const ctx = document.getElementById('timeSeriesChart');
+            if (!ctx) return;
+
+            // Destroy existing chart
+            if (timeSeriesChart) {
+                timeSeriesChart.destroy();
+            }
+
+            // Analyze time series data
+            const timeData = analyzeTimeSeries();
+            
+            timeSeriesChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: timeData.labels,
+                    datasets: [{
+                        label: 'Veri Miktarı',
+                        data: timeData.data,
+                        borderColor: '#667eea',
+                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4,
+                        pointBackgroundColor: '#667eea',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        pointRadius: 6,
+                        pointHoverRadius: 8
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        },
+                        title: {
+                            display: true,
+                            text: 'Zaman Serisi Analizi',
+                            font: {
+                                size: 16,
+                                weight: 'bold'
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(0,0,0,0.1)'
+                            }
+                        },
+                        x: {
+                            grid: {
+                                color: 'rgba(0,0,0,0.1)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function analyzeDataDistribution() {
+            const distribution = {};
+            
+            currentTableData.forEach(row => {
+                Object.keys(row).forEach(key => {
+                    if (key.startsWith('_')) return; // Skip metadata columns
+                    
+                    const value = row[key];
+                    const type = typeof value;
+                    
+                    if (!distribution[type]) {
+                        distribution[type] = 0;
+                    }
+                    distribution[type]++;
+                });
+            });
+
+            return {
+                labels: Object.keys(distribution).map(type => {
+                    switch(type) {
+                        case 'string': return 'Metin';
+                        case 'number': return 'Sayı';
+                        case 'boolean': return 'Boolean';
+                        case 'object': return 'Nesne';
+                        default: return type;
+                    }
+                }),
+                data: Object.values(distribution)
+            };
+        }
+
+        function analyzeTimeSeries() {
+            // Group data by upload date or creation date
+            const dateGroups = {};
+            
+            currentTableData.forEach(row => {
+                let dateKey = 'Bilinmeyen';
+                
+                if (row._UploadDate) {
+                    const date = new Date(row._UploadDate);
+                    dateKey = date.toLocaleDateString('tr-TR');
+                } else if (row._TableName) {
+                    // Use table name as time series if no date available
+                    dateKey = row._TableName;
+                }
+                
+                if (!dateGroups[dateKey]) {
+                    dateGroups[dateKey] = 0;
+                }
+                dateGroups[dateKey]++;
+            });
+
+            const labels = Object.keys(dateGroups).slice(0, 10); // Limit to 10 items
+            const data = labels.map(label => dateGroups[label]);
+
+            return { labels, data };
+        }
+
+        function clearCharts() {
+            if (dataDistributionChart) {
+                dataDistributionChart.destroy();
+                dataDistributionChart = null;
+            }
+            if (timeSeriesChart) {
+                timeSeriesChart.destroy();
+                timeSeriesChart = null;
+            }
+        }
+
         function exportData() {
             if (filteredData.length === 0) {
                 alert('Dışa aktarılacak veri bulunamadı');
@@ -639,6 +959,13 @@
             link.download = 'veri_export.csv';
             link.click();
         }
+    </script>
+    
+    <!-- Initialize app -->
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeApp();
+        });
     </script>
 </body>
 </html>
