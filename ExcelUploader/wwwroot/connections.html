@@ -242,7 +242,7 @@
         </div>
     </div>
 
-    <script src="js/site.js"></script>
+    <!-- site.js removed - using inline JavaScript -->
     <script>
         let currentConnections = [];
         let currentConnectionId = null;
@@ -265,7 +265,7 @@
             try {
                 const connections = await fetch('/api/databaseconnection', {
                     headers: {
-                        'Authorization': `Bearer ${getToken()}`
+                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
                     }
                 }).then(r => r.json());
                 
@@ -287,7 +287,7 @@
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${getToken()}`
+                            'Authorization': `Bearer ${localStorage.getItem('authToken')}`
                         },
                         body: JSON.stringify(defaultConnection)
                     });
@@ -307,7 +307,7 @@
             try {
                 const response = await fetch('/api/databaseconnection', {
                     headers: {
-                        'Authorization': `Bearer ${getToken()}`
+                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
                     }
                 });
                 
@@ -316,12 +316,11 @@
                     displayConnections();
                     return currentConnections; // Bağlantıları döndür
                 } else {
-                    showError('Bağlantılar yüklenirken hata oluştu');
+                    console.error('Failed to load connections:', response.status);
                     return [];
                 }
             } catch (error) {
                 console.error('Error loading connections:', error);
-                showError('Bağlantılar yüklenirken hata oluştu');
                 return [];
             }
         }
@@ -438,7 +437,7 @@
                     method: method,
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${getToken()}`
+                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
                     },
                     body: JSON.stringify(connectionData)
                 });
@@ -466,7 +465,7 @@
                 const response = await fetch(`/api/databaseconnection/${id}`, {
                     method: 'DELETE',
                     headers: {
-                        'Authorization': `Bearer ${getToken()}`
+                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
                     }
                 });
 
@@ -488,7 +487,7 @@
                 const response = await fetch(`/api/databaseconnection/${id}/test`, {
                     method: 'POST',
                     headers: {
-                        'Authorization': `Bearer ${getToken()}`
+                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
                     }
                 });
 
@@ -521,7 +520,7 @@
             try {
                 const response = await fetch(`/api/databaseconnection/${connectionId}/databases`, {
                     headers: {
-                        'Authorization': `Bearer ${getToken()}`
+                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
                     }
                 });
 
@@ -555,7 +554,7 @@
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${getToken()}`
+                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
                     },
                     body: JSON.stringify({ query: query })
                 });
@@ -680,7 +679,7 @@
             `;
             
             try {
-                const token = getToken();
+                const token = localStorage.getItem('authToken');
                 if (!token) {
                     resultDiv.innerHTML = `
                         <div class="alert alert-warning">

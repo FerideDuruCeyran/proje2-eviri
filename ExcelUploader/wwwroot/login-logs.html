@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Excel Uploader - Giriş Günlükleri</title>
     <link rel="stylesheet" href="css/site.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
@@ -261,7 +264,7 @@
     </footer>
 
     <!-- Scripts -->
-    <script src="js/site.js"></script>
+    <!-- site.js removed - using inline JavaScript -->
     <script>
         let currentPage = 1;
         let totalPages = 1;
@@ -286,9 +289,10 @@
         // Load statistics
         async function loadStats() {
             try {
-                const response = await fetch('/api/login-logs/stats', {
+                const response = await fetch(`/api/loginlogs/stats?t=${Date.now()}`, {
                     headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+                        'Cache-Control': 'no-cache'
                     }
                 });
 
@@ -326,9 +330,10 @@
                     ...filters
                 });
 
-                const response = await fetch(`/api/login-logs?${queryParams}`, {
+                const response = await fetch(`/api/loginlogs?${queryParams}&t=${Date.now()}`, {
                     headers: {
-                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+                        'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
+                        'Cache-Control': 'no-cache'
                     }
                 });
 

@@ -215,7 +215,7 @@
     </footer>
 
     <!-- Scripts -->
-    <script src="js/site.js"></script>
+    <!-- site.js removed - using inline JavaScript -->
     <script>
         // Quick authentication check before page loads
         (function() {
@@ -375,7 +375,8 @@
                     
                     if (result.lastLogin) {
                         const loginDate = new Date(result.lastLogin);
-                        lastLoginElement.textContent = formatDate(loginDate.toISOString());
+                        const formattedDate = formatDate(loginDate.toISOString());
+                        lastLoginElement.textContent = formattedDate;
                     } else {
                         lastLoginElement.textContent = 'Henüz giriş yapılmamış';
                     }

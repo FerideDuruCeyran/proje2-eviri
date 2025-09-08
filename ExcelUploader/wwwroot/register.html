@@ -112,6 +112,53 @@
     </footer>
 
     <!-- Scripts -->
-    <script src="js/site.js"></script>
+    <!-- site.js removed - using inline JavaScript -->
+    <script>
+        // Register functionality without external JS
+        document.addEventListener('DOMContentLoaded', function() {
+            const registerForm = document.getElementById('registerForm');
+            
+            registerForm.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                
+                const firstName = document.getElementById('firstName').value;
+                const lastName = document.getElementById('lastName').value;
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
+                const confirmPassword = document.getElementById('confirmPassword').value;
+                
+                if (password !== confirmPassword) {
+                    alert('Şifreler eşleşmiyor!');
+                    return;
+                }
+                
+                try {
+                    const response = await fetch('/api/account/register', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            firstName: firstName,
+                            lastName: lastName,
+                            email: email,
+                            password: password
+                        })
+                    });
+                    
+                    if (response.ok) {
+                        alert('Kayıt başarılı! Giriş yapabilirsiniz.');
+                        window.location.href = '/login';
+                    } else {
+                        const error = await response.json();
+                        alert('Kayıt başarısız: ' + (error.message || 'Bilinmeyen hata'));
+                    }
+                } catch (error) {
+                    console.error('Register error:', error);
+                    alert('Kayıt yapılırken hata oluştu: ' + error.message);
+                }
+            });
+        });
+    </script>
 </body>
 </html>

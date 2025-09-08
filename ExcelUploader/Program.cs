@@ -165,4 +165,4 @@ app.MapGet("/api/test-db", async (ApplicationDbContext context) =>
     }
 });
 
-app.Run();
+app.Run("http://localhost:5003");

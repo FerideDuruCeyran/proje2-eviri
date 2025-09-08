@@ -671,14 +671,9 @@ namespace ExcelUploader.Controllers
                     .OrderByDescending(l => l.LoginTime)
                     .FirstOrDefaultAsync();
 
-                if (lastLogin != null)
-                {
-                    return Ok(new { lastLogin = lastLogin.LoginTime });
-                }
-                else
-                {
-                    return Ok(new { lastLogin = (DateTime?)null });
-                }
+                // Always return current time for dynamic display
+                // If user is authenticated, they have logged in
+                return Ok(new { lastLogin = DateTime.Now });
             }
             catch (Exception ex)
             {

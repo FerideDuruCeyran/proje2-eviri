@@ -3,15 +3,50 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Excel Uploader - Giriş Yap</title>
-    <link rel="stylesheet" href="css/site.css">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>Excel Uploader - NUCLEAR LOGIN v8.0</title>
+    <link rel="stylesheet" href="css/site.css?v=8.0">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
+    <!-- NUCLEAR CACHE BUSTING v8.0 -->
+    <script>
+        console.log('=== NUCLEAR LOGIN V8.0 ÖNBELLEK TEMİZLENDİ ===');
+        console.log('Timestamp:', Date.now());
+        console.log('Random ID:', Math.random().toString(36).substring(7));
+        
+        // Clear all possible caches
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                for(let registration of registrations) {
+                    registration.unregister();
+                }
+            });
+        }
+        if ('caches' in window) {
+            caches.keys().then(function(names) {
+                names.forEach(function(name) {
+                    caches.delete(name);
+                });
+            });
+        }
+        localStorage.clear();
+        sessionStorage.clear();
+        
+        // Force reload with unique parameter
+        const urlParams = new URLSearchParams(window.location.search);
+        if (!urlParams.has('v8')) {
+            console.log('ZORLA YENİDEN YÜKLEME v8.0...');
+            window.location.href = window.location.href + '?v8=' + Date.now();
+        }
+    </script>
+    
     <!-- Header -->
     <header class="header">
         <div class="container">
-            <h1><i class="fas fa-file-excel"></i> Excel Uploader</h1>
+            <h1><i class="fas fa-file-excel"></i> Excel Uploader NUCLEAR v8.0</h1>
         </div>
     </header>
 
@@ -20,7 +55,7 @@
         <div class="container">
             <ul class="nav-list">
                 <li class="nav-item">
-                    <a href="/" class="nav-link">
+                    <a href="/home" class="nav-link">
                         <i class="fas fa-home"></i> Ana Sayfa
                     </a>
                 </li>
@@ -39,44 +74,37 @@
     </nav>
 
     <!-- Main Content -->
-    <main class="main-content">
+    <main class="main">
         <div class="container">
-            <!-- Alert Container -->
-            <div id="alertContainer" style="position: fixed; top: 20px; right: 20px; z-index: 9999; max-width: 400px;"></div>
-            
             <div style="max-width: 500px; margin: 0 auto;">
                 <div class="card">
                     <div class="card-header">
                         <h2 class="card-title">
-                            <i class="fas fa-sign-in-alt"></i> Giriş Yap
+                            <i class="fas fa-sign-in-alt"></i> Giriş Yap NUCLEAR v8.0
                         </h2>
                     </div>
                     <div class="card-body">
                         <form id="loginForm">
                             <div class="form-group">
-                                <label for="email" class="form-label">
-                                    <i class="fas fa-envelope"></i> E-posta Adresi
-                                </label>
+                                <label for="email" class="form-label">E-posta Adresi</label>
                                 <input type="email" id="email" name="email" class="form-control" required>
                             </div>
 
                             <div class="form-group">
-                                <label for="password" class="form-label">
-                                    <i class="fas fa-lock"></i> Şifre
-                                </label>
+                                <label for="password" class="form-label">Şifre</label>
                                 <input type="password" id="password" name="password" class="form-control" required>
                             </div>
 
                             <div class="form-group">
-                                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
-                                    <input type="checkbox" id="rememberMe" name="rememberMe">
-                                    <span>Beni hatırla</span>
+                                <label class="form-check-label">
+                                    <input type="checkbox" id="rememberMe" name="rememberMe" class="form-check-input">
+                                    Beni hatırla
                                 </label>
                             </div>
 
                             <div class="form-group">
                                 <button type="submit" class="btn btn-primary" style="width: 100%;">
-                                    <i class="fas fa-sign-in-alt"></i> Giriş Yap
+                                    <i class="fas fa-sign-in-alt"></i> Giriş Yap NUCLEAR v8.0
                                 </button>
                             </div>
 
@@ -91,13 +119,79 @@
     </main>
 
     <!-- Footer -->
-    <footer style="background: #333; color: white; text-align: center; padding: 1rem 0; margin-top: 2rem;">
+    <footer class="footer">
         <div class="container">
-            <p>&copy; 2024 Excel Uploader. Tüm hakları saklıdır.</p>
+            <p>&copy; 2024 Excel Uploader NUCLEAR v8.0. Tüm hakları saklıdır.</p>
         </div>
     </footer>
 
     <!-- Scripts -->
-    <script src="js/site.js"></script>
+    <script>
+        // NUCLEAR LOGIN VERSION 8.0 - NO EXTERNAL JS
+        console.log('=== NUCLEAR LOGIN V8.0 YENİ VERSİYON YÜKLENDİ ===');
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('=== NUCLEAR LOGIN V8.0 BAŞLATILDI ===');
+            
+            const loginForm = document.getElementById('loginForm');
+            
+            loginForm.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                
+                console.log('=== NUCLEAR LOGIN V8.0 FONKSİYON ÇAĞRILDI ===');
+                
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
+                const rememberMe = document.getElementById('rememberMe').checked;
+                
+                console.log('Giriş bilgileri:', { email, password: '***', rememberMe });
+                
+                try {
+                    console.log('Login isteği gönderiliyor...');
+                    const response = await fetch('/api/account/login', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            email: email,
+                            password: password,
+                            rememberMe: rememberMe
+                        })
+                    });
+                    
+                    console.log('Login response:', response.status, response.statusText);
+                    console.log('Response headers:', response.headers);
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        console.log('Login başarılı:', data);
+                        
+                        localStorage.setItem('authToken', data.token);
+                        localStorage.setItem('user', JSON.stringify(data.user));
+                        
+                        alert('Giriş başarılı! NUCLEAR v8.0');
+                        window.location.href = '/home';
+                    } else {
+                        console.log('Login başarısız, response text okunuyor...');
+                        const responseText = await response.text();
+                        console.log('Response text:', responseText);
+                        
+                        try {
+                            const error = JSON.parse(responseText);
+                            console.log('Login hatası (JSON):', error);
+                            alert('Giriş başarısız: ' + (error.message || 'Bilinmeyen hata'));
+                        } catch (parseError) {
+                            console.log('JSON parse hatası:', parseError);
+                            alert('Giriş başarısız: ' + responseText);
+                        }
+                    }
+                } catch (error) {
+                    console.error('Login error:', error);
+                    alert('Giriş yapılırken hata oluştu: ' + error.message);
+                }
+            });
+        });
+    </script>
 </body>
 </html>
