@@ -261,6 +261,45 @@ namespace ExcelUploader.Controllers
 
 
         // Test all connections endpoint
+        [HttpGet("details")]
+        public async Task<ActionResult> GetAllConnectionsDetails()
+        {
+            try
+            {
+                var connections = await _portService.GetAllConnectionsAsync();
+                
+                var connectionDetails = connections.Select(conn => new
+                {
+                    Id = conn.Id,
+                    Name = conn.Name,
+                    ServerName = conn.ServerName,
+                    Port = conn.Port,
+                    DatabaseName = conn.DatabaseName,
+                    Username = conn.Username,
+                    Password = "***HIDDEN***", // Hide password for security
+                    Description = conn.Description,
+                    IsActive = conn.IsActive,
+                    CreatedDate = conn.CreatedDate,
+                    UpdatedDate = conn.UpdatedDate,
+                    LastTestDate = conn.LastTestDate,
+                    LastTestResult = conn.LastTestResult,
+                    ConnectionString = $"Server={conn.ServerName}{(conn.Port != 1433 ? $",{conn.Port}" : "")};Database={conn.DatabaseName};User Id={conn.Username};Password=***;TrustServerCertificate=true;"
+                }).ToList();
+
+                return Ok(new
+                {
+                    TotalConnections = connections.Count,
+                    ActiveConnections = connections.Count(c => c.IsActive),
+                    InactiveConnections = connections.Count(c => !c.IsActive),
+                    Connections = connectionDetails
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Veritabanı bağlantı detayları alınırken hata oluştu");
+                return StatusCode(500, "Veritabanı bağlantı detayları alınırken hata oluştu");
+            }
+        }
 
     }
 

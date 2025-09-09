@@ -76,37 +76,6 @@
     <!-- Main Content -->
     <main class="main-content">
         <div class="container">
-            <!-- Create New Table -->
-            <div class="card">
-                <div class="card-header">
-                    <h2 class="card-title">
-                        <i class="fas fa-plus"></i> Yeni Tablo Oluştur
-                    </h2>
-                </div>
-                <div class="card-body">
-                    <form id="createTableForm">
-                        <div class="form-group">
-                            <label for="tableName" class="form-label">
-                                <i class="fas fa-table"></i> Tablo Adı
-                            </label>
-                            <input type="text" id="tableName" name="tableName" class="form-control" required>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="tableDescription" class="form-label">
-                                <i class="fas fa-comment"></i> Açıklama
-                            </label>
-                            <textarea id="tableDescription" name="tableDescription" class="form-control" rows="3"></textarea>
-                        </div>
-
-                        <div class="form-group">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-plus"></i> Tablo Oluştur
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
 
             <!-- Existing Tables -->
             <div class="card">
@@ -145,10 +114,7 @@
 
         // Setup event listeners
         function setupEventListeners() {
-            document.getElementById('createTableForm').addEventListener('submit', function(e) {
-                e.preventDefault();
-                createTable();
-            });
+            // No form event listeners needed since create table form was removed
         }
 
         // Load tables
@@ -183,7 +149,7 @@
                     <div style="text-align: center; color: #666; padding: 2rem;">
                         <i class="fas fa-table" style="font-size: 2rem; margin-bottom: 1rem;"></i>
                         <p>Henüz tablo oluşturulmamış</p>
-                        <p>Yukarıdaki formu kullanarak ilk tablonuzu oluşturun</p>
+                        <p>Excel yükleme sayfasından tablo oluşturabilirsiniz</p>
                     </div>
                 `;
                 return;
@@ -230,23 +196,6 @@
             `).join('');
         }
 
-        // Create table
-        async function createTable() {
-            const tableName = document.getElementById('tableName').value;
-            const description = document.getElementById('tableDescription').value;
-
-            if (!tableName.trim()) {
-                showMessage('Lütfen tablo adı girin', 'error');
-                return;
-            }
-
-            // Redirect to upload page with table name and description
-            const params = new URLSearchParams({
-                tableName: tableName,
-                description: description
-            });
-            window.location.href = `/upload.html?${params.toString()}`;
-        }
 
         // View table
         function viewTable(tableName) {

@@ -82,82 +82,54 @@
                     <div class="card text-center">
                         <div class="card-body">
                             <h5 class="card-title">
-                                <i class="fas fa-calendar-day text-primary"></i> Bugün
-                            </h5>
-                            <div class="stats-container">
-                                <div class="stat-item">
-                                    <span class="stat-number" id="todayTotal">-</span>
-                                    <span class="stat-label">Toplam</span>
-                                </div>
-                                <div class="stat-item">
-                                    <span class="stat-number text-success" id="todaySuccess">-</span>
-                                    <span class="stat-label">Başarılı</span>
-                                </div>
-                                <div class="stat-item">
-                                    <span class="stat-number text-danger" id="todayFailed">-</span>
-                                    <span class="stat-label">Başarısız</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="card text-center">
-                        <div class="card-body">
-                            <h5 class="card-title">
-                                <i class="fas fa-calendar-week text-info"></i> Bu Hafta
-                            </h5>
-                            <div class="stats-container">
-                                <div class="stat-item">
-                                    <span class="stat-number" id="weekTotal">-</span>
-                                    <span class="stat-label">Toplam</span>
-                                </div>
-                                <div class="stat-item">
-                                    <span class="stat-number text-success" id="weekSuccess">-</span>
-                                    <span class="stat-label">Başarılı</span>
-                                </div>
-                                <div class="stat-item">
-                                    <span class="stat-number text-danger" id="weekFailed">-</span>
-                                    <span class="stat-label">Başarısız</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="card text-center">
-                        <div class="card-body">
-                            <h5 class="card-title">
-                                <i class="fas fa-calendar-alt text-warning"></i> Bu Ay
-                            </h5>
-                            <div class="stats-container">
-                                <div class="stat-item">
-                                    <span class="stat-number" id="monthTotal">-</span>
-                                    <span class="stat-label">Toplam</span>
-                                </div>
-                                <div class="stat-item">
-                                    <span class="stat-number text-success" id="monthSuccess">-</span>
-                                    <span class="stat-label">Başarılı</span>
-                                </div>
-                                <div class="stat-item">
-                                    <span class="stat-number text-danger" id="monthFailed">-</span>
-                                    <span class="stat-label">Başarısız</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-3">
-                    <div class="card text-center">
-                        <div class="card-body">
-                            <h5 class="card-title">
-                                <i class="fas fa-chart-line text-success"></i> Genel
+                                <i class="fas fa-list text-primary"></i> Toplam Giriş
                             </h5>
                             <div class="stats-container">
                                 <div class="stat-item">
                                     <span class="stat-number" id="totalLogs">-</span>
                                     <span class="stat-label">Toplam Kayıt</span>
                                 </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-check-circle text-success"></i> Başarılı Giriş
+                            </h5>
+                            <div class="stats-container">
+                                <div class="stat-item">
+                                    <span class="stat-number text-success" id="successfulLogs">-</span>
+                                    <span class="stat-label">Başarılı</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-times-circle text-danger"></i> Başarısız Giriş
+                            </h5>
+                            <div class="stats-container">
+                                <div class="stat-item">
+                                    <span class="stat-number text-danger" id="failedLogs">-</span>
+                                    <span class="stat-label">Başarısız</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="card-title">
+                                <i class="fas fa-users text-info"></i> Kullanıcılar
+                            </h5>
+                            <div class="stats-container">
                                 <div class="stat-item">
                                     <span class="stat-number text-primary" id="uniqueUsers">-</span>
                                     <span class="stat-label">Benzersiz Kullanıcı</span>
@@ -303,17 +275,11 @@
 
         // Update statistics display
         function updateStats(stats) {
-            document.getElementById('todayTotal').textContent = stats.today.total;
-            document.getElementById('todaySuccess').textContent = stats.today.successful;
-            document.getElementById('todayFailed').textContent = stats.today.failed;
-
-            document.getElementById('weekTotal').textContent = stats.thisWeek.total;
-            document.getElementById('weekSuccess').textContent = stats.thisWeek.successful;
-            document.getElementById('weekFailed').textContent = stats.thisWeek.failed;
-
-            document.getElementById('monthTotal').textContent = stats.thisMonth.total;
-            document.getElementById('monthSuccess').textContent = stats.thisMonth.successful;
-            document.getElementById('monthFailed').textContent = stats.thisMonth.failed;
+            // Display general statistics from database
+            document.getElementById('totalLogs').textContent = stats.totalLogs || 0;
+            document.getElementById('successfulLogs').textContent = stats.successfulLogs || 0;
+            document.getElementById('failedLogs').textContent = stats.failedLogs || 0;
+            document.getElementById('uniqueUsers').textContent = stats.uniqueUsers || 0;
         }
 
         // Load login logs
