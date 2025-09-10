@@ -270,6 +270,61 @@
         let currentConnections = [];
         let currentConnectionId = null;
 
+        // Utility functions for connections page
+        function getToken() {
+            return localStorage.getItem('authToken');
+        }
+
+        function showError(message) {
+            showAlert(message, 'danger');
+        }
+
+        function showSuccess(message) {
+            showAlert(message, 'success');
+        }
+
+        function showAlert(message, type = 'info') {
+            const alertContainer = document.getElementById('alertContainer') || createAlertContainer();
+            
+            const alert = document.createElement('div');
+            alert.className = `alert alert-${type}`;
+            alert.innerHTML = `
+                ${message}
+                <button type="button" class="close" onclick="this.parentElement.remove()">&times;</button>
+            `;
+            
+            alertContainer.appendChild(alert);
+            
+            // Auto remove after 5 seconds
+            setTimeout(() => {
+                if (alert.parentElement) {
+                    alert.remove();
+                }
+            }, 5000);
+        }
+
+        function createAlertContainer() {
+            const container = document.createElement('div');
+            container.id = 'alertContainer';
+            container.style.position = 'fixed';
+            container.style.top = '20px';
+            container.style.right = '20px';
+            container.style.zIndex = '9999';
+            container.style.maxWidth = '400px';
+            
+            document.body.appendChild(container);
+            return container;
+        }
+
+        function checkAuth() {
+            const token = getToken();
+            if (!token) {
+                window.location.href = '/login';
+                return false;
+            }
+            return true;
+        }
+
         // Load connections on page load
         document.addEventListener('DOMContentLoaded', async function() {
             checkAuth();
@@ -308,7 +363,6 @@
                      };
                     
                     const response = await fetch('/api/databaseconnection', {
-                        method: 'POST',
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -500,7 +554,7 @@
 
         async function testConnection(id) {
             try {
-                const response = await fetch(`/api/databaseconnection/${id}/test`, {
+                const response = await fetch(`/api/databaseconnection/${id}/test-connection`, {
                     method: 'POST',
                     headers: {
                         'Authorization': `Bearer ${getToken()}`
